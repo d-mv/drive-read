@@ -3,7 +3,7 @@
  * Content-Security-Policy proposed in the architecture doc, so CSP violations show up
  * while exercising GIS, the Picker and the Drive API.
  *
- * Run: bun spikes/drive-access/serve.ts (reads spikes/drive-access/.env)
+ * Run from the repo root: bun spikes/drive-access/serve.ts (Bun loads the root .env)
  */
 
 const dir = import.meta.dir

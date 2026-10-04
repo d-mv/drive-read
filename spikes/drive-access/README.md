@@ -13,8 +13,8 @@ architecture doc. Not part of the app; delete once the answers are recorded.
 
 1. Google Cloud: Drive API + Picker API enabled, a Web OAuth client with origin
    `http://localhost:5173`, an API key restricted to that origin.
-2. `cp spikes/drive-access/.env.example spikes/drive-access/.env` and fill it in.
-3. Free port 5173 (the OAuth origin), then from `spikes/drive-access/`: `bun serve.ts`
+2. Fill `VITE_GOOGLE_*` in the repo-root `.env` (see `.env.example`).
+3. Free port 5173 (the OAuth origin), then from the repo root: `bun spikes/drive-access/serve.ts`
 4. Open http://localhost:5173 and run steps 1–3. "Copy log" copies the results.
 
 Pick a folder you know holds EPUB/PDF files you have **not** picked before,

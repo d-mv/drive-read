@@ -1,0 +1,283 @@
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
+import { keyAction, keyInput } from '@/app/keymap'
+import AppIcon from '@/components/AppIcon.vue'
+import ContentsPanel from '@/components/ContentsPanel.vue'
+import ProgressSegments from '@/components/ProgressSegments.vue'
+import TextSettings from '@/components/TextSettings.vue'
+import { formatPercent } from '@/domain/book'
+import { paginatorLayout } from '@/domain/settings'
+import type { Locator } from '@/services/engine/types'
+import { isSome } from '@/shared/result'
+import { READER_FONTS } from '@/styles/fonts'
+import { readerCss } from '@/styles/reader-theme'
+import { useLibrary } from '@/stores/library'
+import { type ReaderError, useReader } from '@/stores/reader'
+import { useSettings } from '@/stores/settings'
+
+/** The reader (canvas: "Reader, light", "Reader with contents, dark", phone "Reader"). */
+const { id } = defineProps<{ id: string }>()
+
+const router = useRouter()
+const reader = useReader()
+const settings = useSettings()
+const library = useLibrary()
+
+const host = ref<HTMLElement>()
+const panel = ref<'none' | 'contents' | 'settings'>('none')
+const contentsButton = ref<HTMLButtonElement>()
+const settingsButton = ref<HTMLButtonElement>()
+
+const starts = computed(() => reader.toc.map((t) => t.start))
+const fraction = computed(() => reader.position?.fraction ?? 0)
+const chapterLabel = computed(() =>
+  reader.chapter ? reader.toc[reader.chapter.index]?.label : undefined,
+)
+const pad = (n: number) => String(n).padStart(2, '0')
+
+const ERRORS: Record<ReaderError, string> = {
+  'not-found': 'This book is not in your library.',
+  'missing-file':
+    'The file for this book is no longer on this device. The browser may have cleared it to free space.',
+  unreadable: "This file can't be opened. It may be protected or damaged.",
+}
+
+function token(name: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+/** Theme and text settings, pushed into the book frame whenever either changes. */
+function applyTheme() {
+  const s = settings.value
+  reader.setTheme({
+    css: readerCss(
+      {
+        paper: token('--color-paper'),
+        ink: token('--color-ink'),
+        ink2: token('--color-ink2'),
+        signal: token('--color-signal'),
+      },
+      s,
+      READER_FONTS,
+    ),
+    maxInlineSize: paginatorLayout(s.margins).maxInlineSize,
+  })
+}
+watch(() => [settings.value, settings.resolvedTheme], applyTheme, { deep: true, immediate: true })
+
+async function open() {
+  panel.value = 'none'
+  if (host.value) await reader.open(id, host.value, { onKeydown })
+}
+
+function back() {
+  void router.push({ name: 'library' })
+}
+
+async function closePanel() {
+  const was = panel.value
+  panel.value = 'none'
+  await nextTick()
+  ;(was === 'contents' ? contentsButton : settingsButton).value?.focus()
+}
+
+function togglePanel(p: 'contents' | 'settings') {
+  if (panel.value === p) void closePanel()
+  else panel.value = p
+}
+
+async function goTo(loc: Locator) {
+  await reader.goTo(loc)
+  // On a phone the contents cover the page: close them so the reader sees where they went.
+  if (matchMedia('(max-width: 767px)').matches) panel.value = 'none'
+}
+
+function onKeydown(e: KeyboardEvent) {
+  const action = keyAction('reader', keyInput(e))
+  if (!isSome(action) || reader.status.kind !== 'ready') return
+  // Inside a panel only Escape (handled by the panel) applies.
+  if (panel.value !== 'none' && action.value !== 'back') return
+  const run: Partial<Record<typeof action.value, () => void>> = {
+    next: () => void reader.next(),
+    prev: () => void reader.prev(),
+    contents: () => togglePanel('contents'),
+    settings: () => togglePanel('settings'),
+    theme: () => void settings.toggleTheme(),
+    back: () => (panel.value !== 'none' ? void closePanel() : back()),
+  }
+  const fn = run[action.value]
+  if (!fn) return
+  e.preventDefault()
+  fn()
+}
+
+async function removeMissing() {
+  await library.remove(id)
+  back()
+}
+
+onMounted(() => {
+  addEventListener('keydown', onKeydown)
+  void open()
+})
+watch(() => id, open)
+onBeforeUnmount(() => {
+  removeEventListener('keydown', onKeydown)
+  reader.close()
+})
+</script>
+
+<template>
+  <div class="flex h-dvh flex-col overflow-hidden">
+    <header
+      class="flex h-14 flex-none items-center gap-1 border-b border-rule px-2 sm:gap-2 sm:px-[clamp(8px,2vw,28px)]"
+    >
+      <button
+        type="button"
+        aria-label="Back to library"
+        class="flex size-11 flex-none items-center justify-center"
+        @click="back"
+      >
+        <AppIcon name="back" />
+      </button>
+      <div class="mr-auto flex min-w-0 items-baseline gap-2.5">
+        <span class="truncate font-medium">{{ reader.book?.title }}</span>
+        <span class="hidden truncate text-sm text-ink2 sm:inline">{{ reader.book?.author }}</span>
+      </div>
+      <button
+        ref="contentsButton"
+        type="button"
+        aria-label="Contents"
+        :aria-pressed="panel === 'contents'"
+        :disabled="reader.status.kind !== 'ready'"
+        class="flex size-11 flex-none items-center justify-center rounded-ctl disabled:opacity-40"
+        :class="panel === 'contents' && 'bg-ink text-paper'"
+        @click="togglePanel('contents')"
+      >
+        <AppIcon name="contents" />
+      </button>
+      <button
+        ref="settingsButton"
+        type="button"
+        aria-label="Text settings"
+        :aria-pressed="panel === 'settings'"
+        class="flex size-11 flex-none items-center justify-center rounded-ctl font-read text-[17px]"
+        :class="panel === 'settings' && 'bg-ink text-paper'"
+        @click="togglePanel('settings')"
+      >
+        Aa
+      </button>
+      <button
+        type="button"
+        aria-label="Switch theme"
+        class="hidden size-11 flex-none items-center justify-center rounded-ctl sm:flex"
+        @click="settings.toggleTheme()"
+      >
+        <AppIcon name="theme" />
+      </button>
+    </header>
+
+    <div class="relative flex min-h-0 flex-1">
+      <ContentsPanel
+        v-if="panel === 'contents'"
+        :toc="reader.toc"
+        :current-index="reader.chapter?.index ?? null"
+        class="absolute inset-0 z-10 md:static md:w-[320px] md:min-w-[240px] md:flex-none md:border-r md:border-rule"
+        @go="goTo"
+        @close="closePanel"
+      />
+
+      <div class="hidden flex-[0_0_clamp(44px,6vw,88px)] items-center justify-center md:flex">
+        <button
+          type="button"
+          aria-label="Previous page"
+          class="flex size-11 items-center justify-center text-ink2"
+          @click="reader.prev()"
+        >
+          <AppIcon name="chevron-left" />
+        </button>
+      </div>
+
+      <main class="relative min-w-0 flex-1 overflow-hidden">
+        <div ref="host" class="absolute inset-0" :aria-busy="reader.status.kind === 'loading'" />
+        <div
+          v-if="reader.status.kind === 'error'"
+          role="alert"
+          class="absolute inset-0 flex flex-col items-start justify-center gap-4 bg-paper px-7 sm:mx-auto sm:max-w-[480px]"
+        >
+          <p class="text-base">{{ ERRORS[reader.status.error] }}</p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              class="h-11 rounded-ctl bg-ink px-4 font-medium text-paper"
+              @click="back"
+            >
+              Back to library
+            </button>
+            <button
+              v-if="reader.status.error === 'missing-file'"
+              type="button"
+              class="h-11 rounded-ctl border border-ink px-4"
+              @click="removeMissing"
+            >
+              Remove book
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <div class="hidden flex-[0_0_clamp(44px,6vw,88px)] items-center justify-center md:flex">
+        <button
+          type="button"
+          aria-label="Next page"
+          class="flex size-11 items-center justify-center text-ink2"
+          @click="reader.next()"
+        >
+          <AppIcon name="chevron-right" />
+        </button>
+      </div>
+
+      <TextSettings
+        v-if="panel === 'settings'"
+        :settings="settings.value"
+        class="absolute right-0 bottom-0 left-0 z-20 shadow-[0_-8px_24px_rgb(0_0_0/0.12)] sm:top-2 sm:right-[clamp(8px,2vw,28px)] sm:bottom-auto sm:left-auto sm:rounded-ctl sm:shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
+        @typeface="settings.setTypeface"
+        @size="settings.stepSize"
+        @line-height="settings.stepLineHeight"
+        @margins="settings.setMargins"
+        @align="settings.setAlign"
+        @theme="settings.setTheme"
+        @close="closePanel"
+      />
+    </div>
+
+    <footer
+      class="flex flex-none flex-col gap-2.5 border-t border-rule px-5 pt-3.5 pb-[max(16px,env(safe-area-inset-bottom))] sm:px-[clamp(16px,3vw,40px)]"
+    >
+      <ProgressSegments :starts="starts" :fraction="fraction" />
+      <div
+        class="tabular flex flex-wrap items-baseline gap-x-3.5 gap-y-1 font-mono text-xs text-ink2"
+      >
+        <span v-if="reader.chapter" class="text-ink"
+          >{{ pad(reader.chapter.index + 1) }} / {{ pad(reader.toc.length) }}</span
+        >
+        <span v-if="chapterLabel" class="hidden truncate font-ui text-[13px] sm:inline">{{
+          chapterLabel
+        }}</span>
+        <span v-if="reader.chapterMinutesLeft !== null" class="ml-auto">
+          {{
+            reader.chapterMinutesLeft < 1 ? 'Under a minute' : `${reader.chapterMinutesLeft} min`
+          }}
+          left in chapter
+        </span>
+        <span
+          class="min-w-9 text-right text-ink"
+          :class="reader.chapterMinutesLeft === null && 'ml-auto'"
+          >{{ formatPercent(fraction) }}</span
+        >
+      </div>
+    </footer>
+  </div>
+</template>

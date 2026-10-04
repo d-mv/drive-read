@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+/* Semantic tokens from the design canvas (architecture doc, Theming). Dark mode swaps values,
+   so components rarely need a dark: variant. */
+@theme {
+  --color-paper: #f3f0e8; /* ground */
+  --color-panel: #e9e5da; /* side panels, notices */
+  --color-ink: #1c1b19; /* text, selected controls */
+  --color-ink2: #5c5850; /* secondary text */
+  --color-rule: #ccc6b8; /* hairlines */
+  --color-track: #ada695; /* unread part of a progress bar */
+  --color-signal: #d9480f; /* reading progress, nothing else */
+
+  --color-cover-dark: #2a2825;
+  --color-cover-dark-ink: #ede9df;
+  --color-cover-pale: #ddd7c8;
+  --color-cover-mid: #b8b1a1;
+
+  --font-ui: 'Space Grotesk Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --font-read: 'Literata Variable', Georgia, serif;
+
+  --radius-ctl: 3px;
+}
+
+[data-theme='dark'] {
+  --color-paper: #171614;
+  --color-panel: #1f1e1b;
+  --color-ink: #e6e2d8;
+  --color-ink2: #a39e92;
+  --color-rule: #383630;
+  --color-track: #565248;
+  --color-signal: #f0672a;
+  color-scheme: dark;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-ui antialiased;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
