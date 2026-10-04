@@ -18,19 +18,24 @@ button { min-height: 44px; padding: 0 16px; border: 1px solid var(--ink); border
 button:disabled { opacity: 0.4; cursor: default }
 #log { margin: 0; padding: 12px; border: 1px solid var(--rule); min-height: 240px; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 ui-monospace, Menlo, monospace }
 .verdict { font-weight: 600; color: var(--signal) }
+#folder { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule) }
+#folder button { width: 100%; min-height: 40px; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; text-align: left; padding: 0 8px }
 </style>
 </head>
 <body>
 <main>
 <h1>Drive Read: access spike</h1>
-<p>Checks folder access under <code>drive.file</code>, the sign-in popup (also from an installed app), and the proposed CSP. Run the steps in order.</p>
+<p>Drive API only (<code>drive.readonly</code> + <code>drive.appdata</code>, no Picker): sign-in popup (also from an installed app), folder browsing and downloads, a whole-Drive book search, the appData folder, and the CSP.</p>
 <div class="row">
 <button id="connect" type="button">1. Connect Drive</button>
-<button id="pick" type="button" disabled>2. Pick a folder (and/or books)</button>
-<button id="appdata" type="button" disabled>3. appData round-trip</button>
+<button id="browse" type="button" disabled>2. Browse from My Drive</button>
+<button id="books" type="button" disabled>3. Find all books</button>
+<button id="appdata" type="button" disabled>4. appData round-trip</button>
 <button id="copy" type="button">Copy log</button>
 </div>
 <p id="mode"></p>
+<p id="trail"></p>
+<ul id="folder"></ul>
 <pre id="log" aria-live="polite"></pre>
 </main>
 <script type="module" src="/spike.js"></script>

@@ -25,3 +25,11 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **Theme persistence:** the localStorage theme mirror wins over IndexedDB on load. An e2e test found that a reload right after a change could revert the theme, because the IndexedDB write hadn't landed yet.
 - **One reading column.** foliate defaults to two-page spreads; the canvas shows one centred 620px column.
 - **Phone:** no tap zones; foliate's swipe handles paging. The grid/list toggle is desktop-only, and the phone always lists.
+
+## 2026-10-04: No Google Picker (user decision)
+
+- **Scope.** Without the Picker, `drive.file` can't see existing books, so the app uses `drive.readonly` and `drive.appdata`. `drive.readonly` is a restricted scope: it works for the owner and up to 100 test users behind Google's unverified-app screen, and a public release needs Google's security assessment.
+- **No API key.** Every Drive call carries the user's OAuth token, so a key adds nothing, and one shipped in the bundle could be used to spend the project's quota. The app ID (project number) was only needed by the Picker.
+- **CSP.** `apis.google.com` and `docs.google.com` are removed.
+- **New UI.** The app needs its own Drive browser screen ("Add from Drive"), which the design canvas doesn't have.
+- **Verify task moot.** "Does picking a folder under drive.file grant access to its files?" no longer applies: with `drive.readonly`, importing a folder means listing its children.

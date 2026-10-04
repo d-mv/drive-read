@@ -3,22 +3,25 @@
 Throwaway page that answers the three "verify before building" questions in the
 architecture doc. Not part of the app; delete once the answers are recorded.
 
+Decision 2026-10-04: **no Google Picker**. The app uses the Drive API directly with
+`drive.readonly` (restricted scope: fine for the owner and up to 100 test users behind the
+unverified-app screen; public release needs Google's security assessment) plus `drive.appdata`.
+
 | Question | How the page answers it |
 |---|---|
-| Does picking a folder under `drive.file` grant access to its files? | Pick a folder → lists its children, downloads the first bytes of up to 3 books, probes one subfolder |
+| Can the app browse folders and download books with `drive.readonly`? | Step 2 browses from My Drive (click folders, click a book to download its first bytes); step 3 searches all of Drive for EPUB/PDF |
 | Does the GIS popup work in an installed PWA on Android? | Step 1 from the installed app; the log shows the display mode |
-| Does the proposed CSP allow GIS, the Picker and the Drive API? | Served with the doc's CSP verbatim; every violation is logged |
+| Does the CSP allow GIS and the Drive API? | Served with the app's CSP; every violation is logged |
+| Do sync records work? | Step 4 writes, lists, reads and deletes a file in the appData folder |
 
 ## Run
 
-1. Google Cloud: Drive API + Picker API enabled, a Web OAuth client with origin
-   `http://localhost:5173`, an API key restricted to that origin.
-2. Fill `VITE_GOOGLE_*` in the repo-root `.env` (see `.env.example`).
+1. Google Cloud: Drive API enabled; OAuth consent screen lists the scopes `drive.readonly` and
+   `drive.appdata`, with your account as a test user; Web OAuth client with origin
+   `http://localhost:5173`. No API key is needed.
+2. Set `VITE_GOOGLE_CLIENT_ID` in the repo-root `.env`.
 3. Free port 5173 (the OAuth origin), then from the repo root: `bun spikes/drive-access/serve.ts`
-4. Open http://localhost:5173 and run steps 1–3. "Copy log" copies the results.
-
-Pick a folder you know holds EPUB/PDF files you have **not** picked before,
-otherwise earlier per-file grants make the folder look like it works.
+4. Open http://localhost:5173 and run steps 1–4. "Copy log" copies the results.
 
 ## Android (installed app)
 

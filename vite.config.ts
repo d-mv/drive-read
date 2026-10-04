@@ -16,9 +16,9 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
  */
 export const CSP = [
   "default-src 'self'",
-  "script-src 'self' https://accounts.google.com https://apis.google.com",
+  "script-src 'self' https://accounts.google.com",
   "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://logger-api.mlnkv.net",
-  'frame-src blob: https://accounts.google.com https://docs.google.com',
+  'frame-src blob: https://accounts.google.com',
   "img-src 'self' blob: data:",
   "style-src 'self' 'unsafe-inline' blob:",
   "font-src 'self' blob: data:",

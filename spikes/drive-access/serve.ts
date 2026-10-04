@@ -8,28 +8,20 @@
 
 const dir = import.meta.dir
 
-// Verbatim from the architecture doc, Deployment > Caddy.
+// The architecture doc's CSP minus the Picker hosts (apis.google.com, docs.google.com).
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' https://accounts.google.com https://apis.google.com",
+  "script-src 'self' https://accounts.google.com",
   "connect-src 'self' https://www.googleapis.com https://accounts.google.com",
-  'frame-src blob: https://accounts.google.com https://docs.google.com',
+  'frame-src blob: https://accounts.google.com',
   "img-src 'self' blob: data:",
   "style-src 'self' 'unsafe-inline' blob:",
   "font-src 'self' blob: data:",
   "worker-src 'self' blob:",
 ].join('; ')
 
-const config = {
-  clientId: Bun.env.VITE_GOOGLE_CLIENT_ID ?? '',
-  apiKey: Bun.env.VITE_GOOGLE_API_KEY ?? '',
-  appId: Bun.env.VITE_GOOGLE_APP_ID ?? '',
-}
-
-const missing = ['VITE_GOOGLE_CLIENT_ID', 'VITE_GOOGLE_API_KEY', 'VITE_GOOGLE_APP_ID'].filter(
-  (k) => !Bun.env[k],
-)
-if (missing.length > 0) console.warn(`Missing in .env: ${missing.join(', ')}`)
+const config = { clientId: Bun.env.VITE_GOOGLE_CLIENT_ID ?? '' }
+if (!config.clientId) console.warn('Missing in .env: VITE_GOOGLE_CLIENT_ID')
 
 const built = await Bun.build({ entrypoints: [`${dir}/spike.ts`], target: 'browser' })
 if (!built.success) throw new AggregateError(built.logs, 'spike.ts build failed')

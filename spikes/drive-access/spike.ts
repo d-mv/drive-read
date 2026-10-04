@@ -1,28 +1,28 @@
 /**
- * Drive access spike. Answers three questions from the architecture doc:
- *  1. Does picking a folder under drive.file grant access to the files inside it?
+ * Drive access spike, Drive API only (no Google Picker). Answers:
+ *  1. With drive.readonly, can the app browse folders and download the books inside?
  *  2. Does the GIS sign-in popup work (incl. from an installed PWA on Android)?
- *  3. Does the proposed CSP allow GIS, the Picker and the Drive API?
+ *  3. Does the CSP allow GIS and the Drive API?
+ *  4. Does the appDataFolder round-trip work (sync records)?
  * Never logs the access token.
  */
 
-type Config = { clientId: string; apiKey: string; appId: string }
+type Config = { clientId: string }
 type TokenResponse = { access_token?: string; expires_in?: number; scope?: string; error?: string }
-type PickedDoc = { id: string; name: string; mimeType: string }
 type DriveFile = { id: string; name: string; mimeType: string; size?: string; md5Checksum?: string }
 
-// Minimal shapes of the Google globals this spike touches.
+// Minimal shape of the GIS global this spike touches.
 declare const google: any
-declare const gapi: any
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.appdata',
 ]
 const FOLDER = 'application/vnd.google-apps.folder'
 const BOOK_TYPES = ['application/epub+zip', 'application/pdf']
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
+const FIELDS = 'nextPageToken,files(id,name,mimeType,size,md5Checksum)'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const logEl = $<HTMLPreElement>('log')
@@ -68,12 +68,12 @@ async function driveJson<T>(url: string): Promise<{ ok: true; value: T } | { ok:
   return { ok: true, value: (await res.json()) as T }
 }
 
+const enable = (...ids: string[]) => ids.forEach((id) => ($<HTMLButtonElement>(id).disabled = false))
+
 // --- 1. Connect ----------------------------------------------------------------
 
 const config: Config = await fetch('/config.json').then((r) => r.json())
-if (!config.clientId || !config.apiKey || !config.appId) {
-  log('config incomplete: fill spikes/drive-access/.env and restart the server', 'verdict')
-}
+if (!config.clientId) log('VITE_GOOGLE_CLIENT_ID missing in the root .env', 'verdict')
 
 $('connect').addEventListener('click', async () => {
   try {
@@ -90,8 +90,8 @@ $('connect').addEventListener('click', async () => {
         const all = google.accounts.oauth2.hasGrantedAllScopes(r, ...SCOPES)
         log(`token ok, expires_in=${r.expires_in}s, all scopes granted=${all}, scope="${r.scope}"`)
         verdict(`sign-in popup works in ${standalone ? 'INSTALLED APP' : 'browser tab'}`)
-        $<HTMLButtonElement>('pick').disabled = false
-        $<HTMLButtonElement>('appdata').disabled = false
+        enable('browse', 'books', 'appdata')
+        void browse('root', 'My Drive')
       },
       error_callback: (e: { type: string; message?: string }) =>
         log(`GIS error_callback: ${e.type} ${e.message ?? ''}`, 'verdict'),
@@ -103,89 +103,93 @@ $('connect').addEventListener('click', async () => {
   }
 })
 
-// --- 2. Pick and probe -----------------------------------------------------------
+// --- 2. Browse folders -------------------------------------------------------------
 
-async function loadPicker(): Promise<void> {
-  if (!('gapi' in window)) await loadScript('https://apis.google.com/js/api.js')
-  await new Promise<void>((resolve) => gapi.load('picker', () => resolve()))
+const trail: { id: string; name: string }[] = []
+
+async function listChildren(folderId: string): Promise<DriveFile[] | null> {
+  const types = [FOLDER, ...BOOK_TYPES].map((t) => `mimeType = '${t}'`).join(' or ')
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed = false and (${types})`)
+  const files: DriveFile[] = []
+  let page = ''
+  do {
+    const r = await driveJson<{ files: DriveFile[]; nextPageToken?: string }>(
+      `${API}/files?q=${q}&pageSize=200&orderBy=folder,name&fields=${FIELDS}${page ? `&pageToken=${page}` : ''}`,
+    )
+    if (!r.ok) {
+      log(`list "${folderId}": HTTP ${r.status} ${r.body}`, 'verdict')
+      return null
+    }
+    files.push(...r.value.files)
+    page = r.value.nextPageToken ?? ''
+  } while (page)
+  return files
 }
 
-$('pick').addEventListener('click', async () => {
-  try {
-    await loadPicker()
-    const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-      .setIncludeFolders(true)
-      .setSelectFolderEnabled(true)
-      .setMimeTypes([...BOOK_TYPES, FOLDER].join(','))
-    new google.picker.PickerBuilder()
-      .addView(view)
-      .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-      .setOAuthToken(token)
-      .setDeveloperKey(config.apiKey)
-      .setAppId(config.appId)
-      .setOrigin(location.origin)
-      .setCallback(async (data: any) => {
-        if (data.action !== google.picker.Action.PICKED) return
-        const docs: PickedDoc[] = data.docs.map((d: any) => ({ id: d.id, name: d.name, mimeType: d.mimeType }))
-        log(`picked ${docs.length}: ${docs.map((d) => `${d.name} [${d.mimeType}]`).join(', ')}`)
-        for (const d of docs) await (d.mimeType === FOLDER ? probeFolder(d, 0) : probeFile(d.id, d.name))
-      })
-      .build()
-      .setVisible(true)
-  } catch (e) {
-    log(`picker failed: ${(e as Error).message}`, 'verdict')
-  }
-})
+async function browse(folderId: string, name: string) {
+  const at = trail.findIndex((t) => t.id === folderId)
+  if (at >= 0) trail.splice(at + 1)
+  else trail.push({ id: folderId, name })
+  $('trail').textContent = trail.map((t) => t.name).join(' / ')
 
-async function probeFile(id: string, name: string): Promise<boolean> {
-  const res = await drive(`${API}/files/${id}?alt=media`, { headers: { range: 'bytes=0-3' } })
+  const files = await listChildren(folderId)
+  const list = $<HTMLUListElement>('folder')
+  list.replaceChildren()
+  if (!files) return
+  if (trail.length > 1) list.append(row('↑ up', () => browse(trail[trail.length - 2]!.id, trail[trail.length - 2]!.name)))
+  for (const f of files) {
+    if (f.mimeType === FOLDER) list.append(row(`[folder] ${f.name}`, () => browse(f.id, f.name)))
+    else list.append(row(`${f.name}  (${fmtSize(f.size)})`, () => probeFile(f)))
+  }
+  const books = files.filter((f) => f.mimeType !== FOLDER).length
+  log(`"${name}": ${files.length - books} folder(s), ${books} book(s)`)
+}
+
+function row(label: string, onClick: () => void) {
+  const li = document.createElement('li')
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.textContent = label
+  b.addEventListener('click', onClick)
+  li.append(b)
+  return li
+}
+
+const fmtSize = (s?: string) => (s ? `${(Number(s) / 1048576).toFixed(1)} MB` : '?')
+
+async function probeFile(f: DriveFile): Promise<boolean> {
+  const res = await drive(`${API}/files/${f.id}?alt=media`, { headers: { range: 'bytes=0-3' } })
   if (!res.ok) {
-    log(`  download "${name}": HTTP ${res.status}`)
+    log(`  download "${f.name}": HTTP ${res.status}`, 'verdict')
     return false
   }
   const head = new TextDecoder().decode(await res.arrayBuffer()).slice(0, 4)
-  log(`  download "${name}": HTTP ${res.status}, magic=${JSON.stringify(head)}`)
+  const expected = f.mimeType === 'application/pdf' ? '%PDF' : 'PK\u0003\u0004'
+  log(`  download "${f.name}": HTTP ${res.status}, magic ok=${head === expected}, md5=${f.md5Checksum ?? '-'}`)
   return true
 }
 
-async function probeFolder(folder: PickedDoc, depth: number): Promise<void> {
-  const pad = '  '.repeat(depth)
-  log(`${pad}folder "${folder.name}" (${folder.id})`)
-  const meta = await driveJson<{ capabilities?: { canListChildren?: boolean } }>(
-    `${API}/files/${folder.id}?fields=id,name,capabilities(canListChildren)`,
+$('browse').addEventListener('click', () => browse('root', 'My Drive'))
+
+// --- 3. Find every book in Drive ------------------------------------------------------
+
+$('books').addEventListener('click', async () => {
+  const types = BOOK_TYPES.map((t) => `mimeType = '${t}'`).join(' or ')
+  const q = encodeURIComponent(`trashed = false and (${types})`)
+  const started = performance.now()
+  const r = await driveJson<{ files: DriveFile[]; nextPageToken?: string }>(
+    `${API}/files?q=${q}&pageSize=1000&orderBy=modifiedTime desc&fields=${FIELDS}`,
   )
-  log(`${pad}  metadata: ${meta.ok ? `ok, canListChildren=${meta.value.capabilities?.canListChildren}` : `HTTP ${meta.status} ${meta.body}`}`)
+  if (!r.ok) return log(`book search: HTTP ${r.status} ${r.body}`, 'verdict')
+  const ms = Math.round(performance.now() - started)
+  log(`book search: ${r.value.files.length} book(s)${r.value.nextPageToken ? ' (more pages)' : ''} in ${ms} ms`)
+  const sample = r.value.files.slice(0, 3)
+  let ok = 0
+  for (const f of sample) if (await probeFile(f)) ok++
+  verdict(`drive.readonly: found ${r.value.files.length} book(s), downloaded ${ok}/${sample.length} sampled`)
+})
 
-  const q = encodeURIComponent(`'${folder.id}' in parents and trashed = false`)
-  const list = await driveJson<{ files: DriveFile[] }>(
-    `${API}/files?q=${q}&pageSize=100&fields=files(id,name,mimeType,size,md5Checksum)`,
-  )
-  if (!list.ok) return log(`${pad}  list children: HTTP ${list.status} ${list.body}`, 'verdict')
-
-  const files = list.value.files
-  log(`${pad}  list children: ${files.length} visible to the app`)
-  for (const f of files) log(`${pad}    - ${f.name} [${f.mimeType}] md5=${f.md5Checksum ?? '-'}`)
-
-  const books = files.filter((f) => BOOK_TYPES.includes(f.mimeType)).slice(0, 3)
-  let downloaded = 0
-  for (const b of books) if (await probeFile(b.id, b.name)) downloaded++
-
-  if (depth === 0) {
-    const sub = files.find((f) => f.mimeType === FOLDER)
-    if (sub) await probeFolder({ id: sub.id, name: sub.name, mimeType: FOLDER }, 1)
-  }
-
-  if (depth > 0) return
-  if (files.length === 0) {
-    verdict('folder pick gives NO visible children (or the folder is empty: retry with a folder you know holds books)')
-  } else if (books.length > 0 && downloaded === books.length) {
-    verdict(`folder pick GRANTS children: listed ${files.length}, downloaded ${downloaded}/${books.length}`)
-  } else {
-    verdict(`children listed (${files.length}) but downloads ${downloaded}/${books.length}: partial access`)
-  }
-}
-
-// --- 3. appData round-trip ---------------------------------------------------------
+// --- 4. appData round-trip ---------------------------------------------------------
 
 $('appdata').addEventListener('click', async () => {
   try {
@@ -199,9 +203,9 @@ $('appdata').addEventListener('click', async () => {
     })
     if (!created.ok) return log(`appData create: HTTP ${created.status} ${await created.text()}`, 'verdict')
     const file = (await created.json()) as { id: string; modifiedTime: string }
-    log(`appData create: ok ${file.id} at ${file.modifiedTime}`)
+    log(`appData create: ok at ${file.modifiedTime}`)
 
-    const list = await driveJson<{ files: DriveFile[] }>(`${API}/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)`)
+    const list = await driveJson<{ files: DriveFile[] }>(`${API}/files?spaces=appDataFolder&fields=files(id,name)`)
     log(`appData list: ${list.ok ? `${list.value.files.length} file(s)` : `HTTP ${list.status}`}`)
 
     const read = await drive(`${API}/files/${file.id}?alt=media`)
@@ -209,7 +213,7 @@ $('appdata').addEventListener('click', async () => {
 
     const del = await drive(`${API}/files/${file.id}`, { method: 'DELETE' })
     log(`appData delete: HTTP ${del.status}`)
-    verdict(`appData round-trip ${created.ok && list.ok && read.ok && del.ok ? 'OK' : 'FAILED'}`)
+    verdict(`appData round-trip ${list.ok && read.ok && del.ok ? 'OK' : 'FAILED'}`)
   } catch (e) {
     log(`appData failed: ${(e as Error).message}`, 'verdict')
   }

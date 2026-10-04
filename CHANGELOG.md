@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-10-04
+
+- No Google Picker: the CSP drops `apis.google.com` (script-src) and `docs.google.com` (frame-src).
+- `.env.example`: only `VITE_GOOGLE_CLIENT_ID` for Google; no API key, app ID or client secret.
+- Drive access spike rewritten for the Drive API with `drive.readonly` (folder browser, book search).
+
 ## 0.1.0 — 2026-10-04
 
 First build: steps 1–3 of the architecture doc (shell, local reader, library). No Google Drive yet.
