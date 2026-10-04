@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-10-05
+
+- "Add from Drive" has no "All books" view any more: it opens on My Drive and browses folders.
+  The search box shows matching books while it has text; "Back to folders" (or clearing it)
+  returns to the same folder.
+- Folders and books are sorted alphabetically by the name shown (author folders by "Mark Dawson",
+  not `dawson,-mark`; books by title), ignoring case and accents, numbers in natural order.
+  Folders come first.
+
 ## 0.2.1 — 2026-10-05
 
 - Fix: browsing folders could show books from all of Drive. The first "All books" listing (several

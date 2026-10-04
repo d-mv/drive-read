@@ -8,13 +8,16 @@ import AppNotice from '@/components/AppNotice.vue'
 import { useAuth } from '@/stores/auth'
 import { useDriveBrowser } from '@/stores/driveBrowser'
 
-/** "Add from Drive" (canvas: DriveBooks, DriveFolders, MobileDriveFolder, MobileDriveReconnect). */
+/**
+ * "Add from Drive" (canvas: DriveFolders, MobileDriveFolder, MobileDriveReconnect): folders from
+ * My Drive down. The search box shows matching books in place of the folder while it has text.
+ */
 const router = useRouter()
 const auth = useAuth()
 const browser = useDriveBrowser()
 
-const tab = ref<'books' | 'folders'>('books')
 const query = ref('')
+const searching = computed(() => query.value.trim() !== '')
 const message = ref<string | null>(null)
 
 const currentFolder = computed(() => browser.trail.at(-1))
@@ -25,7 +28,7 @@ const empty = computed(
 
 function load() {
   message.value = null
-  if (tab.value === 'books') return browser.search(query.value)
+  if (searching.value) return browser.search(query.value)
   const here = currentFolder.value ?? { id: 'root', name: 'My Drive' }
   return browser.openFolder(here.id, here.name)
 }
@@ -33,17 +36,8 @@ function load() {
 let debounce: ReturnType<typeof setTimeout> | undefined
 watch(query, () => {
   clearTimeout(debounce)
-  debounce = setTimeout(() => {
-    tab.value = 'books'
-    void browser.search(query.value)
-  }, 300)
+  debounce = setTimeout(() => void load(), 300)
 })
-
-function showTab(t: 'books' | 'folders') {
-  if (tab.value === t) return
-  tab.value = t
-  void load()
-}
 
 async function reconnect() {
   if (await auth.connect()) await load()
@@ -128,38 +122,23 @@ onBeforeUnmount(() => clearTimeout(debounce))
     <AppNotice v-if="message" :message="message" @dismiss="message = null" />
 
     <div
-      class="flex flex-wrap items-center gap-x-6 border-b border-rule px-5 pt-2 sm:px-[clamp(16px,3vw,40px)]"
+      v-if="searching"
+      class="flex items-center gap-4 border-b border-rule px-5 sm:px-[clamp(16px,3vw,40px)]"
     >
-      <div role="group" aria-label="Browse by" class="mr-auto flex gap-6">
-        <button
-          type="button"
-          :aria-pressed="tab === 'books'"
-          class="flex h-11 items-baseline gap-1.5 border-b-2 pt-3"
-          :class="tab === 'books' ? 'border-ink font-semibold' : 'border-transparent'"
-          @click="showTab('books')"
-        >
-          <span>All books</span>
-          <span
-            v-if="tab === 'books' && browser.status.kind === 'ready'"
-            class="tabular font-mono text-xs font-normal text-ink2"
-            >{{ browser.books.length }}</span
-          >
-        </button>
-        <button
-          type="button"
-          :aria-pressed="tab === 'folders'"
-          class="h-11 border-b-2 pt-3"
-          :class="tab === 'folders' ? 'border-ink font-semibold' : 'border-transparent'"
-          @click="showTab('folders')"
-        >
-          Folders
-        </button>
-      </div>
-      <span class="hidden font-mono text-xs text-ink2 sm:inline">EPUB and PDF in your Drive</span>
+      <span class="mr-auto truncate text-sm text-ink2"
+        >Books in your Drive matching “{{ query.trim() }}”</span
+      >
+      <button
+        type="button"
+        class="h-11 text-sm underline underline-offset-[3px]"
+        @click="query = ''"
+      >
+        Back to folders
+      </button>
     </div>
 
     <nav
-      v-if="tab === 'folders' && browser.trail.length > 0"
+      v-if="!searching && browser.trail.length > 0"
       aria-label="Folder path"
       class="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 pt-2 sm:px-[clamp(16px,3vw,40px)]"
     >
@@ -209,16 +188,14 @@ onBeforeUnmount(() => clearTimeout(debounce))
       </div>
       <p v-else-if="empty" class="px-2 py-10 text-ink2">
         {{
-          tab === 'books'
-            ? query
-              ? `No EPUB or PDF files in your Drive match “${query}”.`
-              : 'No EPUB or PDF files found in your Drive.'
+          searching
+            ? `No EPUB or PDF files in your Drive match “${query.trim()}”.`
             : 'This folder has no books or folders.'
         }}
       </p>
 
       <template v-else-if="browser.status.kind === 'ready'">
-        <ul v-if="tab === 'folders' && browser.folders.length > 0" class="m-0 list-none p-0">
+        <ul v-if="!searching && browser.folders.length > 0" class="m-0 list-none p-0">
           <li
             v-for="f in browser.folders"
             :key="f.id"
@@ -251,7 +228,7 @@ onBeforeUnmount(() => clearTimeout(debounce))
 
         <ul
           class="m-0 list-none p-0"
-          :class="tab === 'folders' && browser.folders.length > 0 && 'border-t border-rule'"
+          :class="!searching && browser.folders.length > 0 && 'border-t border-rule'"
         >
           <li
             v-for="b in browser.books"

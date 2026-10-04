@@ -44,3 +44,9 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **md5 isn't used yet for re-matching** a file uploaded again; it is stored on the record.
 - **Recursive folder add** stops after 500 folders, walking 4 at a time, and says so when it stops early.
 - **Token:** kept in memory and sessionStorage, as the doc says, and treated as expired 60 s before Google's expiry.
+
+## 2026-10-05: Drive browser changes (v0.2.1, v0.3.0)
+
+- **Fixed a race (v0.2.1).** A slow whole-Drive listing could overwrite the folder being browsed. Listings now carry a sequence number, and only the latest one updates the screen.
+- **No "All books" view (user request).** The screen opens on My Drive. Search stays: while the box has text it shows matching books, and the folder trail is kept, so clearing the search returns to the same folder. The canvas artboard "DriveBooks" is now out of date.
+- **Sorting is done in the app, not by Drive.** Drive's `orderBy=name` sorts by the raw name, which doesn't match the labels shown ("Mark Dawson" for `dawson,-mark`). The app sorts with `Intl.Collator` (base sensitivity, numeric).

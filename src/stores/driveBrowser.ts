@@ -39,6 +39,9 @@ export interface BrowserFolder {
   raw: string
 }
 
+/** Alphabetical as people expect: case and accents ignored, "Book 9" before "Book 10". */
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export const useDriveBrowser = defineStore('driveBrowser', () => {
@@ -54,7 +57,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
   const books = computed<BrowserBook[]>(() =>
     files.value
       .filter((f) => f.mimeType !== FOLDER_MIME)
-      .map((f) => {
+      .map((f): BrowserBook => {
         const isEpub = f.mimeType === 'application/epub+zip'
         const owned = inLibrary.value.has(f.id)
         return {
@@ -67,13 +70,16 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
           addable: isEpub && !owned,
           selected: selectedIds.value.includes(f.id),
         }
-      }),
+      })
+      .sort((a, b) => collator.compare(a.title, b.title) || collator.compare(a.name, b.name)),
   )
 
+  /** Shown above the books; sorted by the name on screen, not Drive's raw name. */
   const folders = computed<BrowserFolder[]>(() =>
     files.value
       .filter((f) => f.mimeType === FOLDER_MIME)
-      .map((f) => ({ id: f.id, label: folderLabel(f.name), raw: f.name })),
+      .map((f) => ({ id: f.id, label: folderLabel(f.name), raw: f.name }))
+      .sort((a, b) => collator.compare(a.label, b.label)),
   )
 
   const selected = computed(() => books.value.filter((b) => b.selected))
@@ -127,7 +133,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
 
   /** Every EPUB and PDF in Drive whose name contains `query`. */
   function search(query: string) {
-    trail.value = []
+    // The folder trail stays: clearing the search returns to the same folder.
     return load('search', (token) => useServices().drive.searchBooks(token, query))
   }
 

@@ -194,3 +194,37 @@ describe('responses that arrive late', () => {
     expect(browser.books.map((b) => b.id)).toEqual(['x'])
   })
 })
+
+describe('search inside the folder browser', () => {
+  it('keeps the folder trail, so clearing the search returns to the same folder', async () => {
+    const { drive } = await connected()
+    drive.listChildren.mockResolvedValue(Ok([f('x', 'X.epub')]))
+    drive.searchBooks.mockResolvedValue(Ok([f('a', 'A.epub')]))
+    const browser = useDriveBrowser()
+    await browser.openFolder('root', 'My Drive')
+    await browser.openFolder('books', 'books')
+    await browser.search('a')
+    expect(browser.trail.map((t) => t.id)).toEqual(['root', 'books'])
+  })
+})
+
+describe('order', () => {
+  it('sorts folders by their shown name and books by title, ignoring case, numbers in order', async () => {
+    const { drive } = await connected()
+    drive.listChildren.mockResolvedValue(
+      Ok([
+        f('d', 'dawson,-mark', FOLDER),
+        f('b', 'Zebra', FOLDER),
+        f('a', 'austen,-jane', FOLDER),
+        f('2', 'Book 10 - X.epub'),
+        f('1', 'book 9 - X.epub'),
+        f('3', 'Émile - Y.epub'),
+        f('4', 'Adam Bede - George Eliot.epub'),
+      ]),
+    )
+    const browser = useDriveBrowser()
+    await browser.openFolder('books', 'books')
+    expect(browser.folders.map((x) => x.label)).toEqual(['Jane Austen', 'Mark Dawson', 'Zebra'])
+    expect(browser.books.map((b) => b.title)).toEqual(['Adam Bede', 'book 9', 'Book 10', 'Émile'])
+  })
+})
