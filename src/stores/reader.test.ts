@@ -1,9 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { useAuth } from './auth'
 import { useLibrary } from './library'
 import { useReader } from './reader'
-import { epubFile, META, setupServices } from './test-services'
+import { epubFile, Err, META, Ok, setupServices } from './test-services'
 
 beforeEach(() => setActivePinia(createPinia()))
 
@@ -100,5 +101,92 @@ describe('reading', () => {
     reader.close()
     expect(engine.destroy).toHaveBeenCalled()
     expect(reader.status).toEqual({ kind: 'idle' })
+  })
+})
+
+describe('Drive books', () => {
+  const driveFile = {
+    id: 'd1',
+    name: 'A.epub',
+    mimeType: 'application/epub+zip',
+    size: 3,
+    md5: 'm',
+    modifiedTime: '',
+  }
+
+  async function withDriveBook(token: string | null) {
+    const ctx = await setupServices()
+    if (token)
+      ctx.gis.requestToken.mockResolvedValue(
+        Ok({ accessToken: token, expiresAt: Date.now() + 3_600_000 }),
+      )
+    if (token) await useAuth().connect()
+    await useLibrary().addFromDrive([driveFile])
+    return ctx
+  }
+
+  it('downloads on first open, then reads the real metadata', async () => {
+    const { drive, blobs, engine } = await withDriveBook('tok')
+    drive.download.mockImplementation(async (_t, _f, onProgress) => {
+      onProgress?.(0.5)
+      return Ok(new Blob(['abc'], { type: 'application/epub+zip' }))
+    })
+    const reader = useReader()
+    await reader.open('d1', document.createElement('div'))
+
+    expect(drive.download).toHaveBeenCalledWith(
+      'tok',
+      expect.objectContaining({ id: 'd1' }),
+      expect.any(Function),
+    )
+    expect(blobs.paths()).toContain('books/d1')
+    expect(engine.open).toHaveBeenCalled()
+    expect(reader.status).toEqual({ kind: 'ready' })
+    expect(useLibrary().books[0]).toMatchObject({
+      downloaded: true,
+      title: 'Harbour Year',
+      provisional: false,
+    })
+  })
+
+  it('asks to reconnect when there is no token', async () => {
+    const { drive } = await withDriveBook(null)
+    const reader = useReader()
+    await reader.open('d1', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'error', error: 'reconnect' })
+    expect(drive.download).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [{ kind: 'auth-expired' as const }, 'reconnect'],
+    [{ kind: 'offline' as const }, 'offline'],
+    [{ kind: 'not-found' as const }, 'missing-in-drive'],
+    [{ kind: 'forbidden' as const }, 'missing-in-drive'],
+    [{ kind: 'http' as const, status: 500 }, 'download-failed'],
+  ])('a download error %o shows %s', async (error, shown) => {
+    const { drive } = await withDriveBook('tok')
+    drive.download.mockResolvedValue(Err(error))
+    const reader = useReader()
+    await reader.open('d1', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'error', error: shown })
+    expect(useLibrary().books[0]!.downloaded).toBe(false)
+  })
+
+  it('an expired token on download marks auth expired', async () => {
+    const { drive } = await withDriveBook('tok')
+    drive.download.mockResolvedValue(Err({ kind: 'auth-expired' }))
+    await useReader().open('d1', document.createElement('div'))
+    expect(useAuth().status).toBe('expired')
+  })
+
+  it('downloads again when the browser evicted the file', async () => {
+    const { drive, blobs } = await withDriveBook('tok')
+    drive.download.mockResolvedValue(Ok(new Blob(['abc'])))
+    await useReader().open('d1', document.createElement('div'))
+    await blobs.remove('books/d1')
+    useReader().close()
+    await useReader().open('d1', document.createElement('div'))
+    expect(drive.download).toHaveBeenCalledTimes(2)
+    expect(useReader().status).toEqual({ kind: 'ready' })
   })
 })

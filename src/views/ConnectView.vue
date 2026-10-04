@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { authErrorCopy } from '@/app/copy'
 import { useImportFiles } from '@/app/useImportFiles'
+import { useAuth } from '@/stores/auth'
 
-/** First run (canvas: "First run, connect Drive"). Drive arrives with build step 4. */
+/** First run (canvas: "First run, connect Drive"). */
 const router = useRouter()
+const auth = useAuth()
 const { busy, message, pick } = useImportFiles()
-const driveNote = ref(false)
+
+async function connect() {
+  if (await auth.connect()) await router.push({ name: 'drive' })
+}
 
 async function openFile() {
   const result = await pick()
@@ -46,14 +51,14 @@ async function openFile() {
     <div class="mt-auto flex flex-col gap-2 pt-10">
       <button
         type="button"
-        class="h-[52px] rounded-ctl bg-ink text-base font-medium text-paper"
-        :aria-describedby="driveNote ? 'drive-note' : undefined"
-        @click="driveNote = true"
+        class="h-[52px] rounded-ctl bg-ink text-base font-medium text-paper disabled:opacity-50"
+        :disabled="auth.busy"
+        @click="connect"
       >
-        Connect Google Drive
+        {{ auth.busy ? 'Connecting…' : 'Connect Google Drive' }}
       </button>
-      <p v-if="driveNote" id="drive-note" role="status" class="text-center text-[13px] text-ink2">
-        Google Drive isn't connected in this version yet. Open a file from this device instead.
+      <p v-if="auth.error" role="alert" class="text-center text-[13px] text-signal">
+        {{ authErrorCopy(auth.error) }}
       </p>
       <button
         type="button"

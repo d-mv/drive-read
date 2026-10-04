@@ -12,6 +12,8 @@ export type IconName =
   | 'close'
   | 'minus'
   | 'trash'
+  | 'upload'
+  | 'folder'
 
 type Shape =
   | { kind: 'path'; d: string; filled?: boolean }
@@ -35,6 +37,8 @@ const ICONS: Record<IconName, Shape[]> = {
   close: [{ kind: 'path', d: 'M6 6l12 12M18 6L6 18' }],
   minus: [{ kind: 'path', d: 'M5 12h14' }],
   trash: [{ kind: 'path', d: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3' }],
+  upload: [{ kind: 'path', d: 'M12 16V4M7 9l5-5 5 5M5 20h14' }],
+  folder: [{ kind: 'path', d: 'M3 7h6l2 2h10v10H3z' }],
 }
 
 const { name, size = 20 } = defineProps<{ name: IconName; size?: number }>()

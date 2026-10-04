@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
+import type { DriveError } from '@/services/drive/client'
 import { chapterAt } from '@/services/engine/progress'
 import type {
   BookEngine,
@@ -13,16 +14,36 @@ import type {
 } from '@/services/engine/types'
 import { logger } from '@/services/logger'
 import { bookPath } from '@/services/storage/blobs'
-import { isErr, isNone, toNullable } from '@/shared/result'
+import { isErr, isNone, type Option, toNullable } from '@/shared/result'
 
+import { useAuth } from './auth'
 import { useLibrary } from './library'
 
-export type ReaderError = 'not-found' | 'missing-file' | 'unreadable'
+export type ReaderError =
+  | 'not-found'
+  | 'missing-file'
+  | 'unreadable'
+  /** Drive book, not on this device, and no valid token. */
+  | 'reconnect'
+  | 'offline'
+  | 'missing-in-drive'
+  | 'download-failed'
+  | 'storage-full'
 export type ReaderStatus =
   | { kind: 'idle' }
   | { kind: 'loading' }
+  | { kind: 'downloading'; fraction: number }
   | { kind: 'ready' }
   | { kind: 'error'; error: ReaderError }
+
+const DOWNLOAD_ERROR: Record<DriveError['kind'], ReaderError> = {
+  'auth-expired': 'reconnect',
+  offline: 'offline',
+  'not-found': 'missing-in-drive',
+  forbidden: 'missing-in-drive',
+  'rate-limited': 'download-failed',
+  http: 'download-failed',
+}
 
 /** The open book: engine lifecycle, position, and navigation. */
 export const useReader = defineStore('reader', () => {
@@ -65,8 +86,16 @@ export const useReader = defineStore('reader', () => {
     const record = library.books.find((b) => b.id === id)
     if (!record) return fail('not-found')
 
-    const file = await blobs.get(bookPath(id))
+    let file = await blobs.get(bookPath(id))
     if (mine !== session) return
+    if (isNone(file) && record.source === 'drive') {
+      // Never downloaded, or evicted by the browser: fetch it from Drive (book pipeline step 3).
+      if (record.downloaded) await library.setDownloaded(id, false)
+      const fetched = await download(id, mine)
+      if (fetched === 'stale') return
+      if (typeof fetched === 'string') return fail(fetched)
+      file = fetched
+    }
     if (isNone(file)) return fail('missing-file')
 
     const next = createEngine(record.format)
@@ -80,6 +109,7 @@ export const useReader = defineStore('reader', () => {
 
     engine = next
     toc.value = meta.value.toc
+    if (record.provisional) await library.applyMeta(id, meta.value)
     next.onRelocate((r) => {
       position.value = r.position
       chapterMinutesLeft.value = r.chapterMinutesLeft
@@ -96,6 +126,36 @@ export const useReader = defineStore('reader', () => {
     if (theme) next.setTheme(theme)
     await library.markOpened(id)
     status.value = { kind: 'ready' }
+  }
+
+  /** Downloads a Drive book into OPFS. Returns the stored file, an error, or 'stale'. */
+  async function download(id: string, mine: number): Promise<Option<File> | ReaderError | 'stale'> {
+    const library = useLibrary()
+    const auth = useAuth()
+    const { drive, blobs } = useServices()
+    const record = library.books.find((b) => b.id === id)!
+    const token = auth.validToken()
+    if (isNone(token)) return 'reconnect'
+
+    status.value = { kind: 'downloading', fraction: 0 }
+    const blob = await drive.download(
+      token.value,
+      { id, mimeType: 'application/epub+zip', size: record.size },
+      (fraction) => {
+        if (mine === session) status.value = { kind: 'downloading', fraction }
+      },
+    )
+    if (mine !== session) return 'stale'
+    if (isErr(blob)) {
+      if (blob.error.kind === 'auth-expired') auth.markExpired()
+      logger.warn('book download failed', { reason: blob.error.kind })
+      return DOWNLOAD_ERROR[blob.error.kind]
+    }
+    const stored = await blobs.put(bookPath(id), blob.value)
+    if (isErr(stored)) return stored.error.kind === 'quota' ? 'storage-full' : 'download-failed'
+    await library.setDownloaded(id, true)
+    logger.info('book downloaded', { size: blob.value.size })
+    return blobs.get(bookPath(id))
   }
 
   function fail(error: ReaderError) {

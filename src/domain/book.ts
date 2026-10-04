@@ -15,6 +15,10 @@ export interface BookRecord {
   downloaded: boolean
   addedAt: string
   openedAt: string | null
+  /** From Drive metadata; re-matches a book uploaded again under a new id. */
+  md5?: string | null
+  /** Title and author guessed from the file name until the book is first opened. */
+  provisional?: boolean
 }
 
 /** Same shape locally and in Drive, minus the local-only `dirty` flag (architecture doc). */
@@ -100,4 +104,12 @@ export function filterCounts(items: readonly LibraryItem[]): Record<LibraryFilte
   const counts = { all: items.length, reading: 0, unread: 0, finished: 0 }
   for (const b of items) counts[readingStatus(b.fraction)]++
   return counts
+}
+
+/** The status line on a library card or row. */
+export function statusLabel(fraction: number | undefined, downloaded: boolean): string {
+  const s = readingStatus(fraction)
+  if (s === 'finished') return 'Finished'
+  if (s === 'reading') return formatPercent(fraction!)
+  return downloaded ? '' : 'Drive only'
 }

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0 — 2026-10-04
+
+Build step 4: books from Google Drive (Drive API, `drive.readonly` + `drive.appdata`, no Picker).
+
+- Connect Google Drive (Google Identity Services token model, loaded on first use). The token
+  lives in memory and sessionStorage; an expired token shows "Reconnect Drive", never blocks reading.
+- "Add from Drive" screen: search all EPUB/PDF in Drive, browse folders with a breadcrumb,
+  multi-select, add a whole folder at any depth (Calibre author folders). Titles and authors are
+  read from file names ("Last, First. Title", "Title - Author"); author folders like
+  `dawson,-mark` show as "Mark Dawson".
+- Drive books are registered without downloading; the file streams into OPFS on first open with
+  a progress bar, then the book's real metadata replaces the file-name guess. A file the browser
+  evicted downloads again.
+- Library: "Add from Drive" button, "Drive only" status. Reader errors for reconnect, offline,
+  missing in Drive, failed download and full storage, each with its fix.
+- E2E tests run the whole flow against a faked Google (`e2e/fake-google.ts`) under the real CSP.
+
 ## 0.1.2 — 2026-10-04
 
 - Logging live: `drive-read` registered with logger-api (ingest key in `.env`, CORS for

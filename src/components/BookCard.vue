@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { type BookRecord, formatPercent, readingStatus } from '@/domain/book'
+import { type BookRecord, statusLabel } from '@/domain/book'
 
 import AppIcon from './AppIcon.vue'
 import BookCover from './BookCover.vue'
@@ -10,10 +10,7 @@ import BookCover from './BookCover.vue'
 const { book, fraction } = defineProps<{ book: BookRecord; fraction: number | undefined }>()
 const emit = defineEmits<{ open: []; remove: [] }>()
 
-const status = computed(() => {
-  const s = readingStatus(fraction)
-  return s === 'finished' ? 'Finished' : s === 'reading' ? formatPercent(fraction!) : ''
-})
+const status = computed(() => statusLabel(fraction, book.downloaded))
 </script>
 
 <template>

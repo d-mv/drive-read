@@ -9,11 +9,14 @@ import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 
 import { provideServices } from '@/services'
+import { createGis } from '@/services/auth/gis'
+import { createDriveApi } from '@/services/drive/client'
 import { createEpubEngine } from '@/services/engine/epub'
 import { logger } from '@/services/logger'
 import { opfsBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
 import { localBookId } from '@/services/storage/hash'
+import { useAuth } from '@/stores/auth'
 import { useLibrary } from '@/stores/library'
 import { useSettings } from '@/stores/settings'
 
@@ -37,9 +40,12 @@ async function start() {
     bookId: localBookId,
     now: () => new Date(),
     device: currentDevice(),
+    gis: createGis(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''),
+    drive: createDriveApi(),
   })
 
   const app = createApp(App).use(createPinia())
+  useAuth().restore()
   await Promise.all([useSettings().load(), useLibrary().load()])
   app.use(router).mount('#app')
   logger.info('app started', { books: useLibrary().books.length })

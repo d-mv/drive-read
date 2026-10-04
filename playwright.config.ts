@@ -12,9 +12,10 @@ export default defineConfig({
     { name: 'phone', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    // Empty ingest key: test runs must not write to the drive-read log (shell env beats .env).
+    // Empty ingest key: test runs must not write to the drive-read log; a placeholder client id
+    // for the faked Google sign-in (e2e/fake-google.ts). Shell env beats .env.
     command:
-      'VITE_LOGGER_INGEST_KEY= bunx vite build && bunx vite preview --port 4173 --strictPort',
+      'VITE_LOGGER_INGEST_KEY= VITE_GOOGLE_CLIENT_ID=e2e-client bunx vite build && bunx vite preview --port 4173 --strictPort',
     url: 'http://localhost:4173',
     reuseExistingServer: false,
     timeout: 120_000,

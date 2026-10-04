@@ -9,7 +9,9 @@ import {
   titleFromFileName,
 } from '@/domain/book'
 import { useServices } from '@/services'
-import type { Position } from '@/services/engine/types'
+import type { DriveFile } from '@/services/drive/client'
+import { bookFromFileName } from '@/services/drive/names'
+import type { BookMeta, Position } from '@/services/engine/types'
 import { logger } from '@/services/logger'
 import { bookPath, coverPath } from '@/services/storage/blobs'
 import { isErr } from '@/shared/result'
@@ -144,6 +146,83 @@ export const useLibrary = defineStore('library', () => {
     if (isErr(saved)) logger.warn('progress not saved', { reason: saved.error.kind })
   }
 
+  /**
+   * Registers Drive books (architecture doc, book pipeline step 2). Nothing is downloaded yet:
+   * the file comes down on first open, and the title is a guess from the file name until then.
+   */
+  async function addFromDrive(files: readonly DriveFile[]): Promise<ImportResult> {
+    const { db, now } = useServices()
+    const result: ImportResult = { added: [], failed: [] }
+    for (const file of files) {
+      const existing = books.value.find((b) => b.id === file.id)
+      if (existing) {
+        result.added.push(existing)
+        continue
+      }
+      // PDF arrives with build step 6.
+      if (file.mimeType !== 'application/epub+zip') {
+        result.failed.push({ name: file.name, reason: 'unsupported' })
+        continue
+      }
+      const guess = bookFromFileName(file.name)
+      const record: BookRecord = {
+        v: 1,
+        id: file.id,
+        source: 'drive',
+        format: 'epub',
+        fileName: file.name,
+        title: guess.title,
+        author: guess.author,
+        size: file.size,
+        toc: [],
+        hasCover: false,
+        downloaded: false,
+        addedAt: now().toISOString(),
+        openedAt: null,
+        md5: file.md5,
+        provisional: true,
+      }
+      const saved = await db.putBook(record)
+      if (isErr(saved)) {
+        result.failed.push({
+          name: file.name,
+          reason: saved.error.kind === 'quota' ? 'quota' : 'storage',
+        })
+        continue
+      }
+      books.value.push(record)
+      result.added.push(record)
+    }
+    logger.info('drive books added', { added: result.added.length, failed: result.failed.length })
+    return result
+  }
+
+  async function update(id: string, patch: Partial<BookRecord>) {
+    const book = books.value.find((b) => b.id === id)
+    if (!book) return
+    Object.assign(book, patch)
+    const saved = await useServices().db.putBook({ ...book })
+    if (isErr(saved)) logger.warn('book record not saved', { reason: saved.error.kind })
+  }
+
+  /** The file is (or is no longer) on this device. */
+  const setDownloaded = (id: string, downloaded: boolean) => update(id, { downloaded })
+
+  /** Title, author, contents and cover from the opened book replace the file-name guess. */
+  async function applyMeta(id: string, meta: BookMeta) {
+    const hasCover = meta.cover
+      ? !isErr(await useServices().blobs.put(coverPath(id), meta.cover))
+      : false
+    const book = books.value.find((b) => b.id === id)
+    await update(id, {
+      title: meta.title.trim() || book?.title || '',
+      author: meta.author || book?.author || '',
+      toc: meta.toc,
+      hasCover,
+      provisional: false,
+    })
+  }
+
   async function remove(id: string) {
     const { db, blobs } = useServices()
     await Promise.all([blobs.remove(bookPath(id)), blobs.remove(coverPath(id)), db.deleteBook(id)])
@@ -159,6 +238,9 @@ export const useLibrary = defineStore('library', () => {
     continueBook,
     load,
     importFiles,
+    addFromDrive,
+    setDownloaded,
+    applyMeta,
     markOpened,
     saveProgress,
     remove,

@@ -13,6 +13,7 @@ export const router = createRouter({
       beforeEnter: () => (useLibrary().books.length === 0 ? { name: 'welcome' } : true),
     },
     { path: '/welcome', name: 'welcome', component: () => import('@/views/ConnectView.vue') },
+    { path: '/drive', name: 'drive', component: () => import('@/views/DriveView.vue') },
     {
       path: '/read/:id',
       name: 'reader',

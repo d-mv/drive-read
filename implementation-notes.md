@@ -33,3 +33,14 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **CSP.** `apis.google.com` and `docs.google.com` are removed.
 - **New UI.** The app needs its own Drive browser screen ("Add from Drive"), which the design canvas doesn't have.
 - **Verify task moot.** "Does picking a folder under drive.file grant access to its files?" no longer applies: with `drive.readonly`, importing a folder means listing its children.
+
+## 2026-10-04: Build step 4, Drive import (v0.2.0)
+
+- **library.json in appData isn't written yet.** The doc puts it under "Register"; it moves to build step 5 (sync), together with the merge rules.
+- **No "Folder" column in All books.** Showing each book's folder needs one extra call per parent folder; it was left out to keep search to a single call. The canvas shows the column.
+- **PDFs are listed but not addable** ("PDF later") until build step 6.
+- **Adding on the phone uses checkboxes and the bottom bar only**, as on the canvas. Per-row "Add" buttons are desktop-only.
+- **Folder labels:** only `last,-first` slugs are renamed ("dawson,-mark" → "Mark Dawson"). A single lowercase word like `books` stays as-is. The first version renamed it "Books", which an e2e test caught.
+- **md5 isn't used yet for re-matching** a file uploaded again; it is stored on the record.
+- **Recursive folder add** stops after 500 folders, walking 4 at a time, and says so when it stops early.
+- **Token:** kept in memory and sessionStorage, as the doc says, and treated as expired 60 s before Google's expiry.

@@ -13,6 +13,8 @@ import type { Locator } from '@/services/engine/types'
 import { isSome } from '@/shared/result'
 import { READER_FONTS } from '@/styles/fonts'
 import { readerCss } from '@/styles/reader-theme'
+import { authErrorCopy } from '@/app/copy'
+import { useAuth } from '@/stores/auth'
 import { useLibrary } from '@/stores/library'
 import { type ReaderError, useReader } from '@/stores/reader'
 import { useSettings } from '@/stores/settings'
@@ -24,6 +26,7 @@ const router = useRouter()
 const reader = useReader()
 const settings = useSettings()
 const library = useLibrary()
+const auth = useAuth()
 
 const host = ref<HTMLElement>()
 const panel = ref<'none' | 'contents' | 'settings'>('none')
@@ -42,7 +45,22 @@ const ERRORS: Record<ReaderError, string> = {
   'missing-file':
     'The file for this book is no longer on this device. The browser may have cleared it to free space.',
   unreadable: "This file can't be opened. It may be protected or damaged.",
+  reconnect: 'This book is still in your Drive. Reconnect Drive to download it to this device.',
+  offline: "This book isn't on this device yet. It opens once you're back online.",
+  'missing-in-drive': 'Missing in Drive: the file was deleted or you no longer have access to it.',
+  'download-failed': "The download didn't finish.",
+  'storage-full': 'Not enough space on this device. Remove some downloaded books and try again.',
 }
+
+/** The one action that fixes each error, besides going back. */
+const ACTION: Partial<Record<ReaderError, 'reconnect' | 'retry' | 'remove'>> = {
+  'missing-file': 'remove',
+  'missing-in-drive': 'remove',
+  reconnect: 'reconnect',
+  offline: 'retry',
+  'download-failed': 'retry',
+}
+const ACTION_LABEL = { reconnect: 'Reconnect Drive', retry: 'Try again', remove: 'Remove book' }
 
 function token(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -113,9 +131,13 @@ function onKeydown(e: KeyboardEvent) {
   fn()
 }
 
-async function removeMissing() {
-  await library.remove(id)
-  back()
+async function fix(action: 'reconnect' | 'retry' | 'remove') {
+  if (action === 'remove') {
+    await library.remove(id)
+    return back()
+  }
+  if (action === 'reconnect' && !(await auth.connect())) return
+  await open()
 }
 
 onMounted(() => {
@@ -201,7 +223,24 @@ onBeforeUnmount(() => {
       </div>
 
       <main class="relative min-w-0 flex-1 overflow-hidden">
-        <div ref="host" class="absolute inset-0" :aria-busy="reader.status.kind === 'loading'" />
+        <div
+          ref="host"
+          class="absolute inset-0"
+          :aria-busy="reader.status.kind === 'loading' || reader.status.kind === 'downloading'"
+        />
+        <div
+          v-if="reader.status.kind === 'downloading'"
+          role="status"
+          class="absolute inset-0 flex flex-col items-start justify-center gap-3 bg-paper px-7 sm:mx-auto sm:max-w-[480px]"
+        >
+          <p class="text-base">Downloading from Drive…</p>
+          <div class="h-1 w-full bg-track">
+            <div class="h-1 bg-signal" :style="{ width: `${reader.status.fraction * 100}%` }" />
+          </div>
+          <span class="tabular font-mono text-xs text-ink2">{{
+            formatPercent(reader.status.fraction)
+          }}</span>
+        </div>
         <div
           v-if="reader.status.kind === 'error'"
           role="alert"
@@ -217,14 +256,21 @@ onBeforeUnmount(() => {
               Back to library
             </button>
             <button
-              v-if="reader.status.error === 'missing-file'"
+              v-if="ACTION[reader.status.error]"
               type="button"
-              class="h-11 rounded-ctl border border-ink px-4"
-              @click="removeMissing"
+              class="h-11 rounded-ctl border border-ink px-4 disabled:opacity-50"
+              :disabled="auth.busy"
+              @click="fix(ACTION[reader.status.error]!)"
             >
-              Remove book
+              {{ ACTION_LABEL[ACTION[reader.status.error]!] }}
             </button>
           </div>
+          <p
+            v-if="reader.status.error === 'reconnect' && auth.error"
+            class="text-[13px] text-signal"
+          >
+            {{ authErrorCopy(auth.error) }}
+          </p>
         </div>
       </main>
 

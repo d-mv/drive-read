@@ -1,6 +1,8 @@
-import type { Db } from './storage/db'
-import type { BlobStore } from './storage/blobs'
+import type { Gis } from './auth/gis'
+import type { DriveApi } from './drive/client'
 import type { BookEngine } from './engine/types'
+import type { BlobStore } from './storage/blobs'
+import type { Db } from './storage/db'
 
 /**
  * What the stores need from the outside world. main.ts provides the real ones; tests provide fakes.
@@ -13,6 +15,8 @@ export interface Services {
   bookId: (file: Blob) => Promise<string>
   now: () => Date
   device: { id: string; name: string }
+  gis: Gis
+  drive: DriveApi
 }
 
 let current: Services | undefined

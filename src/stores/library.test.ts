@@ -146,3 +146,65 @@ describe('remove', () => {
     expect(isSome(await services.db.getProgress('local-abc'))).toBe(false)
   })
 })
+
+describe('addFromDrive', () => {
+  const driveFile = (id: string, name: string, mimeType = 'application/epub+zip') => ({
+    id,
+    name,
+    mimeType,
+    size: 1234,
+    md5: `md5-${id}`,
+    modifiedTime: '2026-10-01T00:00:00Z',
+  })
+
+  it('registers Drive books without downloading them, titled from the file name', async () => {
+    const { blobs, engine } = await setupServices()
+    const library = useLibrary()
+    const result = await library.addFromDrive([driveFile('d1', 'Dawson, Mark. The Cleaner.epub')])
+
+    expect(result.failed).toEqual([])
+    expect(result.added).toEqual([
+      expect.objectContaining({
+        id: 'd1',
+        source: 'drive',
+        format: 'epub',
+        title: 'The Cleaner',
+        author: 'Mark Dawson',
+        md5: 'md5-d1',
+        size: 1234,
+        downloaded: false,
+        provisional: true,
+      }),
+    ])
+    expect(blobs.paths()).toEqual([])
+    expect(engine.open).not.toHaveBeenCalled()
+  })
+
+  it('skips books already in the library and refuses PDFs for now', async () => {
+    await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveFile('d1', 'A.epub')])
+    const again = await library.addFromDrive([
+      driveFile('d1', 'A.epub'),
+      driveFile('p1', 'Paper.pdf', 'application/pdf'),
+    ])
+    expect(again.added.map((b) => b.id)).toEqual(['d1'])
+    expect(again.failed).toEqual([{ name: 'Paper.pdf', reason: 'unsupported' }])
+    expect(library.books).toHaveLength(1)
+  })
+
+  it('applies the real metadata once the book is opened', async () => {
+    const { blobs } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveFile('d1', 'A.epub')])
+    await library.applyMeta('d1', META)
+    expect(library.books[0]).toMatchObject({
+      title: 'Harbour Year',
+      author: 'Ines Calder',
+      toc: META.toc,
+      hasCover: true,
+      provisional: false,
+    })
+    expect(blobs.paths()).toEqual(['covers/d1'])
+  })
+})

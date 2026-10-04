@@ -7,6 +7,7 @@ import {
   formatPercent,
   readingStatus,
   selectBooks,
+  statusLabel,
   titleFromFileName,
 } from './book'
 
@@ -108,5 +109,18 @@ describe('selectBooks and filterCounts', () => {
 
   it('counts each filter', () => {
     expect(filterCounts(items)).toEqual({ all: 4, reading: 2, unread: 1, finished: 1 })
+  })
+})
+
+describe('statusLabel', () => {
+  it('shows progress, finished, or nothing for a book on this device', () => {
+    expect(statusLabel(0.42, true)).toBe('42%')
+    expect(statusLabel(1, true)).toBe('Finished')
+    expect(statusLabel(undefined, true)).toBe('')
+  })
+
+  it('marks an unread book that is only in Drive', () => {
+    expect(statusLabel(undefined, false)).toBe('Drive only')
+    expect(statusLabel(0.3, false)).toBe('30%')
   })
 })

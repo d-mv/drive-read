@@ -1,6 +1,8 @@
 import { type Mock, vi } from 'vitest'
 
 import { provideServices, type Services } from '@/services'
+import type { Gis } from '@/services/auth/gis'
+import type { DriveApi } from '@/services/drive/client'
 import type { BookEngine, BookMeta, OpenError, Relocation } from '@/services/engine/types'
 import { memoryBlobStore, type MemoryBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
@@ -31,9 +33,26 @@ export function fakeEngine(meta: Result<BookMeta, OpenError>): FakeEngine {
   return { engine, relocate: (r) => relocateCb?.(r) }
 }
 
+export type MockGis = { [K in keyof Gis]: Mock<Gis[K]> }
+export type MockDrive = { [K in keyof DriveApi]: Mock<DriveApi[K]> }
+
 export interface TestContext extends FakeEngine {
   services: Services
   blobs: MemoryBlobStore
+  gis: MockGis
+  drive: MockDrive
+}
+
+/** Drive mocks answer "nothing" until a test scripts them. */
+function fakeDrive(): MockDrive {
+  return {
+    searchBooks: vi.fn<DriveApi['searchBooks']>(async () => Ok([])),
+    listChildren: vi.fn<DriveApi['listChildren']>(async () => Ok([])),
+    listBooksRecursive: vi.fn<DriveApi['listBooksRecursive']>(async () =>
+      Ok({ books: [], truncated: false }),
+    ),
+    download: vi.fn<DriveApi['download']>(async () => Err({ kind: 'not-found' as const })),
+  }
 }
 
 export const META: BookMeta = {
@@ -57,6 +76,10 @@ export async function setupServices(
   const fake = fakeEngine(opts.meta ?? Ok(META))
   let clock = Date.parse('2026-10-04T12:00:00Z')
   const blobs = memoryBlobStore()
+  const gis: MockGis = {
+    requestToken: vi.fn<Gis['requestToken']>(async () => Err({ kind: 'popup-closed' as const })),
+  }
+  const drive = fakeDrive()
   const services: Services = {
     db: await openDb(`store-test-${++n}`),
     blobs,
@@ -64,9 +87,11 @@ export async function setupServices(
     bookId: async (f) => `local-${await f.text()}`,
     now: () => new Date((clock += 1000)),
     device: { id: 'dev1', name: 'Laptop' },
+    gis,
+    drive,
   }
   provideServices(services)
-  return { services, blobs, ...fake }
+  return { services, blobs, gis, drive, ...fake }
 }
 
 export { Err, Ok }

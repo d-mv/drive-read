@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
 import { applyUpdate, updateAvailable } from '@/app/update'
@@ -95,14 +95,22 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
           >/</kbd
         >
       </label>
+      <RouterLink
+        :to="{ name: 'drive' }"
+        class="flex h-11 items-center gap-2 rounded-ctl border border-ink px-3.5 font-medium"
+      >
+        <AppIcon name="plus" />
+        <span>Add from Drive</span>
+      </RouterLink>
       <button
         type="button"
-        class="flex h-11 items-center gap-2 rounded-ctl border border-ink px-3.5 font-medium disabled:opacity-50"
+        aria-label="Open a file from this device"
+        title="Open a file from this device"
+        class="flex size-11 items-center justify-center rounded-ctl border border-rule disabled:opacity-50"
         :disabled="busy"
         @click="pick"
       >
-        <AppIcon name="plus" />
-        <span>{{ busy ? 'Adding…' : 'Add book' }}</span>
+        <AppIcon name="upload" />
       </button>
       <button
         type="button"
