@@ -112,3 +112,17 @@ test('a book deleted from Drive says so and can be removed', async ({ page }) =>
     page.getByRole('heading', { name: 'Read the books in your Google Drive' }),
   ).toBeVisible()
 })
+
+test('a slow all-books search does not spill books into the folder view', async ({ page }) => {
+  const google = await fakeGoogle(page)
+  google.searchDelayMs = 1500
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Connect Google Drive' }).click()
+  await page.getByRole('button', { name: 'Folders' }).click()
+  await page.getByRole('button', { name: 'Stocks', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'books', exact: true })).toBeVisible()
+
+  await page.waitForTimeout(2000) // the slow search has answered by now
+  await expect(page.getByRole('button', { name: 'books', exact: true })).toBeVisible()
+  await expect(page.getByRole('checkbox')).toHaveCount(0)
+})

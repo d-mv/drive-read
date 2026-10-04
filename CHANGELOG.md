@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 — 2026-10-05
+
+- Fix: browsing folders could show books from all of Drive. The first "All books" listing (several
+  pages for a large Drive) could answer after the user had moved to a folder and overwrite it;
+  the same race applied between quickly clicked folders. Only the latest listing may now update
+  the screen.
+- Each Drive listing is logged (kind, duration, file count, whether it was stale).
+
 ## 0.2.0 — 2026-10-04
 
 Build step 4: books from Google Drive (Drive API, `drive.readonly` + `drive.appdata`, no Picker).

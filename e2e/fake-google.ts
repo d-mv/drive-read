@@ -65,10 +65,12 @@ export interface FakeGoogle {
   /** Status returned by the next downloads (200 serves the fixture EPUB). */
   downloadStatus: number
   downloads: string[]
+  /** Delay for whole-Drive searches, to reproduce slow first loads. */
+  searchDelayMs: number
 }
 
 export async function fakeGoogle(page: Page): Promise<FakeGoogle> {
-  const state: FakeGoogle = { downloadStatus: 200, downloads: [] }
+  const state: FakeGoogle = { downloadStatus: 200, downloads: [], searchDelayMs: 0 }
 
   await page.route('https://accounts.google.com/gsi/client', (route) =>
     route.fulfill({ contentType: 'text/javascript', body: GIS }),
@@ -100,6 +102,8 @@ export async function fakeGoogle(page: Page): Promise<FakeGoogle> {
     const q = url.searchParams.get('q') ?? ''
     const parent = /'([^']+)' in parents/.exec(q)?.[1]
     const name = /name contains '([^']+)'/.exec(q)?.[1]?.toLowerCase()
+    if (parent === undefined && state.searchDelayMs > 0)
+      await new Promise((r) => setTimeout(r, state.searchDelayMs))
     const files = TREE.filter((f) =>
       parent !== undefined
         ? f.parent === parent

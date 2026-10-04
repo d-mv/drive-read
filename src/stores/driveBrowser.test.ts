@@ -154,3 +154,43 @@ describe('folders', () => {
     )
   })
 })
+
+describe('responses that arrive late', () => {
+  function deferred<T>() {
+    let resolve!: (v: T) => void
+    const promise = new Promise<T>((r) => (resolve = r))
+    return { promise, resolve }
+  }
+
+  it('a slow all-books search does not overwrite the folder opened after it', async () => {
+    const { drive } = await connected()
+    const slow = deferred<Awaited<ReturnType<typeof drive.searchBooks>>>()
+    drive.searchBooks.mockReturnValue(slow.promise)
+    drive.listChildren.mockResolvedValue(Ok([f('eliot', 'eliot,-george', FOLDER)]))
+
+    const browser = useDriveBrowser()
+    const searching = browser.search('')
+    await browser.openFolder('books', 'books')
+    slow.resolve(Ok([f('a', 'A.epub'), f('b', 'B.epub')]))
+    await searching
+
+    expect(browser.folders.map((x) => x.id)).toEqual(['eliot'])
+    expect(browser.books).toEqual([])
+    expect(browser.status).toEqual({ kind: 'ready' })
+  })
+
+  it('a slow folder does not overwrite the folder clicked after it', async () => {
+    const { drive } = await connected()
+    const slow = deferred<Awaited<ReturnType<typeof drive.listChildren>>>()
+    drive.listChildren.mockImplementation(async (_t, id) =>
+      id === 'stocks' ? slow.promise : Ok([f('x', 'X.epub')]),
+    )
+    const browser = useDriveBrowser()
+    const first = browser.openFolder('stocks', 'Stocks')
+    await browser.openFolder('books', 'books')
+    slow.resolve(Ok([f('y', 'Y.epub')]))
+    await first
+
+    expect(browser.books.map((b) => b.id)).toEqual(['x'])
+  })
+})

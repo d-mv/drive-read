@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
+import { logger } from '@/services/logger'
 import { type DriveError, type DriveFile, FOLDER_MIME } from '@/services/drive/client'
 import { bookFromFileName, folderLabel } from '@/services/drive/names'
 import { isNone, type Result } from '@/shared/result'
@@ -82,6 +83,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
   /** Runs a Drive call with a valid token, turning auth problems into the reconnect state. */
   async function withToken<T>(
     call: (token: string) => Promise<Result<T, DriveError>>,
+    isCurrent: () => boolean = () => true,
   ): Promise<T | null> {
     const auth = useAuth()
     const token = auth.validToken()
@@ -90,6 +92,8 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
       return null
     }
     const r = await call(token.value)
+    // A newer request owns the screen now; this answer must not touch it.
+    if (!isCurrent()) return null
     if (r._tag === 'Ok') return r.value
     if (r.error.kind === 'auth-expired') {
       auth.markExpired()
@@ -98,10 +102,24 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     return null
   }
 
-  async function load(call: (token: string) => Promise<Result<DriveFile[], DriveError>>) {
+  /** Bumped by every listing; only the latest one may update the screen. */
+  let seq = 0
+
+  async function load(
+    kind: 'search' | 'folder',
+    call: (token: string) => Promise<Result<DriveFile[], DriveError>>,
+  ) {
+    const mine = ++seq
+    const started = performance.now()
     status.value = { kind: 'loading' }
-    const result = await withToken(call)
-    if (!result) return
+    const result = await withToken(call, () => mine === seq)
+    logger.info('drive listed', {
+      kind,
+      ms: Math.round(performance.now() - started),
+      files: result?.length ?? null,
+      stale: mine !== seq,
+    })
+    if (!result || mine !== seq) return
     files.value = result
     selectedIds.value = []
     status.value = { kind: 'ready' }
@@ -110,14 +128,14 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
   /** Every EPUB and PDF in Drive whose name contains `query`. */
   function search(query: string) {
     trail.value = []
-    return load((token) => useServices().drive.searchBooks(token, query))
+    return load('search', (token) => useServices().drive.searchBooks(token, query))
   }
 
   /** Opens a folder; opening one already in the trail goes back up to it. */
   async function openFolder(id: string, name: string) {
     const at = trail.value.findIndex((t) => t.id === id)
     trail.value = at >= 0 ? trail.value.slice(0, at + 1) : [...trail.value, { id, name }]
-    await load((token) => useServices().drive.listChildren(token, id))
+    await load('folder', (token) => useServices().drive.listChildren(token, id))
   }
 
   function toggle(id: string) {
