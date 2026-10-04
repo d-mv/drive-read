@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-10-04
+
+- Logging live: `drive-read` registered with logger-api (ingest key in `.env`, CORS for
+  `https://drive-read.mlnkv.net`, `localhost:5173` and `localhost:4173`). Verified from the app.
+- E2E builds run with an empty ingest key, so test runs never write to the production log.
+
 ## 0.1.1 — 2026-10-04
 
 - No Google Picker: the CSP drops `apis.google.com` (script-src) and `docs.google.com` (frame-src).

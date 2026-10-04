@@ -12,7 +12,9 @@ export default defineConfig({
     { name: 'phone', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: 'bunx vite build && bunx vite preview --port 4173 --strictPort',
+    // Empty ingest key: test runs must not write to the drive-read log (shell env beats .env).
+    command:
+      'VITE_LOGGER_INGEST_KEY= bunx vite build && bunx vite preview --port 4173 --strictPort',
     url: 'http://localhost:4173',
     reuseExistingServer: false,
     timeout: 120_000,
