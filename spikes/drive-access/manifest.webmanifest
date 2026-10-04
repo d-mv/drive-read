@@ -1,0 +1,10 @@
+{
+  "name": "Drive Read spike",
+  "short_name": "DR spike",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F3F0E8",
+  "theme_color": "#F3F0E8",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
