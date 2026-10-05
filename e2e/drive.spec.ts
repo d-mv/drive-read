@@ -163,3 +163,64 @@ test('removing a download frees the file but keeps the book and the place', asyn
   await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toBeVisible()
   expect(google.downloads).toEqual(['voyage', 'voyage'])
 })
+
+test.describe('Drive file changes', () => {
+  /** A whole-Drive listing: the daily check of the library's files (sync/driveCheck.ts). */
+  const isDriveCheck = (url: string) =>
+    new URL(url).searchParams.get('q')?.startsWith('trashed = false') ?? false
+
+  /** Adds and opens the Voyage, and waits for the first daily check (made on that open). */
+  async function readVoyage(page: Page) {
+    await page.clock.install()
+    const google = await fakeGoogle(page)
+    await connect(page)
+    await addVoyage(page)
+    await page.getByRole('button', { name: 'Back to library' }).click()
+    const firstCheck = page.waitForResponse((r) => isDriveCheck(r.url()))
+    await voyageLink(page).click()
+    await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toBeVisible()
+    await firstCheck
+    await page.getByRole('button', { name: 'Back to library' }).click()
+    return google
+  }
+
+  /** The next day: the token has expired, so the reader reconnects, which syncs and checks. */
+  async function nextDayReconnect(page: Page) {
+    await page.clock.fastForward('25:00:00')
+    await page.getByRole('link', { name: 'Add from Drive' }).click()
+    const check = page.waitForResponse((r) => isDriveCheck(r.url()))
+    await page.getByRole('button', { name: 'Reconnect Drive' }).click()
+    await check
+    await page.getByRole('button', { name: 'Back to library' }).click()
+  }
+
+  test('a book deleted from Drive is marked, and its copy still opens', async ({ page }) => {
+    const google = await readVoyage(page)
+    google.deleted.push('voyage')
+    await nextDayReconnect(page)
+    await expect(page.getByText('Missing in Drive').filter({ visible: true })).toHaveCount(1)
+    await voyageLink(page).click()
+    await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toBeVisible()
+    expect(google.downloads).toEqual(['voyage'])
+  })
+
+  test('a book replaced in Drive offers its new version, downloaded on request', async ({
+    page,
+  }) => {
+    const google = await readVoyage(page)
+    google.md5.voyage = 'md5-voyage-v2'
+    await nextDayReconnect(page)
+    await expect(page.getByText('New version').filter({ visible: true })).toHaveCount(1)
+
+    await voyageLink(page).click()
+    const notice = page.getByRole('status').filter({ hasText: 'A newer version of this book' })
+    await expect(notice).toBeVisible()
+    await notice.getByRole('button', { name: 'Get it' }).click()
+    await expect.poll(() => google.downloads).toEqual(['voyage', 'voyage'])
+    await expect(notice).toHaveCount(0)
+    await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Back to library' }).click()
+    await expect(page.getByText('New version')).toHaveCount(0)
+  })
+})

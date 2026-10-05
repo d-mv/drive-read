@@ -304,6 +304,7 @@ flowchart TD
 - A push that fails (offline, expired token, rate limit) leaves the record dirty; the next
   trigger retries. `sync.failed` logs the reason and the backlog.
 - `library.json` merges per entry by `updatedAt`, with removal markers.
+- Passes run under a `navigator.locks` lock, so two tabs never sync at once.
 
 ## Offline, service worker and updates
 
@@ -377,12 +378,23 @@ No failure blocks reading a book already on the device. Each shows one notice or
 | Offline | `offline` event or a failed fetch | Notice with positions waiting | Automatic on `online` |
 | Book not downloaded while offline | `downloaded: false` | Row "Drive only", open explains | Opens once online |
 | Download interrupted | Stream error | Error with Try again; partial file removed | Tap Try again |
-| File deleted or access lost in Drive | 404 / 403 on download | "Missing in Drive" | Remove the book |
+| File deleted or access lost in Drive | Daily Drive check (below), or 404 / 403 on download | "Missing in Drive" on the row; a downloaded copy still opens | Remove the book |
+| File replaced in Drive | Daily Drive check: md5 differs from the downloaded file | "New version" on the row; the reader offers "Get it" | Old file removed, new one downloaded; position falls back to `fraction` if the CFI no longer resolves |
 | Protected or damaged file | `engine.open` fails | "This file can't be opened…" | None |
 | Storage full | `QuotaExceededError` | "Not enough space" with **Free space** | Opens the library's Downloaded view (`/?show=downloaded`): Drive books on the device, largest first; "Remove download" frees the file and keeps the book and place |
 | Storage evicted by the browser | Record says downloaded, OPFS file missing | Row back to "Drive only" | Downloads again on open |
 
 Each state is covered by end-to-end tests against a fake Google (`e2e/fake-google.ts`).
+
+**Daily Drive check** (`services/sync/driveCheck.ts`, run by `stores/sync.ts` after a full sync,
+at most once a day and only with a valid token): one paged `files.list` of every EPUB and PDF in
+Drive (the search query with no name) is compared with the library's Drive books. A book the
+listing lacks is marked missing; one listed again is cleared; a downloaded book whose md5
+changed gets a `driveVersion` offer; a book not downloaded just takes the new md5 and size. A
+listing that reaches the 5000-file cap may be cut short, so then nothing is marked missing. A
+failed check never fails the sync. fast-check properties pin this down: one pass settles (a
+second changes nothing), local books are never touched, and after a complete pass "missing"
+means exactly "not listed".
 
 ## Observability
 

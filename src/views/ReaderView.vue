@@ -34,6 +34,16 @@ const sync = useSync()
 /** Another device's newer position, or the losing side of a conflict: offered once. */
 const offer = computed(() => sync.offers[id])
 
+/** The file changed in Drive since it was downloaded (sync/driveCheck.ts): offered until taken or declined. */
+const versionDeclined = ref(false)
+const newVersion = computed(
+  () => !!reader.book?.driveVersion && !versionDeclined.value && reader.status.kind === 'ready',
+)
+async function getNewVersion() {
+  await library.acceptNewVersion(id)
+  await open()
+}
+
 async function jumpToOffer() {
   const o = sync.takeOffer(id)
   if (o) await reader.goTo(o.locator)
@@ -266,6 +276,23 @@ onBeforeUnmount(() => {
       </div>
 
       <main class="relative min-w-0 flex-1 overflow-hidden">
+        <div
+          v-if="newVersion && !offer"
+          role="status"
+          class="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule bg-panel px-5 py-1.5 text-sm"
+        >
+          <span class="mr-auto py-2">A newer version of this book is in your Drive.</span>
+          <button
+            type="button"
+            class="h-11 font-medium underline underline-offset-[3px]"
+            @click="getNewVersion"
+          >
+            Get it
+          </button>
+          <button type="button" class="h-11 text-ink2" @click="versionDeclined = true">
+            Not now
+          </button>
+        </div>
         <div
           v-if="offer && reader.status.kind === 'ready'"
           role="status"

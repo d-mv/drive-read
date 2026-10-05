@@ -7,6 +7,7 @@ import type { AppDataFile } from '@/services/drive/appdata'
 import type { DriveError, DriveFile } from '@/services/drive/client'
 import { track } from '@/services/events'
 import type { SyncMeta } from '@/services/storage/db'
+import { compareWithDrive } from '@/services/sync/driveCheck'
 import {
   decideProgress,
   type LibraryDoc,
@@ -36,6 +37,9 @@ export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'reconnect' | 'error'
 export type Offer = Pick<ProgressRecord, 'locator' | 'fraction' | 'device' | 'updatedAt'>
 
 const IDLE_MS = 20_000
+const DRIVE_CHECK_EVERY_MS = 24 * 3_600_000
+/** searchBooks stops here; a listing this long may be cut short. */
+const DRIVE_LIST_MAX = 5000
 const LIBRARY_FILE = 'library.json'
 const progressFile = (id: string) => `progress-${id}.json`
 const LOCK = 'drive-read-sync'
@@ -313,9 +317,41 @@ export const useSync = defineStore('sync', () => {
       if (pushErr) return failed(pushErr)
 
       meta.value.lastSyncAt = now().toISOString()
+      if (full) await checkDrive(tok)
       await saveMeta()
       status.value = 'idle'
       track('sync.completed', { ms: performance.now() - started, ...stats })
+    })
+  }
+
+  /**
+   * Once a day: are the library's Drive files still there, and unchanged? One listing of every
+   * book in Drive answers both (sync/driveCheck.ts). A failure only skips the check; it runs
+   * again on the next full pass.
+   */
+  async function checkDrive(tok: string) {
+    const { drive, now } = useServices()
+    const last = meta.value.driveCheckedAt
+    if (last && now().getTime() - Date.parse(last) < DRIVE_CHECK_EVERY_MS) return
+    const books = driveBooks()
+    if (books.length === 0) return
+    const started = performance.now()
+    const listed = await drive.searchBooks(tok, '')
+    if (listed._tag === 'Err') {
+      if (listed.error.kind === 'auth-expired') useAuth().markExpired('sync')
+      track('drive.check_failed', { reason: listed.error.kind })
+      return
+    }
+    const complete = listed.value.length < DRIVE_LIST_MAX
+    const changes = compareWithDrive(books, listed.value, complete)
+    await library.applyDriveChanges(changes)
+    meta.value.driveCheckedAt = now().toISOString()
+    track('drive.checked', {
+      ms: performance.now() - started,
+      books: books.length,
+      missing: library.books.filter((b) => b.source === 'drive' && b.missingInDrive).length,
+      new_versions: library.books.filter((b) => b.driveVersion).length,
+      complete,
     })
   }
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.0 — 2026-10-05
+
+- Drive file changes: once a day, after a full sync with a valid token, the app lists every EPUB
+  and PDF in Drive (a few requests, whatever the library size) and compares it with the library.
+  - A book Drive no longer lists (deleted, trashed, access lost) shows **Missing in Drive**; a
+    downloaded copy still opens.
+  - A downloaded book whose file changed shows **New version**; the reader offers "Get it", which
+    replaces the download and keeps the position (falling back to the fraction if needed).
+  - Books not downloaded just take the new checksum; a listing that may be cut short (5000
+    files) marks nothing missing; a failed check never fails the sync.
+- Events `drive.checked` and `drive.check_failed`.
+- Tests: fast-check properties for the comparison; e2e for both cases against the fake Drive
+  (which can now delete or replace a file).
+
 ## 0.9.0 — 2026-10-05
 
 - Library: a **Downloaded** view (shown once a Drive book is on the device, or at

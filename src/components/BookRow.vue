@@ -28,7 +28,10 @@ const emit = defineEmits<{ open: []; remove: []; removeDownload: [] }>()
 const status = computed(() =>
   action === 'remove-download'
     ? formatSize(book.size)
-    : statusLabel(fraction, book.downloaded, online),
+    : statusLabel(fraction, book.downloaded, online, {
+        missingInDrive: book.missingInDrive,
+        newVersion: !!book.driveVersion,
+      }),
 )
 const unavailable = computed(() => !online && !book.downloaded)
 </script>

@@ -151,6 +151,12 @@ describe('statusLabel', () => {
     expect(statusLabel(undefined, true, false)).toBe('')
   })
 
+  it('says when Drive no longer has the file, or has a newer version, before anything else', () => {
+    expect(statusLabel(0.42, true, true, { missingInDrive: true })).toBe('Missing in Drive')
+    expect(statusLabel(undefined, false, false, { missingInDrive: true })).toBe('Missing in Drive')
+    expect(statusLabel(0.42, true, true, { newVersion: true })).toBe('New version')
+  })
+
   it('marks an unread book that is only in Drive', () => {
     expect(statusLabel(undefined, false)).toBe('Drive only')
     expect(statusLabel(0.3, false)).toBe('30%')

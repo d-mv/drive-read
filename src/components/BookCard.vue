@@ -19,7 +19,12 @@ const {
 }>()
 const emit = defineEmits<{ open: []; remove: [] }>()
 
-const status = computed(() => statusLabel(fraction, book.downloaded, online))
+const status = computed(() =>
+  statusLabel(fraction, book.downloaded, online, {
+    missingInDrive: book.missingInDrive,
+    newVersion: !!book.driveVersion,
+  }),
+)
 const unavailable = computed(() => !online && !book.downloaded)
 </script>
 

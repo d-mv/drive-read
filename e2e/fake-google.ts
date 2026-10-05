@@ -53,11 +53,13 @@ const CORS = {
   'access-control-allow-headers': 'authorization, content-type',
 }
 
-const asDrive = (f: FakeFile) => ({
+const asDrive = (f: FakeFile, md5: Record<string, string>) => ({
   id: f.id,
   name: f.name,
   mimeType: f.mimeType,
-  ...(f.mimeType === FOLDER ? {} : { size: String(EPUB.length), md5Checksum: `md5-${f.id}` }),
+  ...(f.mimeType === FOLDER
+    ? {}
+    : { size: String(EPUB.length), md5Checksum: md5[f.id] ?? `md5-${f.id}` }),
   modifiedTime: '2026-10-01T00:00:00Z',
 })
 
@@ -77,6 +79,10 @@ export interface FakeGoogle {
   searchDelayMs: number
   /** Drop the connection during downloads, as a lost network would. */
   abortDownloads: boolean
+  /** Files deleted from Drive: no longer listed, 404 on download. */
+  deleted: string[]
+  /** Files replaced in Drive: their new md5Checksum. */
+  md5: Record<string, string>
 }
 
 export async function fakeGoogle(
@@ -88,6 +94,8 @@ export async function fakeGoogle(
     downloads: [],
     searchDelayMs: 0,
     abortDownloads: false,
+    deleted: [],
+    md5: {},
   }
 
   await page.route('https://accounts.google.com/gsi/client', (route) =>
@@ -118,6 +126,8 @@ export async function fakeGoogle(
     }
     if (id && url.searchParams.get('alt') === 'media') {
       state.downloads.push(id)
+      if (state.deleted.includes(id))
+        return route.fulfill({ status: 404, headers: CORS, json: { error: { code: 404 } } })
       if (state.abortDownloads) return route.abort('connectionreset')
       if (state.downloadStatus !== 200)
         return route.fulfill({ status: state.downloadStatus, headers: CORS, body: '' })
@@ -137,12 +147,17 @@ export async function fakeGoogle(
     const name = /name contains '([^']+)'/.exec(q)?.[1]?.toLowerCase()
     if (parent === undefined && state.searchDelayMs > 0)
       await new Promise((r) => setTimeout(r, state.searchDelayMs))
-    const files = TREE.filter((f) =>
-      parent !== undefined
-        ? f.parent === parent
-        : f.mimeType !== FOLDER && (!name || f.name.toLowerCase().includes(name)),
+    const files = TREE.filter(
+      (f) =>
+        !state.deleted.includes(f.id) &&
+        (parent !== undefined
+          ? f.parent === parent
+          : f.mimeType !== FOLDER && (!name || f.name.toLowerCase().includes(name))),
     )
-    return route.fulfill({ headers: CORS, json: { files: files.map(asDrive) } })
+    return route.fulfill({
+      headers: CORS,
+      json: { files: files.map((f) => asDrive(f, state.md5)) },
+    })
   })
 
   await page.route('https://www.googleapis.com/upload/drive/v3/files**', async (route: Route) => {

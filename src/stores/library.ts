@@ -13,6 +13,7 @@ import type { DriveFile } from '@/services/drive/client'
 import { bookFromFileName } from '@/services/drive/names'
 import type { BookMeta, Position } from '@/services/engine/types'
 import { track } from '@/services/events'
+import type { DriveChange } from '@/services/sync/driveCheck'
 import { bookPath, coverPath } from '@/services/storage/blobs'
 import { requestPersistence } from '@/services/storage/persist'
 import { isErr, isNone } from '@/shared/result'
@@ -265,6 +266,22 @@ export const useLibrary = defineStore('library', () => {
   /** The file is (or is no longer) on this device. */
   const setDownloaded = (id: string, downloaded: boolean) => update(id, { downloaded })
 
+  /** Applies what the daily Drive check found (sync/driveCheck.ts). */
+  async function applyDriveChanges(changes: readonly DriveChange[]) {
+    for (const c of changes) await update(c.id, c.patch)
+  }
+
+  /**
+   * The reader takes the newer file from Drive: the old download goes and the next open fetches
+   * the new one. The position stays; a CFI that no longer resolves falls back to its fraction.
+   */
+  async function acceptNewVersion(id: string) {
+    const next = books.value.find((b) => b.id === id)?.driveVersion
+    if (!next) return
+    await useServices().blobs.remove(bookPath(id))
+    await update(id, { md5: next.md5, size: next.size, downloaded: false, driveVersion: undefined })
+  }
+
   /** Title, author, contents and cover from the opened book replace the file-name guess. */
   async function applyMeta(id: string, meta: BookMeta) {
     const hasCover = meta.cover
@@ -306,7 +323,7 @@ export const useLibrary = defineStore('library', () => {
     const book = books.value.find((b) => b.id === id)
     if (!book || book.source !== 'drive') return false
     await useServices().blobs.remove(bookPath(id))
-    await setDownloaded(id, false)
+    await update(id, { downloaded: false, driveVersion: undefined })
     track('library.download_removed', { format: book.format, bytes: book.size })
     return true
   }
@@ -333,6 +350,8 @@ export const useLibrary = defineStore('library', () => {
     addFromDrive,
     setDownloaded,
     removeDownload,
+    applyDriveChanges,
+    acceptNewVersion,
     verifyDownloads,
     applyMeta,
     markOpened,

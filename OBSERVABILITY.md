@@ -32,6 +32,8 @@ URLs with paths, tokens or emails.
 | `book.open_failed` | warn | `reason`, `format`, `source` | Broken, missing, offline, needs reconnect |
 | `book.downloaded` | info | `format`, `bytes`, `ms` | Download size and speed |
 | `reading.session` | info | `format`, `source`, `minutes`, `pages`, `from`, `to` | Real reading time and progress; sent on close and when the tab is hidden. `minutes` counts gaps between page turns, each capped at 5 min (idle); `pages` counts only real position changes |
+| `drive.checked` | info | `ms`, `books`, `missing`, `new_versions`, `complete` | Daily check of the library's Drive files: books gone from Drive, newer versions offered; `complete` = false when the listing may be cut short (nothing marked missing then) |
+| `drive.check_failed` | warn | `reason` | Why the daily check was skipped (it runs again on the next full sync) |
 | `drive.listed` | info | `kind` (`search`, `folder`), `ms`, `files`, `stale` | Drive browsing speed; `stale` = answer dropped as outdated |
 | `sync.completed` | info | `ms`, `pushed`, `adopted`, `offered`, `library_changes` | Sync health and volume; `offered` = conflicts and newer positions offered |
 | `sync.failed` | warn | `reason`, `pending` | Sync failures and the backlog they leave |

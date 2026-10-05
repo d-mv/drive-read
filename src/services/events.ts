@@ -24,6 +24,14 @@ export interface Events {
   'library.imported': { source: Source; added: number; failed: number; reason: string | null }
   'library.removed': { source: Source }
   'library.download_removed': { format: Format; bytes: number }
+  'drive.checked': {
+    ms: number
+    books: number
+    missing: number
+    new_versions: number
+    complete: boolean
+  }
+  'drive.check_failed': { reason: string }
   'book.opened': { format: Format; source: Source; ms: number; downloaded_now: boolean }
   'book.open_failed': { reason: string; format: Format | null; source: Source | null }
   'book.downloaded': { format: Format; bytes: number; ms: number }

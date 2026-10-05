@@ -18,6 +18,8 @@ export interface SyncMeta {
     dirty: boolean
   }
   lastSyncAt: string | null
+  /** Last daily check of the library's Drive files (sync/driveCheck.ts). */
+  driveCheckedAt?: string
 }
 
 interface Stores {

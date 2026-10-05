@@ -269,3 +269,60 @@ describe('measurements', () => {
     vi.restoreAllMocks()
   })
 })
+
+describe('Drive file changes', () => {
+  async function withDriveBooks(...ids: string[]) {
+    const d = await device(memoryAppData(), 'Laptop')
+    await useLibrary().addFromDrive(ids.map(driveFile))
+    return d
+  }
+
+  it('marks a book Drive no longer lists, once a day, without failing the sync', async () => {
+    const d = await withDriveBooks('a', 'b')
+    d.ctx.drive.searchBooks.mockResolvedValue(Ok([driveFile('a')]))
+    const info = vi.spyOn(logger, 'info')
+
+    await useSync().syncNow()
+    expect(d.ctx.drive.searchBooks).toHaveBeenCalledWith('tok', '')
+    expect(useLibrary().books.find((b) => b.id === 'b')?.missingInDrive).toBe(true)
+    expect(useLibrary().books.find((b) => b.id === 'a')?.missingInDrive).toBeUndefined()
+    expect(info).toHaveBeenCalledWith(
+      'drive.checked',
+      expect.objectContaining({ books: 2, missing: 1, new_versions: 0, complete: true }),
+    )
+    expect(useSync().status).toBe('idle')
+
+    await useSync().syncNow()
+    expect(d.ctx.drive.searchBooks).toHaveBeenCalledTimes(1)
+    d.ctx.advance(24 * 3_600_000)
+    await useSync().syncNow()
+    expect(d.ctx.drive.searchBooks).toHaveBeenCalledTimes(2)
+  })
+
+  it('offers a new version of a downloaded book', async () => {
+    const d = await withDriveBooks('a')
+    await d.ctx.blobs.put('books/a', new Blob(['old']))
+    await useLibrary().setDownloaded('a', true)
+    d.ctx.drive.searchBooks.mockResolvedValue(Ok([{ ...driveFile('a'), md5: 'md5-v2', size: 99 }]))
+    await useSync().syncNow()
+    expect(useLibrary().books[0]!.driveVersion).toEqual({ md5: 'md5-v2', size: 99 })
+  })
+
+  it('keeps the sync healthy when the check fails, and tries again on the next pass', async () => {
+    const d = await withDriveBooks('a')
+    d.ctx.drive.searchBooks.mockResolvedValue({ _tag: 'Err', error: { kind: 'rate-limited' } })
+    await useSync().syncNow()
+    expect(useSync().status).toBe('idle')
+    await useSync().syncNow()
+    expect(d.ctx.drive.searchBooks).toHaveBeenCalledTimes(2)
+  })
+
+  it('marks nothing missing when the listing may be cut short', async () => {
+    const d = await withDriveBooks('a')
+    d.ctx.drive.searchBooks.mockResolvedValue(
+      Ok(Array.from({ length: 5000 }, (_, i) => driveFile(`other-${i}`))),
+    )
+    await useSync().syncNow()
+    expect(useLibrary().books[0]!.missingInDrive).toBeUndefined()
+  })
+})

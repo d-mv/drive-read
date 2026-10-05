@@ -322,6 +322,59 @@ describe('removeDownload', () => {
   })
 })
 
+describe('Drive file changes', () => {
+  const driveBook = {
+    id: 'd1',
+    name: 'A.epub',
+    mimeType: 'application/epub+zip',
+    size: 100,
+    md5: 'v1',
+    modifiedTime: '',
+  }
+
+  it('applies and stores the changes found in Drive', async () => {
+    const { services } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveBook])
+    await library.applyDriveChanges([{ id: 'd1', patch: { missingInDrive: true } }])
+    expect(library.books[0]!.missingInDrive).toBe(true)
+    const stored = await services.db.getBook('d1')
+    expect(isSome(stored) && stored.value.missingInDrive).toBe(true)
+  })
+
+  it('takes a new version: the old file goes, the next open downloads the new one', async () => {
+    const { blobs } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveBook])
+    await blobs.put('books/d1', new Blob(['old']))
+    await library.setDownloaded('d1', true)
+    await library.saveProgress('d1', at(0.5))
+    await library.applyDriveChanges([
+      { id: 'd1', patch: { driveVersion: { md5: 'v2', size: 200 } } },
+    ])
+
+    await library.acceptNewVersion('d1')
+
+    expect(blobs.paths()).toEqual([])
+    expect(library.books[0]).toMatchObject({ downloaded: false, md5: 'v2', size: 200 })
+    expect(library.books[0]!.driveVersion).toBeUndefined()
+    expect(library.progress.d1?.fraction).toBe(0.5)
+  })
+
+  it('a removed download drops any pending version offer', async () => {
+    const { blobs } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveBook])
+    await blobs.put('books/d1', new Blob(['old']))
+    await library.setDownloaded('d1', true)
+    await library.applyDriveChanges([
+      { id: 'd1', patch: { driveVersion: { md5: 'v2', size: 200 } } },
+    ])
+    await library.removeDownload('d1')
+    expect(library.books[0]!.driveVersion).toBeUndefined()
+  })
+})
+
 describe('verifyDownloads', () => {
   it('returns books whose file the browser evicted to "Drive only"', async () => {
     const { blobs } = await setupServices()

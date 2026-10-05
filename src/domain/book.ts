@@ -19,6 +19,10 @@ export interface BookRecord {
   md5?: string | null
   /** Title and author guessed from the file name until the book is first opened. */
   provisional?: boolean
+  /** Drive no longer lists the file (deleted, trashed or access lost); the local copy still opens. */
+  missingInDrive?: boolean
+  /** The file changed in Drive after it was downloaded: the newer version, offered on open. */
+  driveVersion?: { md5: string; size: number }
 }
 
 /** Same shape locally and in Drive, minus the local-only `dirty` flag (architecture doc). */
@@ -131,7 +135,10 @@ export function statusLabel(
   fraction: number | undefined,
   downloaded: boolean,
   online = true,
+  drive: { missingInDrive?: boolean; newVersion?: boolean } = {},
 ): string {
+  if (drive.missingInDrive) return 'Missing in Drive'
+  if (drive.newVersion) return 'New version'
   const s = readingStatus(fraction)
   if (s === 'finished') return 'Finished'
   if (s === 'reading') return formatPercent(fraction!)
