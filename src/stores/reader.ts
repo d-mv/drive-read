@@ -46,6 +46,9 @@ const DOWNLOAD_ERROR: Record<DriveError['kind'], ReaderError> = {
 }
 
 /** The open book: engine lifecycle, position, and navigation. */
+const positionKey = (l: Locator) =>
+  l.kind === 'cfi' ? l.cfi : l.kind === 'page' ? `${l.page}:${Math.round(l.offset * 100)}` : l.href
+
 export const useReader = defineStore('reader', () => {
   const bookId = ref<string | null>(null)
   const status = ref<ReaderStatus>({ kind: 'idle' })
@@ -67,6 +70,7 @@ export const useReader = defineStore('reader', () => {
     from: number | null
     to: number
     pages: number
+    lastKey?: string
   } | null = null
   let downloadedNow = false
 
@@ -126,8 +130,11 @@ export const useReader = defineStore('reader', () => {
     if (record.provisional) await library.applyMeta(id, meta.value)
     next.onRelocate((r) => {
       if (measure) {
+        // Layout changes (resize, address bar, rotation) report the same position: not a page.
+        const key = positionKey(r.position.locator)
         if (measure.from === null) measure.from = r.position.fraction
-        else measure.pages++
+        else if (key !== measure.lastKey) measure.pages++
+        measure.lastKey = key
         measure.to = r.position.fraction
       }
       position.value = r.position

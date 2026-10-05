@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.1 — 2026-10-05
+
+Fixes found in the first production logs.
+
+- Accounts connected before v0.7.0 were never identified (`user_id` missing): the account is now
+  identified on start when a token is kept but no user id is recorded.
+- `reading.session` counted layout reports (address bar, rotation) as pages: a page now counts
+  only when the position changes.
+- `connect()` waits for identification, so identity is settled when it returns.
+
 ## 0.7.0 — 2026-10-05
 
 Observability and measurability (OBSERVABILITY.md).

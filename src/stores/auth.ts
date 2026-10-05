@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
 import type { AuthError, TokenGrant } from '@/services/auth/gis'
-import { saveUserId, userIdFromPermission } from '@/app/identity'
+import { loadUserId, saveUserId, userIdFromPermission } from '@/app/identity'
 import { track } from '@/services/events'
 import { logger } from '@/services/logger'
 import { None, type Option, Some } from '@/shared/result'
@@ -55,7 +55,11 @@ export const useAuth = defineStore('auth', () => {
   function restore() {
     safely(() => (everConnected.value = localStorage.getItem(CONNECTED_KEY) === '1'))
     const t = readSession()
-    if (fresh(t)) token.value = t
+    if (fresh(t)) {
+      token.value = t
+      // Connected before identification existed (or storage was cleared): identify now.
+      if (!loadUserId()) void identify(t!.accessToken)
+    }
   }
 
   /** Must run from a user gesture: it may open Google's sign-in popup. */
@@ -77,7 +81,8 @@ export const useAuth = defineStore('auth', () => {
         localStorage.setItem(CONNECTED_KEY, '1')
       })
       track('auth.connected', { first })
-      void identify(r.value.accessToken)
+      // Awaited (one small call) so identity is settled when connect() returns.
+      await identify(r.value.accessToken)
       return true
     } finally {
       busy.value = false
@@ -86,8 +91,10 @@ export const useAuth = defineStore('auth', () => {
 
   /** Pseudonymous account id for the logs: a hash of the Drive permission id, never the email. */
   async function identify(accessToken: string) {
-    const about = await useServices().drive.aboutUser(accessToken)
-    if (about._tag === 'Err') return
+    const about = await useServices()
+      .drive.aboutUser(accessToken)
+      .catch(() => null)
+    if (!about || about._tag === 'Err') return
     const userId = await userIdFromPermission(about.value.permissionId)
     saveUserId(userId)
     logger.setIdentity({ userId })

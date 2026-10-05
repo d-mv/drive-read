@@ -231,3 +231,20 @@ describe('measurements', () => {
     vi.restoreAllMocks()
   })
 })
+
+describe('reading.session pages', () => {
+  it('counts a page only when the position changes, not on layout reports', async () => {
+    const info = vi.spyOn(logger, 'info')
+    const { relocate } = await withBook()
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+    relocate(relocation(0.3)) // restored start
+    relocate(relocation(0.3)) // address bar slid: same position
+    relocate(relocation(0.3)) // rotation: same position
+    relocate(relocation(0.4)) // a real page turn
+    reader.close()
+    const session = info.mock.calls.find((c) => c[0] === 'reading.session')![1]
+    expect(session).toMatchObject({ pages: 1, from: 0.3, to: 0.4 })
+    vi.restoreAllMocks()
+  })
+})
