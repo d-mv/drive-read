@@ -271,3 +271,51 @@ describe('reading.session minutes', () => {
     vi.useRealTimers()
   })
 })
+
+describe('zoom (PDF)', () => {
+  /** A zoomable engine, as the PDF one is; `pinch` reports a zoom made by gesture. */
+  async function withZoomableBook() {
+    const ctx = await withBook()
+    let zoomCb: ((z: number) => void) | undefined
+    ctx.engine.setZoom = vi.fn<(z: number) => Promise<void>>(async () => {})
+    ctx.engine.onZoom = vi.fn<(cb: (z: number) => void) => void>((cb) => {
+      zoomCb = cb
+    })
+    await useReader().open('local-abc', document.createElement('div'))
+    return { ...ctx, pinch: (z: number) => zoomCb?.(z) }
+  }
+
+  it('is not offered by engines that cannot zoom', async () => {
+    await withBook()
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+    expect(reader.zoomable).toBe(false)
+    await reader.zoomBy(1)
+    expect(reader.zoom).toBe(1)
+  })
+
+  it('steps through the levels and back to fit', async () => {
+    const { engine } = await withZoomableBook()
+    const reader = useReader()
+    expect(reader.zoomable).toBe(true)
+    await reader.zoomBy(1)
+    expect(engine.setZoom).toHaveBeenLastCalledWith(1.25)
+    expect(reader.zoom).toBe(1.25)
+    await reader.zoomBy(1)
+    expect(reader.zoom).toBe(1.5)
+    await reader.zoomBy(0)
+    expect(engine.setZoom).toHaveBeenLastCalledWith(1)
+    expect(reader.zoom).toBe(1)
+  })
+
+  it('follows a pinch, and starts every book at fit', async () => {
+    const { pinch } = await withZoomableBook()
+    const reader = useReader()
+    pinch(1.8)
+    expect(reader.zoom).toBe(1.8)
+    await reader.zoomBy(1)
+    expect(reader.zoom).toBe(2)
+    reader.close()
+    expect(reader.zoom).toBe(1)
+  })
+})

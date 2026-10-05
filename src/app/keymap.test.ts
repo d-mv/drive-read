@@ -58,3 +58,22 @@ describe('keyAction while typing', () => {
     expect(keyAction('library', key('Escape', { editable: true }))).toEqual(Some('blur'))
   })
 })
+
+describe('PDF zoom keys', () => {
+  const press = (key: string, shiftKey = false) =>
+    keyAction('reader', {
+      key,
+      shiftKey,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      editable: false,
+    })
+
+  it('maps + and = to zoom in, - to zoom out, 0 to fit the width', () => {
+    expect(press('+', true)).toEqual(Some('zoom-in'))
+    expect(press('=')).toEqual(Some('zoom-in'))
+    expect(press('-')).toEqual(Some('zoom-out'))
+    expect(press('0')).toEqual(Some('zoom-reset'))
+  })
+})

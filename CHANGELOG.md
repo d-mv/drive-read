@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.0 — 2026-10-05
+
+- PDF zoom: 100–300% of the fitted width with − / % / + in the footer, the keys `+` `-` `0`, or a
+  two-finger pinch (the page follows the fingers, then renders sharp). Zoomed in, a swipe pans
+  instead of turning the page. Canvas resolution is capped at 16 M pixels (iOS limit).
+- PDF text layer: page text is selectable and copyable (and found by the browser's find).
+- pdf.js data files served from `/pdfjs/` (`scripts/pdfjs-assets.ts`): standard fonts, ICC
+  profiles and the WebAssembly decoders for JPEG 2000, JBIG2 and colour are precached; CMaps (CJK)
+  are cached on first use. CSP `script-src` adds `'wasm-unsafe-eval'` (WebAssembly only, no JS eval).
+- foliate-js's own PDF path is stubbed at build time: ~400 KB of a second pdf.js is no longer
+  shipped or precached.
+- Fix: every PDF open rendered its first page twice.
+- Tests: zoom levels (fast-check), keys, reader store zoom; e2e for zoom, pinch (two-finger CDP
+  touches), the text layer, and the data files under the CSP.
+
 ## 0.10.0 — 2026-10-05
 
 - Drive file changes: once a day, after a full sync with a valid token, the app lists every EPUB

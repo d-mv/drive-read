@@ -4,14 +4,33 @@ import { fileURLToPath, URL } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 import { CSP } from './csp'
+import { pdfjsAssets } from './scripts/pdfjs-assets'
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 const PAPER = '#F3F0E8'
+
+/**
+ * foliate-js opens PDFs through its own vendored pdf.js (`view.js` → `./pdf.js`); this app opens
+ * PDFs with pdfjs-dist instead (services/engine/pdf.ts), so that import becomes a stub and ~400 KB
+ * of unused pdf.js is neither shipped nor precached.
+ */
+const noFoliatePdf: Plugin = {
+  name: 'drive-read:no-foliate-pdf',
+  enforce: 'pre',
+  resolveId(id, importer) {
+    if (id === './pdf.js' && importer?.replaceAll('\\', '/').endsWith('vendor/foliate-js/view.js'))
+      return '\0foliate-pdf-stub'
+  },
+  load(id) {
+    if (id === '\0foliate-pdf-stub')
+      return "export const makePDF = () => { throw new Error('PDFs open with the pdf.js engine') }"
+  },
+}
 
 export default defineConfig({
   // DR_APP_VERSION overrides the version for the e2e update test (two builds, two versions).
@@ -19,6 +38,8 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     vue(),
+    pdfjsAssets(),
+    noFoliatePdf,
     VitePWA({
       // A new worker waits; the library shows "Update available". Never reloads mid-book.
       registerType: 'prompt',
@@ -52,8 +73,20 @@ export default defineConfig({
         } as object),
       },
       workbox: {
-        // Both engines (foliate-js, pdf.js and its worker) are precached: books open offline.
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+        // Both engines (foliate-js, pdf.js and its worker) are precached: books open offline,
+        // with pdf.js's standard fonts, colour profiles and image decoders. CMaps (CJK text,
+        // 1.6 MB) are cached on first use instead.
+        globPatterns: [
+          '**/*.{js,mjs,css,html,svg,png,woff2}',
+          'pdfjs/{standard_fonts,iccs,wasm}/*.{pfb,ttf,icc,wasm}',
+        ],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/pdfjs/cmaps/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'pdfjs-cmaps' },
+          },
+        ],
         navigateFallback: '/index.html',
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },

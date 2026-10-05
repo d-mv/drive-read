@@ -58,3 +58,21 @@ export function step(
     ? { kind: 'scroll', top: Math.max(0, view.top - view.viewport * STEP) }
     : { kind: 'page' }
 }
+
+/** Zoom relative to the page fitted to the reading width (1 = fit). */
+export const ZOOM_LEVELS: readonly number[] = [1, 1.25, 1.5, 2, 2.5, 3]
+const MIN_ZOOM = ZOOM_LEVELS[0]!
+const MAX_ZOOM = ZOOM_LEVELS[ZOOM_LEVELS.length - 1]!
+const EPS = 1e-9
+
+/** The next level in `dir` from `zoom` (which may sit between levels after a pinch). */
+export function stepZoom(zoom: number, dir: 1 | -1): number {
+  return dir === 1
+    ? (ZOOM_LEVELS.find((l) => l > zoom + EPS) ?? MAX_ZOOM)
+    : (ZOOM_LEVELS.findLast((l) => l < zoom - EPS) ?? MIN_ZOOM)
+}
+
+/** The zoom after a pinch that scaled the page by `ratio`, within range and rounded to 5%. */
+export function pinchZoom(zoom: number, ratio: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(zoom * ratio * 20) / 20))
+}

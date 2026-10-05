@@ -13,6 +13,10 @@ export type KeyAction =
   | 'search'
   | 'resume'
   | 'blur'
+  /** PDF only. */
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'zoom-reset'
 
 export interface KeyInput {
   key: string
@@ -34,6 +38,10 @@ const READER: Record<string, KeyAction> = {
   a: 'settings',
   t: 'theme',
   Escape: 'back',
+  '+': 'zoom-in',
+  '=': 'zoom-in',
+  '-': 'zoom-out',
+  '0': 'zoom-reset',
 }
 
 const LIBRARY: Record<string, KeyAction> = {

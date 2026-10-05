@@ -9,7 +9,7 @@ import { memoryBlobStore, type MemoryBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
 import { Err, Ok, type Result } from '@/shared/result'
 
-export type MockEngine = { [K in keyof BookEngine]: Mock<BookEngine[K]> }
+export type MockEngine = { [K in keyof BookEngine]: Mock<NonNullable<BookEngine[K]>> }
 export interface FakeEngine {
   engine: MockEngine
   relocate: (r: Relocation) => void

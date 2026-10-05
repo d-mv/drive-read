@@ -152,6 +152,11 @@ function onKeydown(e: KeyboardEvent) {
     settings: () => togglePanel('settings'),
     theme: () => void settings.toggleTheme(),
     back: () => (panel.value !== 'none' ? void closePanel() : back()),
+    ...(reader.zoomable && {
+      'zoom-in': () => void reader.zoomBy(1),
+      'zoom-out': () => void reader.zoomBy(-1),
+      'zoom-reset': () => void reader.zoomBy(0),
+    }),
   }
   const fn = run[action.value]
   if (!fn) return
@@ -398,6 +403,39 @@ onBeforeUnmount(() => {
         <span v-if="chapterLabel" class="hidden truncate font-ui text-[13px] sm:inline">{{
           chapterLabel
         }}</span>
+        <div
+          v-if="reader.zoomable && reader.status.kind === 'ready'"
+          role="group"
+          aria-label="Zoom"
+          class="flex items-center"
+        >
+          <button
+            type="button"
+            aria-label="Zoom out"
+            class="flex size-11 items-center justify-center text-ink disabled:opacity-35"
+            :disabled="reader.zoom <= 1"
+            @click="reader.zoomBy(-1)"
+          >
+            <AppIcon name="minus" :size="16" />
+          </button>
+          <button
+            type="button"
+            class="h-11 min-w-12 text-ink"
+            :aria-label="`${Math.round(reader.zoom * 100)}%, fit to width`"
+            @click="reader.zoomBy(0)"
+          >
+            {{ Math.round(reader.zoom * 100) }}%
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            class="flex size-11 items-center justify-center text-ink disabled:opacity-35"
+            :disabled="reader.zoom >= 3"
+            @click="reader.zoomBy(1)"
+          >
+            <AppIcon name="plus" :size="16" />
+          </button>
+        </div>
         <span v-if="reader.page" class="ml-auto"
           >Page {{ reader.page.current }} of {{ reader.page.total }}</span
         >

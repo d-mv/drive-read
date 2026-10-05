@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { IDLE_MS } from '@/domain/reading'
 import { useServices } from '@/services'
 import type { DriveError } from '@/services/drive/client'
+import { stepZoom } from '@/services/engine/pdf-layout'
 import { chapterAt } from '@/services/engine/progress'
 import type {
   BookEngine,
@@ -57,6 +58,9 @@ export const useReader = defineStore('reader', () => {
   const chapterMinutesLeft = ref<number | null>(null)
   const page = ref<{ current: number; total: number } | null>(null)
   const toc = ref<TocEntry[]>([])
+  /** PDF zoom, relative to the page fitted to the width; only zoomable engines offer it. */
+  const zoom = ref(1)
+  const zoomable = ref(false)
 
   // Not reactive: the engine owns DOM and a custom element.
   let engine: BookEngine | null = null
@@ -150,6 +154,8 @@ export const useReader = defineStore('reader', () => {
       void library.saveProgress(id, r.position)
     })
     if (opts.onKeydown) next.onKeydown(opts.onKeydown)
+    zoomable.value = !!next.setZoom
+    next.onZoom?.((z) => (zoom.value = z))
 
     const saved = library.progress[id]
     const restore: Restore | undefined = saved
@@ -279,6 +285,8 @@ export const useReader = defineStore('reader', () => {
     chapterMinutesLeft.value = null
     page.value = null
     toc.value = []
+    zoom.value = 1
+    zoomable.value = false
     status.value = { kind: 'idle' }
   }
 
@@ -290,6 +298,14 @@ export const useReader = defineStore('reader', () => {
   }
   const goTo = async (loc: Locator) => {
     await engine?.goTo(loc)
+  }
+
+  /** One zoom level in or out, or back to fitting the width (0). */
+  async function zoomBy(dir: 1 | -1 | 0) {
+    if (!engine?.setZoom) return
+    const to = dir === 0 ? 1 : stepZoom(zoom.value, dir)
+    zoom.value = to
+    await engine.setZoom(to)
   }
 
   function setTheme(t: ReaderTheme) {
@@ -313,5 +329,8 @@ export const useReader = defineStore('reader', () => {
     goTo,
     setTheme,
     flushSession,
+    zoom,
+    zoomable,
+    zoomBy,
   }
 })

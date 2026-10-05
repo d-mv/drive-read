@@ -3,7 +3,15 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 import { Err, Ok, type Result } from '@/shared/result'
 
-import { fractionOf, locateFraction, outlineToc, type PagePosition, step } from './pdf-layout'
+import './pdf-text-layer.css'
+import {
+  fractionOf,
+  locateFraction,
+  outlineToc,
+  type PagePosition,
+  pinchZoom,
+  step,
+} from './pdf-layout'
 import { chapterAt } from './progress'
 import type {
   BookEngine,
@@ -18,8 +26,9 @@ import type {
 
 /**
  * PDF engine on pdf.js (architecture doc, "Engines"): pages render to a canvas, fitted to the
- * reading width; a page taller than the screen scrolls before the next one turns. Pages keep
- * their own colours: dark mode changes only the surround. Loaded as a lazy chunk.
+ * reading width times the zoom; a page taller than the screen scrolls before the next one turns.
+ * A text layer over the canvas makes the text selectable. Pages keep their own colours: dark mode
+ * changes only the surround. Loaded as a lazy chunk.
  */
 
 const loadPdfjs = async () => {
@@ -28,10 +37,21 @@ const loadPdfjs = async () => {
   return lib
 }
 
+/** pdf.js data files, served by scripts/pdfjs-assets.ts. */
+const PDFJS_DATA = {
+  standardFontDataUrl: '/pdfjs/standard_fonts/',
+  cMapUrl: '/pdfjs/cmaps/',
+  cMapPacked: true,
+  iccUrl: '/pdfjs/iccs/',
+  wasmUrl: '/pdfjs/wasm/',
+}
+
 /** Margins → page width: PDF pages are wider than a text column. */
 const PAGE_WIDTH_FACTOR = 1.45
 const COVER_WIDTH = 360
 const SWIPE_PX = 50
+/** iOS Safari draws nothing on a canvas above ~16.7 M pixels: high zoom lowers the resolution. */
+const MAX_CANVAS_PIXELS = 16_000_000
 
 type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
 
@@ -71,9 +91,13 @@ export function createPdfEngine(): BookEngine {
   let maxWidth = 900
   let relocateCb: ((r: Relocation) => void) | undefined
 
+  let pdfjs: Awaited<ReturnType<typeof loadPdfjs>> | null = null
   let scroller: HTMLDivElement | null = null
-  let canvas: HTMLCanvasElement | null = null
+  /** The page shown: canvas plus text layer. */
+  let pageEl: HTMLElement | null = null
   let task: RenderTask | null = null
+  let zoom = 1
+  let zoomCb: ((zoom: number) => void) | undefined
   let resize: ResizeObserver | null = null
   let lastWidth = 0
   const cleanup: (() => void)[] = []
@@ -81,7 +105,8 @@ export function createPdfEngine(): BookEngine {
   async function open(file: File): Promise<Result<BookMeta, OpenError>> {
     try {
       const lib = await loadPdfjs()
-      loading = lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) })
+      pdfjs = lib
+      loading = lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), ...PDFJS_DATA })
       doc = await loading.promise
     } catch (e) {
       // Encrypted (password) or damaged files land here.
@@ -127,34 +152,66 @@ export function createPdfEngine(): BookEngine {
     })
   }
 
-  /** Renders page `index` fitted to the width, then scrolls to `offset` (0..1) of it. */
+  /**
+   * Renders page `index` at the fitted width times the zoom, with its text layer, then scrolls to
+   * `offset` (0..1) down it, keeping the horizontal position when zoomed.
+   */
   async function show(index: number, offset: number) {
-    if (!doc || !scroller || !canvas) return
+    if (!doc || !scroller || !pageEl) return
     const pageIndex = Math.min(doc.numPages - 1, Math.max(0, index))
     task?.cancel()
     const page = await doc.getPage(pageIndex + 1)
     const base = page.getViewport({ scale: 1 })
-    const cssWidth = Math.min(scroller.clientWidth, maxWidth)
+    const cssWidth = Math.min(scroller.clientWidth, maxWidth) * zoom
     lastWidth = scroller.clientWidth
-    const dpr = window.devicePixelRatio || 1
-    const viewport = page.getViewport({ scale: (cssWidth / base.width) * dpr })
-    const next = document.createElement('canvas')
-    next.width = Math.round(viewport.width)
-    next.height = Math.round(viewport.height)
-    next.style.cssText = `display:block;margin:0 auto;width:${cssWidth}px;height:${viewport.height / dpr}px;background:#fff`
-    next.setAttribute('role', 'img')
-    next.setAttribute('aria-label', `Page ${pageIndex + 1} of ${doc.numPages}`)
-    task = page.render({ canvas: next, viewport })
+    const cssViewport = page.getViewport({ scale: cssWidth / base.width })
+    const area = cssViewport.width * cssViewport.height
+    const dpr = Math.min(window.devicePixelRatio || 1, Math.sqrt(MAX_CANVAS_PIXELS / area))
+    const viewport = page.getViewport({ scale: cssViewport.scale * dpr })
+
+    const next = document.createElement('div')
+    next.className = 'pdf-page'
+    next.style.cssText = `width:${cssViewport.width}px;height:${cssViewport.height}px;--total-scale-factor:${cssViewport.scale}`
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(viewport.width)
+    canvas.height = Math.round(viewport.height)
+    canvas.style.cssText = 'display:block;width:100%;height:100%'
+    canvas.setAttribute('role', 'img')
+    canvas.setAttribute('aria-label', `Page ${pageIndex + 1} of ${doc.numPages}`)
+    const text = document.createElement('div')
+    text.className = 'textLayer'
+    next.append(canvas, text)
+
+    task = page.render({ canvas, viewport })
     try {
       await task.promise
     } catch {
       return // cancelled by a newer render
     }
-    canvas.replaceWith(next)
-    canvas = next
+    if (pdfjs)
+      await new pdfjs.TextLayer({
+        textContentSource: page.streamTextContent(),
+        container: text,
+        viewport: cssViewport,
+      })
+        .render()
+        .catch(() => {}) // a page without usable text still reads as an image
+
+    const across =
+      scroller.scrollWidth > scroller.clientWidth
+        ? scroller.scrollLeft / (scroller.scrollWidth - scroller.clientWidth)
+        : 0.5
+    pageEl.replaceWith(next)
+    pageEl = next
     at = { page: pageIndex, offset }
     scroller.scrollTop = offset * Math.max(0, scroller.scrollHeight - scroller.clientHeight)
+    scroller.scrollLeft = across * Math.max(0, scroller.scrollWidth - scroller.clientWidth)
     emit()
+  }
+
+  async function setZoom(z: number) {
+    zoom = z
+    await show(at.page, at.offset)
   }
 
   function onScroll() {
@@ -183,29 +240,63 @@ export function createPdfEngine(): BookEngine {
   async function mount(el: HTMLElement, restore?: Restore) {
     if (!doc) throw new Error('open() before mount()')
     scroller = document.createElement('div')
+    // touch-action: the app handles pinches (zoom); the browser only pans.
     scroller.style.cssText =
-      'position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:16px 0'
+      'position:absolute;inset:0;overflow:auto;padding:16px 0;touch-action:pan-x pan-y'
     scroller.tabIndex = -1
-    canvas = document.createElement('canvas')
-    scroller.append(canvas)
+    pageEl = document.createElement('div')
+    scroller.append(pageEl)
     el.append(scroller)
 
     const onScrollEvt = () => onScroll()
     scroller.addEventListener('scroll', onScrollEvt, { passive: true })
+    // One finger swipes turn pages (at fit; zoomed in, a swipe pans). Two fingers pinch: the
+    // page scales with the fingers, then renders sharp at the new zoom.
     let startX = 0
-    const touchStart = (e: TouchEvent) => (startX = e.touches[0]?.clientX ?? 0)
+    let pinchFrom = 0
+    let ratio = 1
+    const gap = (t: TouchList) =>
+      Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
+    const touchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinchFrom = gap(e.touches)
+        ratio = 1
+      } else startX = e.touches[0]?.clientX ?? 0
+    }
+    const touchMove = (e: TouchEvent) => {
+      if (!pinchFrom || e.touches.length !== 2 || !pageEl) return
+      ratio = gap(e.touches) / pinchFrom
+      pageEl.style.transform = `scale(${ratio})`
+      pageEl.style.transformOrigin = 'center top'
+    }
     const touchEnd = (e: TouchEvent) => {
+      if (pinchFrom) {
+        if (e.touches.length > 0) return
+        pinchFrom = 0
+        if (pageEl) pageEl.style.transform = ''
+        const next = pinchZoom(zoom, ratio)
+        if (next !== zoom) {
+          void setZoom(next)
+          zoomCb?.(next)
+        }
+        return
+      }
+      if (zoom > 1) return
       const dx = (e.changedTouches[0]?.clientX ?? startX) - startX
       if (Math.abs(dx) > SWIPE_PX) void turn(dx < 0 ? 1 : -1)
     }
     scroller.addEventListener('touchstart', touchStart, { passive: true })
+    scroller.addEventListener('touchmove', touchMove, { passive: true })
     scroller.addEventListener('touchend', touchEnd)
     cleanup.push(() => {
       scroller?.removeEventListener('scroll', onScrollEvt)
       scroller?.removeEventListener('touchstart', touchStart)
+      scroller?.removeEventListener('touchmove', touchMove)
       scroller?.removeEventListener('touchend', touchEnd)
     })
 
+    // The observer reports the current size at once: without this, every open rendered twice.
+    lastWidth = scroller.clientWidth
     resize = new ResizeObserver(() => {
       if (scroller && Math.abs(scroller.clientWidth - lastWidth) > 1) void show(at.page, at.offset)
     })
@@ -243,12 +334,17 @@ export function createPdfEngine(): BookEngine {
     },
     // Keys reach the app directly: there is no frame.
     onKeydown() {},
+    setZoom,
+    onZoom(cb) {
+      zoomCb = cb
+    },
     destroy() {
       task?.cancel()
       resize?.disconnect()
       for (const fn of cleanup.splice(0)) fn()
       scroller?.remove()
-      scroller = canvas = null
+      scroller = pageEl = null
+      pdfjs = null
       void loading?.destroy()
       loading = null
       doc = null

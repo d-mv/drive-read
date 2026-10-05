@@ -15,6 +15,10 @@ export interface BookEngine {
   onRelocate(cb: (r: Relocation) => void): void
   /** Keys pressed inside the book frame, which do not reach the app document. */
   onKeydown(cb: (e: KeyboardEvent) => void): void
+  /** PDF only: zoom relative to the page fitted to the reading width (1 = fit). */
+  setZoom?(zoom: number): Promise<void>
+  /** PDF only: the zoom changed by a pinch. */
+  onZoom?(cb: (zoom: number) => void): void
   destroy(): void
 }
 

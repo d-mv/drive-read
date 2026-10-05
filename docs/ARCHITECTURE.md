@@ -269,7 +269,7 @@ flowchart LR
 | Format | Engine | Notes |
 | --- | --- | --- |
 | EPUB | foliate-js (git submodule, pinned commit) | Paginated, reader themes and typefaces, CFI positions; book scripts blocked by CSP |
-| PDF | pdfjs-dist 6 | Pages scaled to width, scrolled; position is page + offset; no zoom or text layer yet (planned) |
+| PDF | pdfjs-dist 6 | Pages fitted to width and scrolled; zoom 100–300% (buttons, `+` `-` `0`, pinch); a text layer makes text selectable; standard fonts, CMaps, ICC profiles and WebAssembly image decoders (JPEG 2000, JBIG2) served from `/pdfjs/`; position is page + offset |
 
 Local books (opened from the device) go straight to OPFS, keyed by a content hash. They stay on
 that device: they are not in `library.json` and their progress does not sync.
@@ -314,6 +314,8 @@ The service worker caches only the app shell; books and sync records never pass 
 | --- | --- | --- |
 | HTML, JS, CSS, fonts, icons | Cache Storage, Workbox precache | Precached, versioned by build hash |
 | Engine chunks (foliate-js, pdf.js and its worker) | Cache Storage | Precached, so both formats open offline |
+| pdf.js data: standard fonts, ICC profiles, WebAssembly decoders | Cache Storage | Precached (`scripts/pdfjs-assets.ts` emits them to `/pdfjs/`) |
+| pdf.js CMaps (CJK text, 1.6 MB) | Cache Storage | Cached on first use |
 | Book files and covers | OPFS | Written by the app |
 | Drive API responses | Not cached | Network only |
 | Google Identity script | Not cached | Loaded on demand |
@@ -445,7 +447,7 @@ flowchart LR
 
 ```text
 default-src 'self';
-script-src 'self' https://accounts.google.com;
+script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com;
 connect-src 'self' https://www.googleapis.com https://accounts.google.com https://logger-api.mlnkv.net;
 frame-src blob: https://accounts.google.com;
 img-src 'self' blob: data:;
@@ -455,6 +457,9 @@ worker-src 'self' blob:
 ```
 
 `script-src` allows neither `blob:` nor `'unsafe-inline'`, so a script inside a book cannot run.
+`'wasm-unsafe-eval'` only lets pdf.js compile its own WebAssembly decoders, served from `'self'`;
+it allows no JavaScript eval. foliate-js's own PDF path (with a second, vendored pdf.js) is
+replaced by a stub at build time, so it is neither shipped nor precached.
 
 **Google Cloud:** OAuth Web client with origins `http://localhost:5173` and
 `https://drive-read.mlnkv.net`, no redirect URIs; Drive API enabled; no API key; consent screen
