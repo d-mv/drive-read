@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3 — 2026-10-05
+
+- Docs: `docs/ARCHITECTURE.md` (renamed from `Ebook Reader Architecture.md`) rewritten as built,
+  with Mermaid diagrams for system context, sign-in, book pipeline, sync decisions, updates,
+  observability and deployment. No code changes.
+
 ## 0.8.2 — 2026-10-05
 
 - Fix: Reload on the update notice did nothing on the owner's phone (logs: six taps, same
