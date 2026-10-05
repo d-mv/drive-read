@@ -7,14 +7,24 @@ import AppIcon from './AppIcon.vue'
 import BookCover from './BookCover.vue'
 
 /** A book in the list. */
-const { book, fraction } = defineProps<{ book: BookRecord; fraction: number | undefined }>()
+const {
+  book,
+  fraction,
+  online = true,
+} = defineProps<{
+  book: BookRecord
+  fraction: number | undefined
+  /** Offline, a book not on this device cannot open: shown dimmed. */
+  online?: boolean
+}>()
 const emit = defineEmits<{ open: []; remove: [] }>()
 
-const status = computed(() => statusLabel(fraction, book.downloaded))
+const status = computed(() => statusLabel(fraction, book.downloaded, online))
+const unavailable = computed(() => !online && !book.downloaded)
 </script>
 
 <template>
-  <li class="flex items-center gap-1 border-t border-rule">
+  <li class="flex items-center gap-1 border-t border-rule" :class="unavailable && 'opacity-45'">
     <a
       :href="`/read/${book.id}`"
       class="grid min-w-0 flex-1 grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-x-3.5 py-2"

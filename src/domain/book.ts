@@ -111,9 +111,14 @@ export function filterCounts(items: readonly LibraryItem[]): Record<LibraryFilte
 }
 
 /** The status line on a library card or row. */
-export function statusLabel(fraction: number | undefined, downloaded: boolean): string {
+export function statusLabel(
+  fraction: number | undefined,
+  downloaded: boolean,
+  online = true,
+): string {
   const s = readingStatus(fraction)
   if (s === 'finished') return 'Finished'
   if (s === 'reading') return formatPercent(fraction!)
-  return downloaded ? '' : 'Drive only'
+  if (downloaded) return ''
+  return online ? 'Drive only' : 'Not downloaded'
 }

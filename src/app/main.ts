@@ -9,6 +9,7 @@ import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 
 import { provideServices } from '@/services'
+import { track } from '@/services/events'
 import { createGis } from '@/services/auth/gis'
 import { createAppData } from '@/services/drive/appdata'
 import { createDriveApi } from '@/services/drive/client'
@@ -27,7 +28,7 @@ import { currentDevice } from './device'
 import { router } from './router'
 import { startSyncTriggers } from './syncTriggers'
 import { startInstallWatch } from './install'
-import { reportStarted, startObservability } from './observability'
+import { reportStarted, startObservability, vueErrorEvent } from './observability'
 import { registerServiceWorker } from './update'
 
 declare global {
@@ -53,10 +54,16 @@ async function start() {
 
   startObservability(currentDeviceValue)
   const app = createApp(App).use(createPinia())
+  app.config.errorHandler = (err, _instance, info) => {
+    console.error(err)
+    track('error.uncaught', vueErrorEvent(err, info))
+  }
   useAuth().restore()
   await Promise.all([useSettings().load(), useLibrary().load(), useSync().load()])
   app.use(router).mount('#app')
   reportStarted(useLibrary().books.length)
+  // Books the browser deleted under storage pressure go back to "Drive only".
+  void useLibrary().verifyDownloads()
 
   // Opened from the OS ("Open with Drive Read"), where the browser supports file handlers.
   window.launchQueue?.setConsumer(async ({ files }) => {

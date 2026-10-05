@@ -87,3 +87,10 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **CSP violations report only the blocked origin or kind** (`blob`, `inline`, …). A blob URL or path could name a book.
 - **Log levels come from event names.** A test caught that `sync.failed` was logged as info; the rule is now `[._]failed$`.
 - **Logger retention is 7 days.** Long-term trends need longer retention or periodic aggregates (Kairos task).
+
+## 2026-10-05: Hardening, first pass (v0.8.0)
+
+- **One idle threshold (5 min, `domain/reading.ts`) for both the wake lock and reading time.** Keeping the screen on with nobody reading would drain the battery, and counting that time would inflate `reading.session`.
+- **An interrupted download shows the "offline" message with Try again.** The doc suggested a Retry on the library row; the reader screen is where the user is when it happens.
+- **Deferred to their own tasks:** noticing a file replaced in Drive (md5), "Missing in Drive" on library rows, and "Remove download" to free space.
+- **The phone checks stay with the owner:** sign-in in the installed app, and install and update on a phone.

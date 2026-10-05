@@ -30,15 +30,16 @@ URLs with paths, tokens or emails.
 | `book.opened` | info | `format`, `source`, `ms`, `downloaded_now` | Time to open, with and without download |
 | `book.open_failed` | warn | `reason`, `format`, `source` | Broken, missing, offline, needs reconnect |
 | `book.downloaded` | info | `format`, `bytes`, `ms` | Download size and speed |
-| `reading.session` | info | `format`, `source`, `minutes`, `pages`, `from`, `to` | Real reading time and progress; sent on close and when the tab is hidden |
+| `reading.session` | info | `format`, `source`, `minutes`, `pages`, `from`, `to` | Real reading time and progress; sent on close and when the tab is hidden. `minutes` counts gaps between page turns, each capped at 5 min (idle); `pages` counts only real position changes |
 | `drive.listed` | info | `kind` (`search`, `folder`), `ms`, `files`, `stale` | Drive browsing speed; `stale` = answer dropped as outdated |
 | `sync.completed` | info | `ms`, `pushed`, `adopted`, `offered`, `library_changes` | Sync health and volume; `offered` = conflicts and newer positions offered |
 | `sync.failed` | warn | `reason`, `pending` | Sync failures and the backlog they leave |
 | `storage.persisted` | info | `granted`, `usage_mb`, `quota_mb` | Whether the browser keeps books under pressure, space used |
+| `storage.evicted` | info | `books` | Books whose file the browser deleted under storage pressure (back to "Drive only") |
 | `storage.write_failed` | warn | `what` (`progress`, `book`), `reason` (`quota`, `unknown`) | Lost writes |
 | `pwa.update_available`, `pwa.update_applied`, `pwa.updated` (`from`, `to`), `pwa.offline_ready` | info | | Update uptake: offered → applied → running |
 | `pwa.install_prompted`, `pwa.install_result` (`outcome`), `pwa.installed` | info | | Install funnel |
-| `error.uncaught` | error | `message` (≤300 chars), `source` (`chunk.js:line` or `promise`) | Crashes |
+| `error.uncaught` | error | `message` (≤300 chars), `source` (`chunk.js:line`, `promise` or `vue:<where>`) | Crashes, including Vue render and handler errors. The browser's "ResizeObserver loop" notice is ignored |
 | `csp.violation` | warn | `directive`, `blocked` (origin or kind only) | Blocked content, e.g. scripts inside books (`blob`) |
 
 ## Asking questions

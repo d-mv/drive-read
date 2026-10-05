@@ -248,3 +248,26 @@ describe('reading.session pages', () => {
     vi.restoreAllMocks()
   })
 })
+
+describe('reading.session minutes', () => {
+  it('counts idle gaps (no page turn) as at most 5 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-05T10:00:00Z'))
+    const info = vi.spyOn(logger, 'info')
+    const { relocate } = await withBook()
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+    relocate(relocation(0.3))
+    vi.setSystemTime(new Date('2026-10-05T10:02:00Z')) // read 2 min
+    relocate(relocation(0.4))
+    vi.setSystemTime(new Date('2026-10-05T11:30:00Z')) // phone left on the table
+    relocate(relocation(0.5))
+    vi.setSystemTime(new Date('2026-10-05T11:31:00Z'))
+    reader.close()
+    const session = info.mock.calls.find((c) => c[0] === 'reading.session')![1]
+    // 2 + min(88, 5) + 1 = 8 minutes, not 91.
+    expect(session).toMatchObject({ minutes: 8, pages: 2 })
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+})

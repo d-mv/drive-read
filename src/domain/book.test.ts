@@ -119,6 +119,12 @@ describe('statusLabel', () => {
     expect(statusLabel(undefined, true)).toBe('')
   })
 
+  it('says "Not downloaded" for a Drive-only book while offline', () => {
+    expect(statusLabel(undefined, false, false)).toBe('Not downloaded')
+    expect(statusLabel(0.3, false, false)).toBe('30%')
+    expect(statusLabel(undefined, true, false)).toBe('')
+  })
+
   it('marks an unread book that is only in Drive', () => {
     expect(statusLabel(undefined, false)).toBe('Drive only')
     expect(statusLabel(0.3, false)).toBe('30%')

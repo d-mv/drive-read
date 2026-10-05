@@ -7,14 +7,24 @@ import AppIcon from './AppIcon.vue'
 import BookCover from './BookCover.vue'
 
 /** A book in the grid. The whole card opens the book; remove sits beside the status. */
-const { book, fraction } = defineProps<{ book: BookRecord; fraction: number | undefined }>()
+const {
+  book,
+  fraction,
+  online = true,
+} = defineProps<{
+  book: BookRecord
+  fraction: number | undefined
+  /** Offline, a book not on this device cannot open: shown dimmed. */
+  online?: boolean
+}>()
 const emit = defineEmits<{ open: []; remove: [] }>()
 
-const status = computed(() => statusLabel(fraction, book.downloaded))
+const status = computed(() => statusLabel(fraction, book.downloaded, online))
+const unavailable = computed(() => !online && !book.downloaded)
 </script>
 
 <template>
-  <article class="group flex min-w-0 flex-col gap-2.5">
+  <article class="group flex min-w-0 flex-col gap-2.5" :class="unavailable && 'opacity-45'">
     <a :href="`/read/${book.id}`" class="flex flex-col gap-2.5" @click.prevent="emit('open')">
       <BookCover
         :id="book.id"

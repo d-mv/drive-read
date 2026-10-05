@@ -3,9 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
-import { lastReadLabel, syncedLabel, syncNotice } from '@/app/copy'
+import { formatSize, lastReadLabel, syncedLabel, syncNotice } from '@/app/copy'
 import { appVersion } from '@/app/update'
 import { canInstall, install, iosHint } from '@/app/install'
+import { useOnline } from '@/app/useOnline'
 import { useImportFiles } from '@/app/useImportFiles'
 import AppIcon from '@/components/AppIcon.vue'
 import AppNotice from '@/components/AppNotice.vue'
@@ -27,6 +28,13 @@ const settings = useSettings()
 const sync = useSync()
 const auth = useAuth()
 const syncDismissed = ref(false)
+const online = useOnline()
+/** Space used on this device (books, covers, app), from navigator.storage.estimate(). */
+const usedBytes = ref<number | null>(null)
+onMounted(async () => {
+  const est = await navigator.storage?.estimate?.().catch(() => null)
+  if (est?.usage !== undefined) usedBytes.value = est.usage
+})
 const continueLastRead = computed(() => {
   const rec = continueEntry.value && library.progress[continueEntry.value.id]
   return rec ? lastReadLabel(rec, useServices().device.id) : null
@@ -227,6 +235,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
         :key="entry.id"
         :book="entry.book"
         :fraction="entry.fraction"
+        :online="online"
         @open="open(entry.id)"
         @remove="remove(entry.id, entry.title)"
       />
@@ -242,6 +251,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
         :key="entry.id"
         :book="entry.book"
         :fraction="entry.fraction"
+        :online="online"
         @open="open(entry.id)"
         @remove="remove(entry.id, entry.title)"
       />
@@ -251,6 +261,9 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
       class="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rule px-5 py-3 text-[13px] text-ink2 sm:px-[clamp(16px,3vw,40px)]"
     >
       <span class="tabular font-mono text-xs">Drive Read v{{ appVersion }}</span>
+      <span v-if="usedBytes !== null" class="tabular font-mono text-xs"
+        >{{ formatSize(usedBytes) }} on this device</span
+      >
       <button
         v-if="canInstall"
         type="button"

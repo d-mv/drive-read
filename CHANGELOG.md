@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0 — 2026-10-05
+
+Build step 7, hardening (first pass), guided by the first production logs.
+
+- Wake lock (owner task): the screen stays on while a book is open, sleeps after 5 minutes
+  without a page turn, and comes back on the next one; released when leaving the book.
+- Reading sessions count active time: gaps between page turns are capped at 5 minutes (logs
+  showed 104-minute sessions with no pages).
+- Vue render and handler errors are logged (`error.uncaught`, source `vue:…`); the browser's
+  harmless "ResizeObserver loop" notice is no longer reported as a crash.
+- Books whose file the browser deleted under storage pressure go back to "Drive only" at start
+  (`storage.evicted`).
+- Offline: Drive books not on this device are dimmed and say "Not downloaded".
+- Library footer shows the space used on this device.
+- E2E: offline cold start from the service-worker cache (downloaded book opens, others marked),
+  and an interrupted download that is retried successfully.
+
 ## 0.7.1 — 2026-10-05
 
 Fixes found in the first production logs.

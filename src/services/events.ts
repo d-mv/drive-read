@@ -43,6 +43,7 @@ export interface Events {
   }
   'sync.failed': { reason: string; pending: number }
   'storage.write_failed': { what: string; reason: string }
+  'storage.evicted': { books: number }
   'storage.persisted': { granted: boolean; usage_mb: number; quota_mb: number }
   'pwa.update_available': Record<string, never>
   'pwa.update_applied': Record<string, never>

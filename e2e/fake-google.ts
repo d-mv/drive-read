@@ -75,13 +75,20 @@ export interface FakeGoogle {
   downloads: string[]
   /** Delay for whole-Drive searches, to reproduce slow first loads. */
   searchDelayMs: number
+  /** Drop the connection during downloads, as a lost network would. */
+  abortDownloads: boolean
 }
 
 export async function fakeGoogle(
   page: Page,
   appData: AppDataStore = appDataStore(),
 ): Promise<FakeGoogle> {
-  const state: FakeGoogle = { downloadStatus: 200, downloads: [], searchDelayMs: 0 }
+  const state: FakeGoogle = {
+    downloadStatus: 200,
+    downloads: [],
+    searchDelayMs: 0,
+    abortDownloads: false,
+  }
 
   await page.route('https://accounts.google.com/gsi/client', (route) =>
     route.fulfill({ contentType: 'text/javascript', body: GIS }),
@@ -111,6 +118,7 @@ export async function fakeGoogle(
     }
     if (id && url.searchParams.get('alt') === 'media') {
       state.downloads.push(id)
+      if (state.abortDownloads) return route.abort('connectionreset')
       if (state.downloadStatus !== 200)
         return route.fulfill({ status: state.downloadStatus, headers: CORS, body: '' })
       return route.fulfill({

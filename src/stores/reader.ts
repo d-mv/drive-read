@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { IDLE_MS } from '@/domain/reading'
 import { useServices } from '@/services'
 import type { DriveError } from '@/services/drive/client'
 import { chapterAt } from '@/services/engine/progress'
@@ -71,6 +72,9 @@ export const useReader = defineStore('reader', () => {
     to: number
     pages: number
     lastKey?: string
+    /** Time spent reading: gaps between page turns, each capped at IDLE_MS. */
+    activeMs: number
+    lastAt: number
   } | null = null
   let downloadedNow = false
 
@@ -136,6 +140,9 @@ export const useReader = defineStore('reader', () => {
         else if (key !== measure.lastKey) measure.pages++
         measure.lastKey = key
         measure.to = r.position.fraction
+        const now = Date.now()
+        measure.activeMs += Math.min(now - measure.lastAt, IDLE_MS)
+        measure.lastAt = now
       }
       position.value = r.position
       chapterMinutesLeft.value = r.chapterMinutesLeft
@@ -155,6 +162,8 @@ export const useReader = defineStore('reader', () => {
       from: null,
       to: 0,
       pages: 0,
+      activeMs: 0,
+      lastAt: Date.now(),
     }
     await next.mount(el, restore)
     if (mine !== session) return
@@ -171,14 +180,18 @@ export const useReader = defineStore('reader', () => {
 
   function startMeasure() {
     const b = book.value
+    const at = position.value?.fraction ?? null
     measure = b
       ? {
           format: b.format,
           source: b.source,
           started: Date.now(),
-          from: position.value?.fraction ?? null,
-          to: position.value?.fraction ?? 0,
+          from: at,
+          to: at ?? 0,
           pages: 0,
+          activeMs: 0,
+          lastAt: Date.now(),
+          lastKey: position.value ? positionKey(position.value.locator) : undefined,
         }
       : null
   }
@@ -192,7 +205,10 @@ export const useReader = defineStore('reader', () => {
       track('reading.session', {
         format: measure.format,
         source: measure.source,
-        minutes: Math.round(((Date.now() - measure.started) / 60_000) * 10) / 10,
+        minutes:
+          Math.round(
+            ((measure.activeMs + Math.min(Date.now() - measure.lastAt, IDLE_MS)) / 60_000) * 10,
+          ) / 10,
         pages: measure.pages,
         from: Math.round(measure.from * 1000) / 1000,
         to: Math.round(measure.to * 1000) / 1000,

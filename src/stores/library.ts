@@ -15,7 +15,7 @@ import type { BookMeta, Position } from '@/services/engine/types'
 import { track } from '@/services/events'
 import { bookPath, coverPath } from '@/services/storage/blobs'
 import { requestPersistence } from '@/services/storage/persist'
-import { isErr } from '@/shared/result'
+import { isErr, isNone } from '@/shared/result'
 
 import { useSync } from './sync'
 
@@ -280,6 +280,23 @@ export const useLibrary = defineStore('library', () => {
   }
 
   /** `fromSync`: the removal came from another device, so it is not reported back. */
+  /**
+   * Books recorded as downloaded whose file is gone (the browser evicted it under storage
+   * pressure) go back to "Drive only"; they download again on open. Returns how many.
+   */
+  async function verifyDownloads(): Promise<number> {
+    const { blobs } = useServices()
+    let evicted = 0
+    for (const b of books.value.filter((x) => x.source === 'drive' && x.downloaded)) {
+      if (isNone(await blobs.get(bookPath(b.id)))) {
+        await setDownloaded(b.id, false)
+        evicted++
+      }
+    }
+    if (evicted > 0) track('storage.evicted', { books: evicted })
+    return evicted
+  }
+
   async function remove(id: string, opts: { fromSync?: boolean } = {}) {
     const { db, blobs } = useServices()
     const source = books.value.find((b) => b.id === id)?.source
@@ -301,6 +318,7 @@ export const useLibrary = defineStore('library', () => {
     importFiles,
     addFromDrive,
     setDownloaded,
+    verifyDownloads,
     applyMeta,
     markOpened,
     saveProgress,

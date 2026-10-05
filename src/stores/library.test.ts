@@ -264,3 +264,36 @@ describe('persistence of updated records', () => {
     })
   })
 })
+
+describe('verifyDownloads', () => {
+  it('returns books whose file the browser evicted to "Drive only"', async () => {
+    const { blobs } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([
+      {
+        id: 'd1',
+        name: 'A.epub',
+        mimeType: 'application/epub+zip',
+        size: 1,
+        md5: null,
+        modifiedTime: '',
+      },
+      {
+        id: 'd2',
+        name: 'B.epub',
+        mimeType: 'application/epub+zip',
+        size: 1,
+        md5: null,
+        modifiedTime: '',
+      },
+    ])
+    await blobs.put('books/d2', new Blob(['b']))
+    await library.setDownloaded('d1', true) // file never stored: evicted
+    await library.setDownloaded('d2', true)
+    expect(await library.verifyDownloads()).toBe(1)
+    expect(library.books.map((b) => [b.id, b.downloaded])).toEqual([
+      ['d1', false],
+      ['d2', true],
+    ])
+  })
+})

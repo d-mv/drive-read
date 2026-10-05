@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
+import { browserWakeLock, createWakeLock } from '@/app/wakeLock'
 import AppIcon from '@/components/AppIcon.vue'
 import ContentsPanel from '@/components/ContentsPanel.vue'
 import ProgressSegments from '@/components/ProgressSegments.vue'
@@ -150,9 +151,21 @@ async function fix(action: 'reconnect' | 'retry' | 'remove') {
   await open()
 }
 
+/** Keeps the screen on while reading; lets it sleep after idle minutes (app/wakeLock.ts). */
+const wakeLock = createWakeLock(browserWakeLock())
+watch(
+  () => reader.status.kind === 'ready',
+  (ready) => void (ready ? wakeLock.start() : wakeLock.stop()),
+)
+watch(
+  () => reader.position,
+  () => void wakeLock.activity(),
+)
+
 /** A closed tab never calls close(): report the reading session whenever the tab is hidden. */
 function onVisibility() {
   if (document.visibilityState === 'hidden') reader.flushSession()
+  else void wakeLock.visible()
 }
 
 onMounted(() => {
@@ -165,6 +178,7 @@ watch(() => id, open)
 onBeforeUnmount(() => {
   removeEventListener('keydown', onKeydown)
   document.removeEventListener('visibilitychange', onVisibility)
+  void wakeLock.stop()
   reader.close()
 })
 </script>
