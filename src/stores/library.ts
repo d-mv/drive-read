@@ -12,8 +12,9 @@ import { useServices } from '@/services'
 import type { DriveFile } from '@/services/drive/client'
 import { bookFromFileName } from '@/services/drive/names'
 import type { BookMeta, Position } from '@/services/engine/types'
-import { logger } from '@/services/logger'
+import { track } from '@/services/events'
 import { bookPath, coverPath } from '@/services/storage/blobs'
+import { requestPersistence } from '@/services/storage/persist'
 import { isErr } from '@/shared/result'
 
 import { useSync } from './sync'
@@ -118,13 +119,15 @@ export const useLibrary = defineStore('library', () => {
       const r = await importOne(file)
       if (typeof r === 'string') result.failed.push({ name: file.name, reason: r })
       else result.added.push(r)
-      logger.info(typeof r === 'string' ? 'import failed' : 'book imported', {
-        reason: typeof r === 'string' ? r : null,
-        size: file.size,
-      })
     }
-    // Ask once, after the first book is stored, so the browser keeps our data.
-    if (result.added.length > 0) void navigator.storage?.persist?.()
+    track('library.imported', {
+      source: 'local',
+      added: result.added.length,
+      failed: result.failed.length,
+      reason: result.failed[0]?.reason ?? null,
+    })
+    // Ask once books are stored, so the browser keeps them under storage pressure.
+    if (result.added.length > 0) void requestPersistence()
     return result
   }
 
@@ -154,7 +157,7 @@ export const useLibrary = defineStore('library', () => {
     }
     progress.value[id] = record
     const saved = await db.putProgress(record)
-    if (isErr(saved)) logger.warn('progress not saved', { reason: saved.error.kind })
+    if (isErr(saved)) track('storage.write_failed', { what: 'progress', reason: saved.error.kind })
     if (books.value.find((b) => b.id === id)?.source === 'drive') useSync().nudge()
   }
 
@@ -234,9 +237,19 @@ export const useLibrary = defineStore('library', () => {
       books.value.push(record)
       result.added.push(record)
     }
-    logger.info('drive books added', { added: result.added.length, failed: result.failed.length })
     const created = result.added.filter((b) => !before.has(b.id))
-    if (!opts.fromSync && created.length > 0) await useSync().noteAdded(created)
+    if (!opts.fromSync) {
+      track('library.imported', {
+        source: 'drive',
+        added: created.length,
+        failed: result.failed.length,
+        reason: result.failed[0]?.reason ?? null,
+      })
+      if (created.length > 0) {
+        await useSync().noteAdded(created)
+        void requestPersistence()
+      }
+    }
     return result
   }
 
@@ -245,7 +258,7 @@ export const useLibrary = defineStore('library', () => {
     if (!book) return
     Object.assign(book, patch)
     const saved = await useServices().db.putBook({ ...toRaw(book) })
-    if (isErr(saved)) logger.warn('book record not saved', { reason: saved.error.kind })
+    if (isErr(saved)) track('storage.write_failed', { what: 'book', reason: saved.error.kind })
   }
 
   /** The file is (or is no longer) on this device. */
@@ -269,10 +282,12 @@ export const useLibrary = defineStore('library', () => {
   /** `fromSync`: the removal came from another device, so it is not reported back. */
   async function remove(id: string, opts: { fromSync?: boolean } = {}) {
     const { db, blobs } = useServices()
-    const wasDrive = books.value.find((b) => b.id === id)?.source === 'drive'
+    const source = books.value.find((b) => b.id === id)?.source
+    const wasDrive = source === 'drive'
     await Promise.all([blobs.remove(bookPath(id)), blobs.remove(coverPath(id)), db.deleteBook(id)])
     books.value = books.value.filter((b) => b.id !== id)
     delete progress.value[id]
+    if (source && !opts.fromSync) track('library.removed', { source })
     if (wasDrive && !opts.fromSync) await useSync().noteRemoved(id)
   }
 

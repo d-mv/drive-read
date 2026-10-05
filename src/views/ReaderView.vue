@@ -150,14 +150,21 @@ async function fix(action: 'reconnect' | 'retry' | 'remove') {
   await open()
 }
 
+/** A closed tab never calls close(): report the reading session whenever the tab is hidden. */
+function onVisibility() {
+  if (document.visibilityState === 'hidden') reader.flushSession()
+}
+
 onMounted(() => {
   addEventListener('keydown', onKeydown)
+  document.addEventListener('visibilitychange', onVisibility)
   // Opening a book pulls, so a position read elsewhere is offered right away.
   void open().then(() => sync.syncNow())
 })
 watch(() => id, open)
 onBeforeUnmount(() => {
   removeEventListener('keydown', onKeydown)
+  document.removeEventListener('visibilitychange', onVisibility)
   reader.close()
 })
 </script>

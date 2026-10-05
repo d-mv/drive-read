@@ -109,6 +109,7 @@ function fakeDrive(): MockDrive {
       Ok({ books: [], truncated: false }),
     ),
     download: vi.fn<DriveApi['download']>(async () => Err({ kind: 'not-found' as const })),
+    aboutUser: vi.fn<DriveApi['aboutUser']>(async () => Ok({ permissionId: 'abc' })),
   }
 }
 

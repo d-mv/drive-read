@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 — 2026-10-05
+
+Observability and measurability (OBSERVABILITY.md).
+
+- Pseudonymous identity on every log event: `device` (random per-browser id and kind) and,
+  after connecting Drive, `user_id` (SHA-256 of the Drive permission id; never the email).
+- Typed event catalogue (`src/services/events.ts`): app start timing, Drive connect and expiry,
+  imports and removals, book open time and failures, downloads, reading sessions (minutes,
+  pages, from → to; sent on close and when the tab is hidden), Drive listings, sync results
+  and failures, storage persistence and usage, PWA update and install funnels, uncaught
+  errors and CSP violations (origin or kind only).
+- Fix: `sync.failed` and other `.failed` events were logged at info level.
+
 ## 0.6.1 — 2026-10-05
 
 - Deployment: `deploy.toml` (static SPA, drive-read.mlnkv.net), Dockerfile (bun build → Caddy),

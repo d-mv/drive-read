@@ -1,5 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { USER_KEY } from '@/app/identity'
+import { logger } from '@/services/logger'
 
 import { Err, None, Ok, Some } from '@/shared/result'
 
@@ -65,5 +68,23 @@ describe('auth', () => {
     auth.markExpired()
     expect(auth.status).toBe('expired')
     expect(sessionStorage.length).toBe(0)
+  })
+})
+
+describe('identity in the logs', () => {
+  it('after connecting, records the hashed account id and reports the connection', async () => {
+    const info = vi.spyOn(logger, 'info')
+    const setIdentity = vi.spyOn(logger, 'setIdentity')
+    const { gis } = await setupServices()
+    gis.requestToken.mockResolvedValue(
+      Ok({ accessToken: 'tok', expiresAt: Date.now() + 3_600_000 }),
+    )
+    await useAuth().connect()
+    await vi.waitFor(() =>
+      expect(setIdentity).toHaveBeenCalledWith({ userId: 'u_ba7816bf8f01cfea' }),
+    )
+    expect(localStorage.getItem(USER_KEY)).toBe('u_ba7816bf8f01cfea')
+    expect(info).toHaveBeenCalledWith('auth.connected', { first: true })
+    vi.restoreAllMocks()
   })
 })

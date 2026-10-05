@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
-import { logger } from '@/services/logger'
+import { track } from '@/services/events'
 import { type DriveError, type DriveFile, FOLDER_MIME } from '@/services/drive/client'
 import { bookFromFileName, folderLabel } from '@/services/drive/names'
 import { isNone, type Result } from '@/shared/result'
@@ -102,7 +102,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     if (!isCurrent()) return null
     if (r._tag === 'Ok') return r.value
     if (r.error.kind === 'auth-expired') {
-      auth.markExpired()
+      auth.markExpired('drive-browser')
       status.value = { kind: 'reconnect' }
     } else status.value = { kind: 'error', error: r.error }
     return null
@@ -119,7 +119,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     const started = performance.now()
     status.value = { kind: 'loading' }
     const result = await withToken(call, () => mine === seq)
-    logger.info('drive listed', {
+    track('drive.listed', {
       kind,
       ms: Math.round(performance.now() - started),
       files: result?.length ?? null,

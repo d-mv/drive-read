@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
 import type { AuthError, TokenGrant } from '@/services/auth/gis'
+import { saveUserId, userIdFromPermission } from '@/app/identity'
+import { track } from '@/services/events'
 import { logger } from '@/services/logger'
 import { None, type Option, Some } from '@/shared/result'
 
@@ -64,31 +66,43 @@ export const useAuth = defineStore('auth', () => {
       const r = await useServices().gis.requestToken()
       if (r._tag === 'Err') {
         error.value = r.error
-        logger.warn('drive connect failed', { reason: r.error.kind })
+        track('auth.connect_failed', { reason: r.error.kind })
         return false
       }
+      const first = !everConnected.value
       token.value = r.value
       everConnected.value = true
       safely(() => {
         sessionStorage.setItem(TOKEN_KEY, JSON.stringify(r.value))
         localStorage.setItem(CONNECTED_KEY, '1')
       })
-      logger.info('drive connected')
+      track('auth.connected', { first })
+      void identify(r.value.accessToken)
       return true
     } finally {
       busy.value = false
     }
   }
 
+  /** Pseudonymous account id for the logs: a hash of the Drive permission id, never the email. */
+  async function identify(accessToken: string) {
+    const about = await useServices().drive.aboutUser(accessToken)
+    if (about._tag === 'Err') return
+    const userId = await userIdFromPermission(about.value.permissionId)
+    saveUserId(userId)
+    logger.setIdentity({ userId })
+  }
+
   /** The token if it is still good; a stale one is dropped. */
   function validToken(): Option<string> {
     if (fresh(token.value)) return Some(token.value!.accessToken)
-    if (token.value) markExpired()
+    if (token.value) markExpired('expiry')
     return None
   }
 
-  /** After a 401 or a passed expiry. */
-  function markExpired() {
+  /** After a 401 or a passed expiry. `where` says which call found out. */
+  function markExpired(where = 'api') {
+    if (token.value) track('auth.expired', { where })
     token.value = null
     if (!everConnected.value) everConnected.value = true
     tick.value++

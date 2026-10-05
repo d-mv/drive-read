@@ -12,7 +12,7 @@ import type {
   Restore,
   TocEntry,
 } from '@/services/engine/types'
-import { logger } from '@/services/logger'
+import { track } from '@/services/events'
 import { bookPath } from '@/services/storage/blobs'
 import { isErr, isNone, type Option, toNullable } from '@/shared/result'
 
@@ -59,6 +59,17 @@ export const useReader = defineStore('reader', () => {
   let theme: ReaderTheme | null = null
   let session = 0
 
+  /** The reading session being measured (reading.session): from open or the last flush. */
+  let measure: {
+    format: 'epub' | 'pdf'
+    source: 'local' | 'drive'
+    started: number
+    from: number | null
+    to: number
+    pages: number
+  } | null = null
+  let downloadedNow = false
+
   const book = computed(() => useLibrary().books.find((b) => b.id === bookId.value))
   const chapter = computed(() =>
     position.value && toc.value.length > 0
@@ -78,6 +89,8 @@ export const useReader = defineStore('reader', () => {
   ) {
     close()
     const mine = ++session
+    const openStarted = performance.now()
+    downloadedNow = false
     const library = useLibrary()
     const { blobs, createEngine } = useServices()
     bookId.value = id
@@ -85,7 +98,8 @@ export const useReader = defineStore('reader', () => {
 
     if (!library.loaded) await library.load()
     const record = library.books.find((b) => b.id === id)
-    if (!record) return fail('not-found')
+    if (!record) return failWith('not-found', undefined)
+    const fail = (error: ReaderError) => failWith(error, record)
 
     let file = await blobs.get(bookPath(id))
     if (mine !== session) return
@@ -104,7 +118,6 @@ export const useReader = defineStore('reader', () => {
     if (mine !== session) return next.destroy()
     if (isErr(meta)) {
       next.destroy()
-      logger.warn('book failed to open', { reason: meta.error.kind })
       return fail('unreadable')
     }
 
@@ -112,6 +125,11 @@ export const useReader = defineStore('reader', () => {
     toc.value = meta.value.toc
     if (record.provisional) await library.applyMeta(id, meta.value)
     next.onRelocate((r) => {
+      if (measure) {
+        if (measure.from === null) measure.from = r.position.fraction
+        else measure.pages++
+        measure.to = r.position.fraction
+      }
       position.value = r.position
       chapterMinutesLeft.value = r.chapterMinutesLeft
       page.value = r.page ?? null
@@ -123,11 +141,57 @@ export const useReader = defineStore('reader', () => {
     const restore: Restore | undefined = saved
       ? { locator: saved.locator, fraction: saved.fraction }
       : undefined
+    measure = {
+      format: record.format,
+      source: record.source,
+      started: Date.now(),
+      from: null,
+      to: 0,
+      pages: 0,
+    }
     await next.mount(el, restore)
     if (mine !== session) return
     if (theme) next.setTheme(theme)
     await library.markOpened(id)
     status.value = { kind: 'ready' }
+    track('book.opened', {
+      format: record.format,
+      source: record.source,
+      ms: performance.now() - openStarted,
+      downloaded_now: downloadedNow,
+    })
+  }
+
+  function startMeasure() {
+    const b = book.value
+    measure = b
+      ? {
+          format: b.format,
+          source: b.source,
+          started: Date.now(),
+          from: position.value?.fraction ?? null,
+          to: position.value?.fraction ?? 0,
+          pages: 0,
+        }
+      : null
+  }
+
+  /**
+   * Reports the reading session so far (reading.session) and starts a new one: on close, and
+   * when the tab is hidden, since a closed tab never calls close().
+   */
+  function flushSession() {
+    if (measure && measure.from !== null && status.value.kind === 'ready') {
+      track('reading.session', {
+        format: measure.format,
+        source: measure.source,
+        minutes: Math.round(((Date.now() - measure.started) / 60_000) * 10) / 10,
+        pages: measure.pages,
+        from: Math.round(measure.from * 1000) / 1000,
+        to: Math.round(measure.to * 1000) / 1000,
+      })
+    }
+    startMeasure()
   }
 
   /** Downloads a Drive book into OPFS. Returns the stored file, an error, or 'stale'. */
@@ -140,6 +204,7 @@ export const useReader = defineStore('reader', () => {
     if (isNone(token)) return 'reconnect'
 
     status.value = { kind: 'downloading', fraction: 0 }
+    const downloadStarted = performance.now()
     const blob = await drive.download(
       token.value,
       {
@@ -153,22 +218,36 @@ export const useReader = defineStore('reader', () => {
     )
     if (mine !== session) return 'stale'
     if (isErr(blob)) {
-      if (blob.error.kind === 'auth-expired') auth.markExpired()
-      logger.warn('book download failed', { reason: blob.error.kind })
+      if (blob.error.kind === 'auth-expired') auth.markExpired('download')
       return DOWNLOAD_ERROR[blob.error.kind]
     }
     const stored = await blobs.put(bookPath(id), blob.value)
     if (isErr(stored)) return stored.error.kind === 'quota' ? 'storage-full' : 'download-failed'
     await library.setDownloaded(id, true)
-    logger.info('book downloaded', { size: blob.value.size })
+    downloadedNow = true
+    track('book.downloaded', {
+      format: record.format,
+      bytes: blob.value.size,
+      ms: performance.now() - downloadStarted,
+    })
     return blobs.get(bookPath(id))
   }
 
-  function fail(error: ReaderError) {
+  function failWith(
+    error: ReaderError,
+    record: { format: 'epub' | 'pdf'; source: 'local' | 'drive' } | undefined,
+  ) {
     status.value = { kind: 'error', error }
+    track('book.open_failed', {
+      reason: error,
+      format: record?.format ?? null,
+      source: record?.source ?? null,
+    })
   }
 
   function close() {
+    flushSession()
+    measure = null
     session++
     engine?.destroy()
     engine = null
@@ -210,5 +289,6 @@ export const useReader = defineStore('reader', () => {
     prev,
     goTo,
     setTheme,
+    flushSession,
   }
 })

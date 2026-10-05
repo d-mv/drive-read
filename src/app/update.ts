@@ -1,5 +1,8 @@
 import { ref } from 'vue'
 
+import { track } from '@/services/events'
+import { logger } from '@/services/logger'
+
 /**
  * Service worker updates (vite-plugin-pwa, prompt mode). A new worker waits until the reader
  * chooses Reload; the app never reloads on its own, so a book is never pulled away mid-page.
@@ -40,13 +43,22 @@ let apply: ((reload?: boolean) => Promise<void>) | null = null
 
 export async function registerServiceWorker() {
   const change = noteVersion(appVersion)
-  if (change.kind === 'updated') updatedTo.value = change.to
+  if (change.kind === 'updated') {
+    updatedTo.value = change.to
+    track('pwa.updated', { from: change.from, to: change.to })
+  }
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
 
   const { registerSW } = await import('virtual:pwa-register')
   apply = registerSW({
-    onNeedRefresh: () => (updateAvailable.value = true),
-    onOfflineReady: () => (offlineReady.value = change.kind === 'first-run'),
+    onNeedRefresh: () => {
+      updateAvailable.value = true
+      track('pwa.update_available', {})
+    },
+    onOfflineReady: () => {
+      offlineReady.value = change.kind === 'first-run'
+      track('pwa.offline_ready', {})
+    },
     onRegisteredSW: (_url, registration) => {
       if (!registration) return
       const check = () => {
@@ -63,5 +75,7 @@ export async function registerServiceWorker() {
 
 /** Activates the waiting version and reloads. The URL keeps the open book; its place is saved. */
 export function applyUpdate() {
+  track('pwa.update_applied', {})
+  void logger.flush({ keepalive: true })
   void apply?.(true)
 }

@@ -1,5 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { logger } from '@/services/logger'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
@@ -188,5 +190,44 @@ describe('Drive books', () => {
     await useReader().open('d1', document.createElement('div'))
     expect(drive.download).toHaveBeenCalledTimes(2)
     expect(useReader().status).toEqual({ kind: 'ready' })
+  })
+})
+
+describe('measurements', () => {
+  it('reports how long a book took to open, and the reading session when it closes', async () => {
+    const info = vi.spyOn(logger, 'info')
+    const { relocate } = await withBook()
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+    relocate(relocation(0.3))
+    relocate(relocation(0.6))
+    reader.close()
+    const events = Object.fromEntries(info.mock.calls.map((c) => [c[0], c[1]]))
+    expect(events['book.opened']).toMatchObject({
+      format: 'epub',
+      source: 'local',
+      downloaded_now: false,
+    })
+    expect(events['book.opened']!.ms).toEqual(expect.any(Number))
+    // The first report is the restored start, not a page turn.
+    expect(events['reading.session']).toMatchObject({
+      format: 'epub',
+      source: 'local',
+      pages: 1,
+      from: 0.3,
+      to: 0.6,
+    })
+    vi.restoreAllMocks()
+  })
+
+  it('reports why a book failed to open', async () => {
+    const warn = vi.spyOn(logger, 'warn')
+    await setupServices()
+    await useReader().open('nope', document.createElement('div'))
+    expect(warn).toHaveBeenCalledWith(
+      'book.open_failed',
+      expect.objectContaining({ reason: 'not-found' }),
+    )
+    vi.restoreAllMocks()
   })
 })

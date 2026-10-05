@@ -27,7 +27,17 @@ interface Event {
   app_version: string
   session_id: string
   platform: 'web'
+  device?: string
+  user_id?: string
   context?: Context
+}
+
+/** Who the events are about: never an email or name, only random or hashed ids. */
+export interface Identity {
+  /** Random per-browser id and its kind, e.g. "a3f9c2e1/Phone". */
+  device?: string | null
+  /** Hash of the Google account's Drive permission id, e.g. "u_0123456789abcdef". */
+  userId?: string | null
 }
 
 export function createLogger(opts: LoggerOptions) {
@@ -38,6 +48,7 @@ export function createLogger(opts: LoggerOptions) {
   const enabled = Boolean(opts.baseUrl && opts.ingestKey)
 
   let buffer: Event[] = []
+  let identity: { device?: string; userId?: string } = {}
   let timer: ReturnType<typeof setTimeout> | undefined
 
   async function send(batch: Event[], keepalive: boolean, retry: boolean): Promise<void> {
@@ -74,13 +85,24 @@ export function createLogger(opts: LoggerOptions) {
       app_version: opts.appVersion,
       session_id: opts.sessionId,
       platform: 'web',
+      ...(identity.device ? { device: identity.device } : {}),
+      ...(identity.userId ? { user_id: identity.userId } : {}),
       ...(context ? { context } : {}),
     })
     if (buffer.length >= maxBatch) void flush()
     else timer ??= setTimeout(() => void flush(), flushMs)
   }
 
+  /** Applies to events logged from now on. A key set to null clears it; a missing key is kept. */
+  function setIdentity(next: Identity) {
+    const merged = { ...identity }
+    if (next.device !== undefined) merged.device = next.device ?? undefined
+    if (next.userId !== undefined) merged.userId = next.userId ?? undefined
+    identity = merged
+  }
+
   return {
+    setIdentity,
     debug: (m: string, c?: Context) => log('debug', m, c),
     info: (m: string, c?: Context) => log('info', m, c),
     warn: (m: string, c?: Context) => log('warn', m, c),
@@ -104,10 +126,4 @@ if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void logger.flush({ keepalive: true })
   })
-  addEventListener('error', (e) => logger.error('uncaught error', { message: String(e.message) }))
-  addEventListener('unhandledrejection', (e) =>
-    logger.error('unhandled rejection', {
-      message: String((e.reason as Error)?.message ?? e.reason),
-    }),
-  )
 }

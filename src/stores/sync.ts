@@ -5,7 +5,7 @@ import type { BookRecord, ProgressRecord } from '@/domain/book'
 import { useServices } from '@/services'
 import type { AppDataFile } from '@/services/drive/appdata'
 import type { DriveError, DriveFile } from '@/services/drive/client'
-import { logger } from '@/services/logger'
+import { track } from '@/services/events'
 import type { SyncMeta } from '@/services/storage/db'
 import {
   decideProgress,
@@ -67,6 +67,8 @@ export const useSync = defineStore('sync', () => {
   const meta = ref<SyncMeta>(emptyMeta())
   const offers = ref<Record<string, Offer>>({})
   let timer: ReturnType<typeof setTimeout> | undefined
+  /** What the current pass did (sync.completed). */
+  let stats = { pushed: 0, adopted: 0, offered: 0, library_changes: 0 }
 
   const library = useLibrary()
   const driveBooks = () => library.books.filter((b) => b.source === 'drive')
@@ -136,10 +138,10 @@ export const useSync = defineStore('sync', () => {
 
   function failed(e: DriveError) {
     if (e.kind === 'auth-expired') {
-      useAuth().markExpired()
+      useAuth().markExpired('sync')
       status.value = 'reconnect'
     } else status.value = e.kind === 'offline' ? 'offline' : 'error'
-    logger.warn('sync failed', { reason: e.kind, pending: pending.value })
+    track('sync.failed', { reason: e.kind, pending: pending.value })
   }
 
   /** Merges library.json into this device and applies the result to the library. */
@@ -178,10 +180,12 @@ export const useSync = defineStore('sync', () => {
         modifiedTime: '',
       }))
       await library.addFromDrive(asFiles, { fromSync: true })
+      stats.library_changes += asFiles.length
     }
     for (const id of changes.toRemove) {
       if (useReader().bookId === id) continue // never pull the book out from under the reader
       await library.remove(id, { fromSync: true })
+      stats.library_changes++
     }
     await saveMeta()
     return null
@@ -209,6 +213,7 @@ export const useSync = defineStore('sync', () => {
         if (book.id === openId) {
           // The reader asks before moving the page.
           offers.value[book.id] = toOffer(remote.record)
+          stats.offered++
           if (local) await library.markSynced(book.id, file.id, file.modifiedTime)
           continue
         }
@@ -218,9 +223,16 @@ export const useSync = defineStore('sync', () => {
           remoteId: file.id,
           remoteModifiedTime: file.modifiedTime,
         })
-        if (decision.offer === 'local' && local) offers.value[book.id] = toOffer(toRaw(local))
+        stats.adopted++
+        if (decision.offer === 'local' && local) {
+          offers.value[book.id] = toOffer(toRaw(local))
+          stats.offered++
+        }
       } else if (decision.action === 'push') {
-        if (decision.offer === 'remote') offers.value[book.id] = toOffer(remote.record)
+        if (decision.offer === 'remote') {
+          offers.value[book.id] = toOffer(remote.record)
+          stats.offered++
+        }
         await library.markSynced(book.id, file.id, file.modifiedTime)
       }
     }
@@ -247,6 +259,7 @@ export const useSync = defineStore('sync', () => {
         : await appdata.create(tok, name, body, opts)
       if (r._tag === 'Err') return r.error
       await library.markSynced(book.id, r.value.id, r.value.modifiedTime, rec.updatedAt)
+      stats.pushed++
     }
 
     if (meta.value.library.dirty) {
@@ -266,6 +279,7 @@ export const useSync = defineStore('sync', () => {
         remoteModifiedTime: r.value.modifiedTime,
         dirty: false,
       }
+      stats.pushed++
       await saveMeta()
     }
     return null
@@ -282,6 +296,8 @@ export const useSync = defineStore('sync', () => {
     if (!tok) return
     await withLock(async () => {
       status.value = 'syncing'
+      stats = { pushed: 0, adopted: 0, offered: 0, library_changes: 0 }
+      const started = performance.now()
       const { appdata, now } = useServices()
       const listed = await appdata.list(tok)
       if (listed._tag === 'Err') return failed(listed.error)
@@ -299,6 +315,7 @@ export const useSync = defineStore('sync', () => {
       meta.value.lastSyncAt = now().toISOString()
       await saveMeta()
       status.value = 'idle'
+      track('sync.completed', { ms: performance.now() - started, ...stats })
     })
   }
 

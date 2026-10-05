@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 
+import { track } from '@/services/events'
+
 /**
  * Installing the app. Chromium browsers fire `beforeinstallprompt`: it is kept and replayed
  * from our own "Install app" button. iOS Safari has no prompt, so it gets a short hint.
@@ -33,8 +35,10 @@ export function startInstallWatch() {
     e.preventDefault()
     deferred = e as InstallPromptEvent
     canInstall.value = true
+    track('pwa.install_prompted', {})
   })
   addEventListener('appinstalled', () => {
+    track('pwa.installed', {})
     deferred = null
     canInstall.value = false
     iosHint.value = false
@@ -44,7 +48,8 @@ export function startInstallWatch() {
 export async function install() {
   if (!deferred) return
   await deferred.prompt()
-  await deferred.userChoice.catch(() => null)
+  const choice = await deferred.userChoice.catch(() => null)
+  track('pwa.install_result', { outcome: choice?.outcome ?? 'unknown' })
   deferred = null
   canInstall.value = false
 }

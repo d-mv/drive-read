@@ -14,7 +14,6 @@ import { createAppData } from '@/services/drive/appdata'
 import { createDriveApi } from '@/services/drive/client'
 import { createEpubEngine } from '@/services/engine/epub'
 import { createPdfEngine } from '@/services/engine/pdf'
-import { logger } from '@/services/logger'
 import { opfsBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
 import { localBookId } from '@/services/storage/hash'
@@ -28,6 +27,7 @@ import { currentDevice } from './device'
 import { router } from './router'
 import { startSyncTriggers } from './syncTriggers'
 import { startInstallWatch } from './install'
+import { reportStarted, startObservability } from './observability'
 import { registerServiceWorker } from './update'
 
 declare global {
@@ -37,6 +37,7 @@ declare global {
 }
 
 async function start() {
+  const currentDeviceValue = currentDevice()
   provideServices({
     db: await openDb(),
     blobs: opfsBlobStore(),
@@ -44,17 +45,18 @@ async function start() {
     createEngine: (format) => (format === 'pdf' ? createPdfEngine() : createEpubEngine()),
     bookId: localBookId,
     now: () => new Date(),
-    device: currentDevice(),
+    device: currentDeviceValue,
     gis: createGis(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''),
     drive: createDriveApi(),
     appdata: createAppData(),
   })
 
+  startObservability(currentDeviceValue)
   const app = createApp(App).use(createPinia())
   useAuth().restore()
   await Promise.all([useSettings().load(), useLibrary().load(), useSync().load()])
   app.use(router).mount('#app')
-  logger.info('app started', { books: useLibrary().books.length })
+  reportStarted(useLibrary().books.length)
 
   // Opened from the OS ("Open with Drive Read"), where the browser supports file handlers.
   window.launchQueue?.setConsumer(async ({ files }) => {

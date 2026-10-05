@@ -2,6 +2,7 @@ import { createPinia, type Pinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { provideServices } from '@/services'
+import { logger } from '@/services/logger'
 import type { DriveFile } from '@/services/drive/client'
 import type { Position } from '@/services/engine/types'
 
@@ -241,5 +242,30 @@ describe('failures', () => {
     await useSync().syncNow()
     expect(useSync().status).toBe('reconnect')
     expect(appdata.calls).toEqual([])
+  })
+})
+
+describe('measurements', () => {
+  it('reports what each sync did', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Laptop')
+    await useLibrary().addFromDrive([driveFile('b1')])
+    await useLibrary().saveProgress('b1', at(0.3))
+    const info = vi.spyOn(logger, 'info')
+    await useSync().syncNow()
+    const done = info.mock.calls.find((c) => c[0] === 'sync.completed')![1]
+    expect(done).toMatchObject({ pushed: 2, adopted: 0, offered: 0, library_changes: 0 })
+    vi.restoreAllMocks()
+  })
+
+  it('reports failures with the number of changes waiting', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Laptop')
+    await useLibrary().addFromDrive([driveFile('b1')])
+    appdata.fail = { kind: 'offline' }
+    const warn = vi.spyOn(logger, 'warn')
+    await useSync().syncNow()
+    expect(warn).toHaveBeenCalledWith('sync.failed', { reason: 'offline', pending: 1 })
+    vi.restoreAllMocks()
   })
 })

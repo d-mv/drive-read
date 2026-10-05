@@ -161,3 +161,17 @@ describe('download', () => {
     expect(progress.at(-1)).toBe(1)
   })
 })
+
+describe('aboutUser', () => {
+  it("returns the account's stable permission id", async () => {
+    const f = fakeFetch((url) => {
+      expect(url.pathname).toBe('/drive/v3/about')
+      expect(url.searchParams.get('fields')).toBe('user(permissionId)')
+      return json({ user: { permissionId: '0123' } })
+    })
+    expect(await createDriveApi(f.fn).aboutUser('t')).toEqual({
+      _tag: 'Ok',
+      value: { permissionId: '0123' },
+    })
+  })
+})

@@ -79,3 +79,11 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **The update notice is now an app-wide toast** (`UpdateToast.vue`) instead of a library-only bar. In the reader it sits above the footer.
 - **The update e2e test runs its own static server on a free port.** `vite preview` caches its file list, so it wouldn't see the swapped build.
 - **Not done here:** server headers. `sw.js` and `index.html` need `Cache-Control: no-cache` on Caddy; that's checked in the deploy task.
+
+## 2026-10-05: Observability (v0.7.0)
+
+- **Identity is options A and B (owner decision):** a random device id, plus a hashed Drive permission id. No email. The `drive.readonly` scope is enough for `about.user.permissionId`.
+- **`reading.session` doesn't count the first position report**, since that's the restored starting point. It is sent when the book closes and when the tab is hidden, because a closed tab never calls `close()`.
+- **CSP violations report only the blocked origin or kind** (`blob`, `inline`, …). A blob URL or path could name a book.
+- **Log levels come from event names.** A test caught that `sync.failed` was logged as info; the rule is now `[._]failed$`.
+- **Logger retention is 7 days.** Long-term trends need longer retention or periodic aggregates (Kairos task).

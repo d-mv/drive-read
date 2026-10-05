@@ -175,7 +175,19 @@ export function createDriveApi(fetchFn: FetchFn = (i, init) => fetch(i, init)) {
     return Ok(new Blob(chunks as BlobPart[], { type: file.mimeType }))
   }
 
-  return { searchBooks, listChildren, listBooksRecursive, download }
+  /**
+   * The signed-in account's Drive permission id: stable and opaque (not an email).
+   * Used only, hashed, to tell one person's devices apart in the logs.
+   */
+  async function aboutUser(token: string): Promise<Result<{ permissionId: string }, DriveError>> {
+    const res = await request(token, `${API}/about?fields=user(permissionId)`)
+    if (res._tag === 'Err') return res
+    const body = (await res.value.json()) as { user?: { permissionId?: string } }
+    const id = body.user?.permissionId
+    return id ? Ok({ permissionId: id }) : Err({ kind: 'http', status: 422 })
+  }
+
+  return { searchBooks, listChildren, listBooksRecursive, download, aboutUser }
 }
 
 export type DriveApi = ReturnType<typeof createDriveApi>

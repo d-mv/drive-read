@@ -106,3 +106,22 @@ describe('createLogger', () => {
     await expect(log.flush()).resolves.toBeUndefined()
   })
 })
+
+describe('identity', () => {
+  it('adds device and user_id to events once set, and drops user_id when cleared', async () => {
+    const f = fakeFetch()
+    const log = createLogger({ ...base, fetch: f.fn })
+    log.info('before')
+    log.setIdentity({ device: 'a3f9c2e1/Phone', userId: 'u_0123456789abcdef' })
+    log.info('after')
+    log.setIdentity({ userId: null })
+    log.info('signed out')
+    await log.flush()
+    const [before, after, out] = f.bodies()[0]
+    expect(before).not.toHaveProperty('device')
+    expect(before).not.toHaveProperty('user_id')
+    expect(after).toMatchObject({ device: 'a3f9c2e1/Phone', user_id: 'u_0123456789abcdef' })
+    expect(out).toMatchObject({ device: 'a3f9c2e1/Phone' })
+    expect(out).not.toHaveProperty('user_id')
+  })
+})
