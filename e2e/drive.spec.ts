@@ -137,3 +137,29 @@ test('a slow search answered after leaving it does not spill into the folder vie
   await expect(page.getByRole('button', { name: 'Stocks', exact: true })).toBeVisible()
   await expect(page.getByRole('checkbox')).toHaveCount(0)
 })
+
+test('removing a download frees the file but keeps the book and the place', async ({ page }) => {
+  const google = await fakeGoogle(page)
+  await connect(page)
+  await addVoyage(page)
+  await page.getByRole('button', { name: 'Back to library' }).click()
+  await voyageLink(page).click()
+  await expect(page.getByText('01 / 04')).toBeVisible()
+  await page.getByRole('button', { name: 'Back to library' }).click()
+
+  // The reader's "Not enough space" error links here.
+  await page.goto('/?show=downloaded')
+  const downloads = page.getByRole('list', { name: 'Downloaded books' })
+  await expect(downloads.getByRole('listitem')).toHaveCount(1)
+  await expect(downloads).toContainText(/\d+(\.\d)? (KB|MB)/)
+  await downloads.getByRole('button', { name: 'Remove download of The Test Voyage' }).click()
+  await expect(downloads).toHaveCount(0)
+  await expect(page.getByText('No downloaded Drive books on this device.')).toBeVisible()
+
+  // Still in the library; opening downloads it again.
+  await page.getByRole('button', { name: /^All/ }).click()
+  await voyageLink(page).click()
+  await expect(page).toHaveURL(/\/read\/voyage$/)
+  await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toBeVisible()
+  expect(google.downloads).toEqual(['voyage', 'voyage'])
+})

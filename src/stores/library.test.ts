@@ -1,7 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Position } from '@/services/engine/types'
+import { logger } from '@/services/logger'
 import { isSome } from '@/shared/result'
 
 import { useLibrary } from './library'
@@ -262,6 +263,62 @@ describe('persistence of updated records', () => {
       provisional: false,
       openedAt: expect.any(String),
     })
+  })
+})
+
+describe('removeDownload', () => {
+  const driveBook = {
+    id: 'd1',
+    name: 'A.epub',
+    mimeType: 'application/epub+zip',
+    size: 4321,
+    md5: null,
+    modifiedTime: '',
+  }
+
+  it('frees the file of a Drive book but keeps the book, cover and position', async () => {
+    const { blobs, services } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveBook])
+    await blobs.put('books/d1', new Blob(['book']))
+    await blobs.put('covers/d1', new Blob(['cover']))
+    await library.setDownloaded('d1', true)
+    await library.saveProgress('d1', at(0.4))
+    const info = vi.spyOn(logger, 'info')
+
+    expect(await library.removeDownload('d1')).toBe(true)
+
+    expect(blobs.paths()).toEqual(['covers/d1'])
+    expect(library.books[0]).toMatchObject({ id: 'd1', downloaded: false })
+    expect(library.items[0]!.downloadBytes).toBeNull()
+    expect(library.progress.d1?.fraction).toBe(0.4)
+    expect(isSome(await services.db.getProgress('d1'))).toBe(true)
+    expect(info).toHaveBeenCalledWith('library.download_removed', { format: 'epub', bytes: 4321 })
+  })
+
+  it('refuses a book from this device: its file is the only copy', async () => {
+    const { blobs } = await setupServices()
+    const library = useLibrary()
+    await library.importFiles([epubFile('abc')])
+    expect(await library.removeDownload('local-abc')).toBe(false)
+    expect(blobs.paths()).toContain('books/local-abc')
+    expect(library.books[0]!.downloaded).toBe(true)
+  })
+
+  it('shows downloaded Drive books with their size in the library items', async () => {
+    const { blobs } = await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([driveBook])
+    await library.importFiles([epubFile('abc')])
+    expect(library.items.map((i) => [i.id, i.downloadBytes])).toEqual(
+      expect.arrayContaining([
+        ['d1', null],
+        ['local-abc', null],
+      ]),
+    )
+    await blobs.put('books/d1', new Blob(['book']))
+    await library.setDownloaded('d1', true)
+    expect(library.items.find((i) => i.id === 'd1')!.downloadBytes).toBe(4321)
   })
 })
 

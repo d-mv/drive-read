@@ -379,7 +379,7 @@ No failure blocks reading a book already on the device. Each shows one notice or
 | Download interrupted | Stream error | Error with Try again; partial file removed | Tap Try again |
 | File deleted or access lost in Drive | 404 / 403 on download | "Missing in Drive" | Remove the book |
 | Protected or damaged file | `engine.open` fails | "This file can't be opened…" | None |
-| Storage full | `QuotaExceededError` | "Not enough space" | Free space |
+| Storage full | `QuotaExceededError` | "Not enough space" with **Free space** | Opens the library's Downloaded view (`/?show=downloaded`): Drive books on the device, largest first; "Remove download" frees the file and keeps the book and place |
 | Storage evicted by the browser | Record says downloaded, OPFS file missing | Row back to "Drive only" | Downloads again on open |
 
 Each state is covered by end-to-end tests against a fake Google (`e2e/fake-google.ts`).

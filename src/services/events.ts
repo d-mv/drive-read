@@ -23,6 +23,7 @@ export interface Events {
   'auth.expired': { where: string }
   'library.imported': { source: Source; added: number; failed: number; reason: string | null }
   'library.removed': { source: Source }
+  'library.download_removed': { format: Format; bytes: number }
   'book.opened': { format: Format; source: Source; ms: number; downloaded_now: boolean }
   'book.open_failed': { reason: string; format: Format | null; source: Source | null }
   'book.downloaded': { format: Format; bytes: number; ms: number }

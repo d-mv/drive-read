@@ -62,7 +62,8 @@ const item = (
   author: string,
   fraction: number | undefined,
   activityAt: string,
-): LibraryItem => ({ id, title, author, fraction, activityAt })
+  downloadBytes: number | null = null,
+): LibraryItem => ({ id, title, author, fraction, activityAt, downloadBytes })
 
 describe('selectBooks and filterCounts', () => {
   const items = [
@@ -108,7 +109,32 @@ describe('selectBooks and filterCounts', () => {
   })
 
   it('counts each filter', () => {
-    expect(filterCounts(items)).toEqual({ all: 4, reading: 2, unread: 1, finished: 1 })
+    expect(filterCounts(items)).toEqual({
+      all: 4,
+      reading: 2,
+      unread: 1,
+      finished: 1,
+      downloaded: 0,
+    })
+  })
+})
+
+describe('the Downloaded filter', () => {
+  const items = [
+    item('d1', 'Small', 'A', 0.2, '2026-10-01T00:00:00Z', 1_000),
+    item('d2', 'Large', 'B', undefined, '2026-10-03T00:00:00Z', 9_000),
+    item('d3', 'Drive only', 'C', undefined, '2026-10-02T00:00:00Z'),
+  ]
+
+  it('lists Drive books stored on this device, largest first, whatever the sort', () => {
+    for (const sort of ['recent', 'title', 'author'] as const)
+      expect(
+        selectBooks(items, { filter: 'downloaded', query: '', sort }).map((b) => b.id),
+      ).toEqual(['d2', 'd1'])
+  })
+
+  it('is counted', () => {
+    expect(filterCounts(items).downloaded).toBe(2)
   })
 })
 

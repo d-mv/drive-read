@@ -38,7 +38,8 @@ export interface ProgressRecord {
 }
 
 export type ReadingStatus = 'unread' | 'reading' | 'finished'
-export type LibraryFilter = 'all' | ReadingStatus
+/** 'downloaded': Drive books stored on this device, whose file can be removed to free space. */
+export type LibraryFilter = 'all' | ReadingStatus | 'downloaded'
 export type LibrarySort = 'recent' | 'title' | 'author'
 export type CoverTone = 'dark' | 'pale' | 'mid'
 
@@ -50,6 +51,8 @@ export interface LibraryItem {
   fraction: number | undefined
   /** Last opened, else added. */
   activityAt: string
+  /** Size of a Drive book's file on this device; null when not downloaded or a local book. */
+  downloadBytes: number | null
 }
 
 const FINISHED_AT = 0.995
@@ -98,15 +101,28 @@ export function selectBooks<T extends LibraryItem>(
   by: { filter: LibraryFilter; query: string; sort: LibrarySort },
 ): T[] {
   const q = fold(by.query.trim())
+  const keep = (b: T) =>
+    by.filter === 'all' ||
+    (by.filter === 'downloaded'
+      ? b.downloadBytes !== null
+      : readingStatus(b.fraction) === by.filter)
+  // Freeing space: the largest files first.
+  const order =
+    by.filter === 'downloaded'
+      ? (a: T, b: T) => b.downloadBytes! - a.downloadBytes!
+      : SORTS[by.sort]
   return items
-    .filter((b) => by.filter === 'all' || readingStatus(b.fraction) === by.filter)
+    .filter(keep)
     .filter((b) => !q || fold(b.title).includes(q) || fold(b.author).includes(q))
-    .sort(SORTS[by.sort])
+    .sort(order)
 }
 
 export function filterCounts(items: readonly LibraryItem[]): Record<LibraryFilter, number> {
-  const counts = { all: items.length, reading: 0, unread: 0, finished: 0 }
-  for (const b of items) counts[readingStatus(b.fraction)]++
+  const counts = { all: items.length, reading: 0, unread: 0, finished: 0, downloaded: 0 }
+  for (const b of items) {
+    counts[readingStatus(b.fraction)]++
+    if (b.downloadBytes !== null) counts.downloaded++
+  }
   return counts
 }
 

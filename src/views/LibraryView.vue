@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
 import { formatSize, lastReadLabel, syncedLabel, syncNotice } from '@/app/copy'
@@ -23,6 +23,7 @@ import { useSync } from '@/stores/sync'
 
 /** The library (canvas: "Library, light" and the phone "Library"). */
 const router = useRouter()
+const route = useRoute()
 const library = useLibrary()
 const settings = useSettings()
 const sync = useSync()
@@ -31,10 +32,11 @@ const syncDismissed = ref(false)
 const online = useOnline()
 /** Space used on this device (books, covers, app), from navigator.storage.estimate(). */
 const usedBytes = ref<number | null>(null)
-onMounted(async () => {
+async function refreshUsage() {
   const est = await navigator.storage?.estimate?.().catch(() => null)
   if (est?.usage !== undefined) usedBytes.value = est.usage
-})
+}
+onMounted(refreshUsage)
 const continueLastRead = computed(() => {
   const rec = continueEntry.value && library.progress[continueEntry.value.id]
   return rec ? lastReadLabel(rec, useServices().device.id) : null
@@ -44,7 +46,8 @@ const syncMessage = computed(() =>
 )
 const { busy, message, pick } = useImportFiles()
 
-const filter = ref<LibraryFilter>('all')
+/** `/?show=downloaded` opens the Downloaded view (linked from the reader's "Not enough space"). */
+const filter = ref<LibraryFilter>(route.query.show === 'downloaded' ? 'downloaded' : 'all')
 const sort = ref<LibrarySort>('recent')
 const query = ref('')
 const search = ref<HTMLInputElement>()
@@ -60,9 +63,21 @@ const FILTERS: { value: LibraryFilter; label: string }[] = [
   { value: 'reading', label: 'Reading' },
   { value: 'unread', label: 'Unread' },
   { value: 'finished', label: 'Finished' },
+  { value: 'downloaded', label: 'Downloaded' },
 ]
+/** Downloaded appears once there is something to free, or when linked to. */
+const filters = computed(() =>
+  FILTERS.filter(
+    (f) => f.value !== 'downloaded' || counts.value.downloaded > 0 || filter.value === 'downloaded',
+  ),
+)
 
 const open = (id: string) => router.push({ name: 'reader', params: { id } })
+
+async function removeDownload(id: string) {
+  await library.removeDownload(id)
+  await refreshUsage()
+}
 
 async function remove(id: string, title: string) {
   if (!confirm(`Remove “${title}” from this device? Your reading position is removed too.`)) return
@@ -175,7 +190,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
     <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 pt-5 sm:px-[clamp(16px,3vw,40px)]">
       <div role="group" aria-label="Show" class="mr-auto flex flex-wrap gap-x-6">
         <button
-          v-for="f in FILTERS"
+          v-for="f in filters"
           :key="f.value"
           type="button"
           :aria-pressed="filter === f.value"
@@ -223,8 +238,37 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
     </div>
 
     <p v-if="shown.length === 0" class="px-5 py-10 text-ink2 sm:px-[clamp(16px,3vw,40px)]">
-      {{ query ? `Nothing matches “${query}”.` : 'No books here yet.' }}
+      {{
+        query
+          ? `Nothing matches “${query}”.`
+          : filter === 'downloaded'
+            ? 'No downloaded Drive books on this device.'
+            : 'No books here yet.'
+      }}
     </p>
+
+    <!-- Freeing space: always a list, largest files first, each file removable. -->
+    <section
+      v-else-if="filter === 'downloaded'"
+      class="px-3 pt-2 pb-12 sm:px-[clamp(16px,3vw,40px)]"
+    >
+      <p class="px-2 py-2 text-[13px] text-ink2">
+        Removing a download frees space on this device. The book and your place stay, and it
+        downloads again when you open it.
+      </p>
+      <ul aria-label="Downloaded books" class="m-0 list-none p-0">
+        <BookRow
+          v-for="entry in shown"
+          :key="entry.id"
+          :book="entry.book"
+          :fraction="entry.fraction"
+          :online="online"
+          action="remove-download"
+          @open="open(entry.id)"
+          @remove-download="removeDownload(entry.id)"
+        />
+      </ul>
+    </section>
 
     <main
       v-else-if="settings.value.libraryView === 'grid'"
@@ -242,7 +286,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
     </main>
     <!-- The phone always lists; the grid is a desktop layout. -->
     <ul
-      v-if="shown.length > 0"
+      v-if="shown.length > 0 && filter !== 'downloaded'"
       class="m-0 list-none px-3 pt-2 pb-12 sm:px-[clamp(16px,3vw,40px)]"
       :class="settings.value.libraryView === 'grid' && 'sm:hidden'"
     >

@@ -49,6 +49,7 @@ export const useLibrary = defineStore('library', () => {
       author: book.author,
       fraction: progress.value[book.id]?.fraction,
       activityAt: book.openedAt ?? book.addedAt,
+      downloadBytes: book.source === 'drive' && book.downloaded ? book.size : null,
       book,
     })),
   )
@@ -297,6 +298,19 @@ export const useLibrary = defineStore('library', () => {
     return evicted
   }
 
+  /**
+   * Frees a Drive book's file to save space; the book, cover and position stay, and it downloads
+   * again on open. False for a book from this device: its file is the only copy.
+   */
+  async function removeDownload(id: string): Promise<boolean> {
+    const book = books.value.find((b) => b.id === id)
+    if (!book || book.source !== 'drive') return false
+    await useServices().blobs.remove(bookPath(id))
+    await setDownloaded(id, false)
+    track('library.download_removed', { format: book.format, bytes: book.size })
+    return true
+  }
+
   async function remove(id: string, opts: { fromSync?: boolean } = {}) {
     const { db, blobs } = useServices()
     const source = books.value.find((b) => b.id === id)?.source
@@ -318,6 +332,7 @@ export const useLibrary = defineStore('library', () => {
     importFiles,
     addFromDrive,
     setDownloaded,
+    removeDownload,
     verifyDownloads,
     applyMeta,
     markOpened,

@@ -64,14 +64,21 @@ const ERRORS: Record<ReaderError, string> = {
 }
 
 /** The one action that fixes each error, besides going back. */
-const ACTION: Partial<Record<ReaderError, 'reconnect' | 'retry' | 'remove'>> = {
+type FixAction = 'reconnect' | 'retry' | 'remove' | 'free-space'
+const ACTION: Partial<Record<ReaderError, FixAction>> = {
   'missing-file': 'remove',
   'missing-in-drive': 'remove',
   reconnect: 'reconnect',
   offline: 'retry',
   'download-failed': 'retry',
+  'storage-full': 'free-space',
 }
-const ACTION_LABEL = { reconnect: 'Reconnect Drive', retry: 'Try again', remove: 'Remove book' }
+const ACTION_LABEL: Record<FixAction, string> = {
+  reconnect: 'Reconnect Drive',
+  retry: 'Try again',
+  remove: 'Remove book',
+  'free-space': 'Free space',
+}
 
 function token(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -142,7 +149,11 @@ function onKeydown(e: KeyboardEvent) {
   fn()
 }
 
-async function fix(action: 'reconnect' | 'retry' | 'remove') {
+async function fix(action: FixAction) {
+  if (action === 'free-space') {
+    void router.push({ name: 'library', query: { show: 'downloaded' } })
+    return
+  }
   if (action === 'remove') {
     await library.remove(id)
     return back()

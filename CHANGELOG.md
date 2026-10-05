@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0 — 2026-10-05
+
+- Library: a **Downloaded** view (shown once a Drive book is on the device, or at
+  `/?show=downloaded`) lists Drive books stored here with their size, largest first. "Remove
+  download" deletes the file only: the book, its cover and reading position stay, and it
+  downloads again on open. Books opened from this device are not listed (their file is the only
+  copy).
+- Reader: "Not enough space" now has a **Free space** button that opens that view.
+- Event `library.download_removed` (`format`, `bytes`).
+
 ## 0.8.5 — 2026-10-05
 
 - Phone library: the 64 px Continue cover (for books without a cover image) shows the title

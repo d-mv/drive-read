@@ -27,6 +27,7 @@ URLs with paths, tokens or emails.
 | `auth.expired` | warn | `where` (`expiry`, `sync`, `download`, `drive-browser`) | How often access lapses mid-use |
 | `library.imported` | info | `source` (`local`, `drive`), `added`, `failed`, `reason` | Books added per source, import failures |
 | `library.removed` | info | `source` | Removals |
+| `library.download_removed` | info | `format`, `bytes` | Space freed by removing a Drive book's download (the book stays) |
 | `book.opened` | info | `format`, `source`, `ms`, `downloaded_now` | Time to open, with and without download |
 | `book.open_failed` | warn | `reason`, `format`, `source` | Broken, missing, offline, needs reconnect |
 | `book.downloaded` | info | `format`, `bytes`, `ms` | Download size and speed |
