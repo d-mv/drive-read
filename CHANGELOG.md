@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.5 — 2026-10-05
+
+- Phone library: the 64 px Continue cover (for books without a cover image) shows the title
+  only, in a smaller size, as on the design canvas; the author stays beside it. From the `sm`
+  breakpoint up the 96 px cover is unchanged.
+
 ## 0.8.4 — 2026-10-05
 
 - Internal: dropped the `idb` package (no release since May 2025). `src/services/storage/idb.ts`

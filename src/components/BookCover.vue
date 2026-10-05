@@ -44,11 +44,18 @@ const TONE = {
   mid: 'bg-cover-mid text-[#1c1b19]',
 } as const
 
-/** sm: list rows, md: the Continue cover, lg: grid cards. */
+/**
+ * sm: list rows, md: the Continue cover (64 px on a phone, title only; 96 px from `sm:`),
+ * lg: grid cards.
+ */
 const TEXT = {
-  sm: { title: 'text-[9px]', author: 'hidden' },
-  md: { title: 'text-[13px]', author: 'text-[8px]' },
-  lg: { title: 'text-lg', author: 'text-[10px]' },
+  sm: { box: 'p-1.5', title: 'text-[9px]', author: 'hidden' },
+  md: {
+    box: 'p-[7px] sm:p-3.5',
+    title: 'text-[10px] sm:text-[13px]',
+    author: 'hidden sm:block sm:text-[8px]',
+  },
+  lg: { box: 'p-3.5', title: 'text-lg', author: 'text-[10px]' },
 } as const
 </script>
 
@@ -64,7 +71,7 @@ const TEXT = {
     v-else
     aria-hidden="true"
     class="flex aspect-[2/3] w-full flex-col justify-between overflow-hidden border border-rule"
-    :class="[TONE[coverTone(id)], size === 'sm' ? 'p-1.5' : 'p-3.5']"
+    :class="[TONE[coverTone(id)], TEXT[size].box]"
   >
     <div class="font-read leading-tight font-medium" :class="TEXT[size].title">{{ title }}</div>
     <div class="font-mono tracking-[0.06em] uppercase" :class="TEXT[size].author">{{ author }}</div>

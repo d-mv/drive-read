@@ -99,6 +99,19 @@ test('the library lists the book and resumes it', async ({ page, isMobile }) => 
   await expect(page).toHaveURL(/\/read\//)
 })
 
+test('on a phone the small Continue cover shows the title only', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'the 64 px cover is the phone layout')
+  await addBook(page)
+  await page.getByRole('button', { name: 'Back to library' }).click()
+  const cover = page.getByRole('region', { name: 'Continue reading' }).locator('[aria-hidden]')
+  await expect(cover.getByText('The Test Voyage')).toBeVisible()
+  await expect(cover.getByText('Ada Fixture')).toBeHidden()
+  // The author is still shown once, beside the cover.
+  await expect(
+    page.getByRole('region', { name: 'Continue reading' }).getByText('Ada Fixture'),
+  ).toHaveCount(2)
+})
+
 test('removing the last book returns to the welcome screen', async ({ page }) => {
   await addBook(page)
   await page.getByRole('button', { name: 'Back to library' }).click()
