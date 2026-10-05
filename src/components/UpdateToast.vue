@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
-import { applyUpdate, offlineReady, updateAvailable, updatedTo } from '@/app/update'
+import { applyUpdate, offlineReady, updateAvailable, updatedTo, updating } from '@/app/update'
 
 import AppIcon from './AppIcon.vue'
 
@@ -14,6 +14,7 @@ const route = useRoute()
 const AUTO_HIDE_MS = 8000
 
 const message = computed(() => {
+  if (updating.value) return { text: 'Updating…', action: null, busy: true }
   if (updateAvailable.value) return { text: 'A new version is ready.', action: 'Reload' as const }
   if (updatedTo.value) return { text: `Updated to v${updatedTo.value}.`, action: null }
   if (offlineReady.value) return { text: 'Ready to work offline.', action: null }
@@ -31,7 +32,7 @@ watch(
   message,
   (m) => {
     clearTimeout(timer)
-    if (m && !m.action) timer = setTimeout(dismiss, AUTO_HIDE_MS)
+    if (m && !m.action && !('busy' in m)) timer = setTimeout(dismiss, AUTO_HIDE_MS)
   },
   { immediate: true },
 )
@@ -57,6 +58,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       {{ message.action }}
     </button>
     <button
+      v-if="!('busy' in message)"
       type="button"
       aria-label="Dismiss"
       class="flex size-11 items-center justify-center"

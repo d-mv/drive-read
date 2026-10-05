@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 — 2026-10-05
+
+- Update toast: after tapping Reload it says "Updating…" and ignores further taps (production
+  logs showed three taps during a ~20 s activation on a phone).
+
 ## 0.8.0 — 2026-10-05
 
 Build step 7, hardening (first pass), guided by the first production logs.

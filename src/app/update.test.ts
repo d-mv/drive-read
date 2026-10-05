@@ -24,3 +24,18 @@ describe('noteVersion', () => {
     spy.mockRestore()
   })
 })
+
+describe('applyUpdate', () => {
+  it('acts once: further taps while updating do nothing, and the toast can say so', async () => {
+    const { applyUpdate, updating } = await import('./update')
+    const { logger } = await import('@/services/logger')
+    const info = vi.spyOn(logger, 'info')
+    expect(updating.value).toBe(false)
+    applyUpdate()
+    applyUpdate()
+    applyUpdate()
+    expect(updating.value).toBe(true)
+    expect(info.mock.calls.filter((c) => c[0] === 'pwa.update_applied')).toHaveLength(1)
+    info.mockRestore()
+  })
+})

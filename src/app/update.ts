@@ -19,6 +19,8 @@ export const appVersion: string = typeof __APP_VERSION__ === 'string' ? __APP_VE
 export const updateAvailable = ref(false)
 /** The first install finished: the app now works offline. */
 export const offlineReady = ref(false)
+/** Reload was tapped: activating the new version can take a few seconds on a phone. */
+export const updating = ref(false)
 /** This run is the first since an update to this version. */
 export const updatedTo = ref<string | null>(null)
 
@@ -75,6 +77,9 @@ export async function registerServiceWorker() {
 
 /** Activates the waiting version and reloads. The URL keeps the open book; its place is saved. */
 export function applyUpdate() {
+  // One tap is enough: logs showed repeated taps while the phone was still activating.
+  if (updating.value) return
+  updating.value = true
   track('pwa.update_applied', {})
   void logger.flush({ keepalive: true })
   void apply?.(true)
