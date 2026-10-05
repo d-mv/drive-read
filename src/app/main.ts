@@ -27,6 +27,7 @@ import App from './App.vue'
 import { currentDevice } from './device'
 import { router } from './router'
 import { startSyncTriggers } from './syncTriggers'
+import { startInstallWatch } from './install'
 import { registerServiceWorker } from './update'
 
 declare global {
@@ -63,6 +64,7 @@ async function start() {
   })
 
   startSyncTriggers()
+  startInstallWatch()
   void registerServiceWorker()
 }
 

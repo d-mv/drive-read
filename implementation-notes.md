@@ -70,3 +70,12 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **Text settings for a PDF show only Margins (page width) and Theme.**
 - **Precache is now ~2.9 MB**, mostly the pdf.js worker (1.2 MB), so both formats open offline as the doc requires.
 - **Test fixture:** `e2e/fixtures/build-pdf.ts` hand-writes a 6-page PDF with an outline and metadata, without adding a PDF library.
+
+## 2026-10-05: Build step 8, PWA and updates (v0.6.0), added by the owner
+
+- **Run before hardening (step 7)** at the owner's choice, so hardening can test the update flow on Android too.
+- **Icons are rendered with the Playwright Chromium already installed** (`scripts/icons.ts`) rather than adding an image tool. Maskable and Apple touch icons shrink the artwork into the 80% safe zone.
+- **Update checks** call `registration.update()` on visibility, on coming back online and hourly. Only a user tap applies an update. The open book survives the reload because its route is in the URL and its position is saved on every page turn.
+- **The update notice is now an app-wide toast** (`UpdateToast.vue`) instead of a library-only bar. In the reader it sits above the footer.
+- **The update e2e test runs its own static server on a free port.** `vite preview` caches its file list, so it wouldn't see the swapped build.
+- **Not done here:** server headers. `sw.js` and `index.html` need `Cache-Control: no-cache` on Caddy; that's checked in the deploy task.

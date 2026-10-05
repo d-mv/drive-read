@@ -4,7 +4,8 @@ import { RouterLink, useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
 import { lastReadLabel, syncedLabel, syncNotice } from '@/app/copy'
-import { applyUpdate, updateAvailable } from '@/app/update'
+import { appVersion } from '@/app/update'
+import { canInstall, install, iosHint } from '@/app/install'
 import { useImportFiles } from '@/app/useImportFiles'
 import AppIcon from '@/components/AppIcon.vue'
 import AppNotice from '@/components/AppNotice.vue'
@@ -39,7 +40,6 @@ const filter = ref<LibraryFilter>('all')
 const sort = ref<LibrarySort>('recent')
 const query = ref('')
 const search = ref<HTMLInputElement>()
-const updateDismissed = ref(false)
 
 const counts = computed(() => filterCounts(library.items))
 const shown = computed(() =>
@@ -155,13 +155,6 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
     />
 
     <AppNotice v-if="message" :message="message" @dismiss="message = null" />
-    <AppNotice
-      v-if="updateAvailable && !updateDismissed"
-      message="Update available."
-      action-label="Reload"
-      @action="applyUpdate"
-      @dismiss="updateDismissed = true"
-    />
 
     <ContinueRow
       v-if="continueEntry && !query"
@@ -253,5 +246,20 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
         @remove="remove(entry.id, entry.title)"
       />
     </ul>
+
+    <footer
+      class="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rule px-5 py-3 text-[13px] text-ink2 sm:px-[clamp(16px,3vw,40px)]"
+    >
+      <span class="tabular font-mono text-xs">Drive Read v{{ appVersion }}</span>
+      <button
+        v-if="canInstall"
+        type="button"
+        class="h-11 font-medium text-ink underline underline-offset-[3px]"
+        @click="install"
+      >
+        Install app
+      </button>
+      <span v-else-if="iosHint">To install: Share, then Add to Home Screen.</span>
+    </footer>
   </div>
 </template>

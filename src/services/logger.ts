@@ -91,8 +91,6 @@ export function createLogger(opts: LoggerOptions) {
 
 export type Logger = ReturnType<typeof createLogger>
 
-declare const __APP_VERSION__: string
-
 /** The app's logger. Sends nothing until VITE_LOGGER_INGEST_KEY is set. */
 export const logger = createLogger({
   baseUrl: import.meta.env.VITE_LOGGER_API_BASE_URL ?? '',

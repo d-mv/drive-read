@@ -7,28 +7,15 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+import { CSP } from './csp'
 
-/**
- * The production Content-Security-Policy (architecture doc, Deployment), plus the Logger origin.
- * script-src allows neither blob: nor 'unsafe-inline', so scripts inside a book cannot run.
- * Served by `vite preview` so the built app is tested under it; Caddy serves the same header.
- */
-export const CSP = [
-  "default-src 'self'",
-  "script-src 'self' https://accounts.google.com",
-  "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://logger-api.mlnkv.net",
-  'frame-src blob: https://accounts.google.com',
-  "img-src 'self' blob: data:",
-  "style-src 'self' 'unsafe-inline' blob:",
-  "font-src 'self' blob: data:",
-  "worker-src 'self' blob:",
-].join('; ')
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 const PAPER = '#F3F0E8'
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(version) },
+  // DR_APP_VERSION overrides the version for the e2e update test (two builds, two versions).
+  define: { __APP_VERSION__: JSON.stringify(process.env.DR_APP_VERSION ?? version) },
   plugins: [
     tailwindcss(),
     vue(),
@@ -36,8 +23,9 @@ export default defineConfig({
       // A new worker waits; the library shows "Update available". Never reloads mid-book.
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['icon.svg', 'theme-init.js'],
+      includeAssets: ['icon.svg', 'theme-init.js', 'apple-touch-icon-180x180.png'],
       manifest: {
+        id: '/',
         name: 'Drive Read',
         short_name: 'Drive Read',
         description: 'Read the books in your Google Drive, online or off.',
@@ -46,7 +34,13 @@ export default defineConfig({
         display: 'standalone',
         background_color: PAPER,
         theme_color: PAPER,
-        icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        categories: ['books', 'education'],
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' },
+        ],
         // Not in the PWA plugin's manifest type yet.
         ...({
           file_handlers: [
@@ -59,7 +53,7 @@ export default defineConfig({
       },
       workbox: {
         // Both engines (foliate-js, pdf.js and its worker) are precached: books open offline.
-        globPatterns: ['**/*.{js,mjs,css,html,svg,woff2}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },

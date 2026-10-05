@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0 — 2026-10-05
+
+Build step 8: installable PWA with reliable updates.
+
+- Install: PNG icons (192, 512, maskable 512) and an Apple touch icon rendered from icon.svg
+  (`bun run icons`), iOS meta tags, manifest `id`. "Install app" where the browser offers it;
+  an "Add to Home Screen" hint in iOS Safari. The library footer shows the version.
+- Updates: checks on start, when the tab is shown again, when back online, and hourly while
+  open. "A new version is ready. Reload" appears app-wide, the reader included, and never reloads
+  on its own; Reload returns to the same book and page. One-time "Updated to vX" afterwards;
+  "Ready to work offline" after the first install.
+- E2E test of the real update flow: build v1 and v2, swap them under a running page, check the
+  offer, reload, and confirm the version, book and position.
+- The CSP lives in `csp.ts`, shared by `vite preview` and the update test's server.
+
 ## 0.5.0 — 2026-10-05
 
 Build step 6: PDF.

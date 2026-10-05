@@ -1,6 +1,6 @@
 {
   "name": "drive-read",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,8 +12,9 @@
     "test:unit": "vitest",
     "test:e2e": "playwright test",
     "lint": "oxlint src e2e",
-    "format": "oxfmt src e2e *.ts",
-    "format:check": "oxfmt --check src e2e *.ts"
+    "format": "oxfmt src e2e scripts *.ts",
+    "format:check": "oxfmt --check src e2e scripts *.ts",
+    "icons": "bun scripts/icons.ts"
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",
