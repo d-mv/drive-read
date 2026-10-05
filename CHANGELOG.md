@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.4 — 2026-10-05
+
+- Internal: dropped the `idb` package (no release since May 2025). `src/services/storage/idb.ts`
+  holds the three helpers `db.ts` needs over raw IndexedDB (`openDatabase`, `request`, `done`);
+  an open connection now closes itself when another tab upgrades the database.
+- Tests: before removal, 200 random operation sequences gave identical results from the old and
+  new implementations. A model-based property test (`db.model.test.ts`, fast-check) now checks the
+  store against an in-memory model.
+
 ## 0.8.3 — 2026-10-05
 
 - Docs: `docs/ARCHITECTURE.md` (renamed from `Ebook Reader Architecture.md`) rewritten as built,

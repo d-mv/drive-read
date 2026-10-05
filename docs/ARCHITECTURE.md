@@ -81,7 +81,7 @@ src/
                 epub.ts          foliate-js adapter (epub-meta.ts: title, author, cover)
                 pdf.ts           pdf.js adapter (pdf-layout.ts: layout maths)
                 progress.ts      chapter and progress maths
-    storage/    db.ts            IndexedDB (idb): books, progress, settings, meta
+    storage/    db.ts            IndexedDB (raw, via idb.ts): books, progress, settings, meta
                 blobs.ts         OPFS reads; writes through blobs.worker.ts
                 hash.ts          content hash for local files
                 persist.ts       storage.persist() and usage

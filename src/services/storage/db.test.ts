@@ -1,4 +1,3 @@
-import { openDB } from 'idb'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { BookRecord, ProgressRecord } from '@/domain/book'
@@ -6,6 +5,7 @@ import { DEFAULT_SETTINGS } from '@/domain/settings'
 import { None, Ok, Some } from '@/shared/result'
 
 import { type Db, openDb } from './db'
+import { done, openDatabase } from './idb'
 
 const book = (id: string): BookRecord => ({
   v: 1,
@@ -85,14 +85,14 @@ describe('sync meta (v2)', () => {
 
   it('upgrades a v1 database without losing books', async () => {
     const name = `migrate-${++n}`
-    const v1 = await openDB(name, 1, {
-      upgrade(d) {
-        d.createObjectStore('books', { keyPath: 'id' })
-        d.createObjectStore('progress', { keyPath: 'fileId' })
-        d.createObjectStore('settings')
-      },
+    const v1 = await openDatabase(name, 1, (d) => {
+      d.createObjectStore('books', { keyPath: 'id' })
+      d.createObjectStore('progress', { keyPath: 'fileId' })
+      d.createObjectStore('settings')
     })
-    await v1.put('books', book('old'))
+    const tx = v1.transaction('books', 'readwrite')
+    tx.objectStore('books').put(book('old'))
+    await done(tx)
     v1.close()
 
     const upgraded = await openDb(name)
