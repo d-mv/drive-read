@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1 — 2026-10-05
+
+- Deployment: `deploy.toml` (static SPA, drive-read.mlnkv.net), Dockerfile (bun build → Caddy),
+  `.dockerignore` (no `.env`). The container's Caddyfile is generated from `csp.ts`
+  (`scripts/caddyfile.ts`): CSP and security headers, `no-cache` for everything outside
+  `/assets/` (index.html, sw.js, manifest: updates arrive), `immutable` for hashed assets,
+  SPA fallback. The logger ingest key stays out of git (server compose and `.env` only).
+
 ## 0.6.0 — 2026-10-05
 
 Build step 8: installable PWA with reliable updates.

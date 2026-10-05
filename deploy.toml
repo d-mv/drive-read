@@ -1,0 +1,15 @@
+[deploy]
+name = "drive-read"
+type = "static-spa"
+port = 80
+domain = "drive-read.mlnkv.net"
+provider = "contabo"
+dockerfile = true
+dockerfile_exposes = 80
+# Build-time (Vite) config: the only source for the image; all of it ends up in the client bundle.
+# VITE_LOGGER_INGEST_KEY is never committed: its value lives only in the server's
+# /opt/apps/docker-compose.yml build.args (and the local .env).
+build_args = { VITE_GOOGLE_CLIENT_ID = "435139183832-3vjhvsl9larrfpfl9d3dkrdi8gr2pm5n.apps.googleusercontent.com", VITE_LOGGER_API_BASE_URL = "https://logger-api.mlnkv.net/api", VITE_LOGGER_INGEST_KEY = "${VITE_LOGGER_INGEST_KEY}" }
+
+[previous]
+fly = false
