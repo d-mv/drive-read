@@ -50,3 +50,13 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **Fixed a race (v0.2.1).** A slow whole-Drive listing could overwrite the folder being browsed. Listings now carry a sequence number, and only the latest one updates the screen.
 - **No "All books" view (user request).** The screen opens on My Drive. Search stays: while the box has text it shows matching books, and the folder trail is kept, so clearing the search returns to the same folder. The canvas artboard "DriveBooks" is now out of date.
 - **Sorting is done in the app, not by Drive.** Drive's `orderBy=name` sorts by the raw name, which doesn't match the labels shown ("Mark Dawson" for `dawson,-mark`). The app sorts with `Intl.Collator` (base sensitivity, numeric).
+
+## 2026-10-05: Build step 5, sync (v0.4.0)
+
+- **Books opened from local files don't sync** (the open decision is left on its conservative default). Only Drive books sync.
+- **Idle pushes merge library.json first.** Every push lists the app folder (one call) and merges library.json if it changed, so a push never overwrites another device's library changes. Progress records are pushed without reading the remote copy first; a conflict between two positions is resolved at the next pull, following the doc's latest-write-wins rule.
+- **A removal from another device skips the book open in the reader;** it is applied on the next sync.
+- **Continue reading** now follows the latest position from any device, not just the last book opened on this one (the canvas shows "Last read on phone").
+- **Bug found through the remote log:** `{ ...reactiveBook }` keeps nested proxies, and IndexedDB can't clone them, so record updates failed silently. Records are now unwrapped with `toRaw` before writing, and the sync meta and library.json are copied as JSON. A regression test reloads from storage.
+- **Vitest loads `.env`,** so unit tests were sending to the production log. `test.env` now blanks the ingest key.
+- **Sync status in the header** ("Synced 14:02", click to sync now) is shown only once Drive has been connected.

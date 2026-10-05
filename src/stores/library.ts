@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, toRaw } from 'vue'
 
 import {
   type BookRecord,
@@ -15,6 +15,8 @@ import type { BookMeta, Position } from '@/services/engine/types'
 import { logger } from '@/services/logger'
 import { bookPath, coverPath } from '@/services/storage/blobs'
 import { isErr } from '@/shared/result'
+
+import { useSync } from './sync'
 
 export type ImportFailure = 'unsupported' | 'unreadable' | 'quota' | 'storage'
 
@@ -45,13 +47,13 @@ export const useLibrary = defineStore('library', () => {
     })),
   )
 
-  /** The most recently opened book that is started but not finished. */
-  const continueBook = computed(
-    () =>
-      books.value
-        .filter((b) => b.openedAt && readingStatus(progress.value[b.id]?.fraction) === 'reading')
-        .sort((a, b) => b.openedAt!.localeCompare(a.openedAt!))[0],
-  )
+  /** The unfinished book read most recently, on any device (positions sync). */
+  const continueBook = computed(() => {
+    const lastRead = (id: string) => progress.value[id]?.updatedAt ?? ''
+    return books.value
+      .filter((b) => readingStatus(progress.value[b.id]?.fraction) === 'reading')
+      .sort((a, b) => lastRead(b.id).localeCompare(lastRead(a.id)))[0]
+  })
 
   async function load() {
     const { db } = useServices()
@@ -125,12 +127,13 @@ export const useLibrary = defineStore('library', () => {
     const book = books.value.find((b) => b.id === id)
     if (!book) return
     book.openedAt = now().toISOString()
-    await db.putBook({ ...book })
+    await db.putBook({ ...toRaw(book) })
   }
 
-  /** Written on every page turn. `dirty` marks it for the sync queue (build step 5). */
+  /** Written on every page turn. `dirty` marks it for the sync queue; Drive books nudge it. */
   async function saveProgress(id: string, position: Position) {
     const { db, now, device } = useServices()
+    const prev = progress.value[id]
     const record: ProgressRecord = {
       v: 1,
       fileId: id,
@@ -140,19 +143,51 @@ export const useLibrary = defineStore('library', () => {
       device: { ...device },
       dirty: true,
       bookmarks: [],
+      ...(prev?.remoteId ? { remoteId: prev.remoteId } : {}),
+      ...(prev?.remoteModifiedTime ? { remoteModifiedTime: prev.remoteModifiedTime } : {}),
     }
     progress.value[id] = record
     const saved = await db.putProgress(record)
     if (isErr(saved)) logger.warn('progress not saved', { reason: saved.error.kind })
+    if (books.value.find((b) => b.id === id)?.source === 'drive') useSync().nudge()
+  }
+
+  /** A position from another device, adopted as is (not dirty). */
+  async function applyRemoteProgress(record: ProgressRecord) {
+    progress.value[record.fileId] = record
+    await useServices().db.putProgress({ ...record })
+  }
+
+  /**
+   * After a push or pull: remember the Drive file and the modifiedTime seen. The record stays
+   * dirty if it changed after `pushedUpdatedAt` (a page turned while the push was in flight).
+   */
+  async function markSynced(
+    id: string,
+    remoteId: string,
+    remoteModifiedTime: string,
+    pushedUpdatedAt?: string,
+  ) {
+    // Raw copy: IndexedDB cannot clone the store's reactive proxies.
+    const rec = toRaw(progress.value[id])
+    if (!rec) return
+    const clean = pushedUpdatedAt !== undefined && rec.updatedAt === pushedUpdatedAt
+    const next = { ...rec, remoteId, remoteModifiedTime, dirty: clean ? false : rec.dirty }
+    progress.value[id] = next
+    await useServices().db.putProgress(next)
   }
 
   /**
    * Registers Drive books (architecture doc, book pipeline step 2). Nothing is downloaded yet:
    * the file comes down on first open, and the title is a guess from the file name until then.
    */
-  async function addFromDrive(files: readonly DriveFile[]): Promise<ImportResult> {
+  async function addFromDrive(
+    files: readonly DriveFile[],
+    opts: { fromSync?: boolean } = {},
+  ): Promise<ImportResult> {
     const { db, now } = useServices()
     const result: ImportResult = { added: [], failed: [] }
+    const before = new Set(books.value.map((b) => b.id))
     for (const file of files) {
       const existing = books.value.find((b) => b.id === file.id)
       if (existing) {
@@ -194,6 +229,8 @@ export const useLibrary = defineStore('library', () => {
       result.added.push(record)
     }
     logger.info('drive books added', { added: result.added.length, failed: result.failed.length })
+    const created = result.added.filter((b) => !before.has(b.id))
+    if (!opts.fromSync && created.length > 0) await useSync().noteAdded(created)
     return result
   }
 
@@ -201,7 +238,7 @@ export const useLibrary = defineStore('library', () => {
     const book = books.value.find((b) => b.id === id)
     if (!book) return
     Object.assign(book, patch)
-    const saved = await useServices().db.putBook({ ...book })
+    const saved = await useServices().db.putBook({ ...toRaw(book) })
     if (isErr(saved)) logger.warn('book record not saved', { reason: saved.error.kind })
   }
 
@@ -223,11 +260,14 @@ export const useLibrary = defineStore('library', () => {
     })
   }
 
-  async function remove(id: string) {
+  /** `fromSync`: the removal came from another device, so it is not reported back. */
+  async function remove(id: string, opts: { fromSync?: boolean } = {}) {
     const { db, blobs } = useServices()
+    const wasDrive = books.value.find((b) => b.id === id)?.source === 'drive'
     await Promise.all([blobs.remove(bookPath(id)), blobs.remove(coverPath(id)), db.deleteBook(id)])
     books.value = books.value.filter((b) => b.id !== id)
     delete progress.value[id]
+    if (wasDrive && !opts.fromSync) await useSync().noteRemoved(id)
   }
 
   return {
@@ -243,6 +283,8 @@ export const useLibrary = defineStore('library', () => {
     applyMeta,
     markOpened,
     saveProgress,
+    applyRemoteProgress,
+    markSynced,
     remove,
   }
 })

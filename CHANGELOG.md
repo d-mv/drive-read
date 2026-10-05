@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0 — 2026-10-05
+
+Build step 5: sync through the Drive app folder.
+
+- Reading positions (`progress-<fileId>.json`) and the library (`library.json`) sync between
+  devices. Writes stay local first; Drive gets them 20 s after the last page turn, when the tab
+  is hidden (keepalive), and on "Sync now". Pulls run on app start, book open, back online and
+  after (re)connecting. A cross-tab lock keeps two tabs from syncing at once.
+- Conflict rule: only a real conflict (Drive changed since last seen *and* local changes
+  waiting) compares times; the later write wins and the other position is offered once. A newer
+  position for the open book is offered ("Jump to 61%, read on Phone yesterday 23:10?"), never
+  applied under the reader.
+- Library: removals are markers, so another device does not add a removed book back; books added
+  elsewhere appear as "Drive only". "Continue reading" follows the latest position from any
+  device, with "Last read on Phone, …". Header shows "Synced 14:02" (click to sync now);
+  notices for waiting changes when offline or disconnected.
+- Books opened from a local file stay on this device (not synced).
+- IndexedDB v2: `meta` store for sync state (migration keeps v1 data).
+- Fix: updated book records (downloaded flag, real title/contents, opened time) failed to save
+  ("book record not saved" in the log): reactive proxies cannot be cloned into IndexedDB.
+- Unit tests no longer send events to the production logger.
+
 ## 0.3.0 — 2026-10-05
 
 - "Add from Drive" has no "All books" view any more: it opens on My Drive and browses folders.

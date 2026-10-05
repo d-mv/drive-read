@@ -1,3 +1,4 @@
+import { openDB } from 'idb'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { BookRecord, ProgressRecord } from '@/domain/book'
@@ -67,5 +68,35 @@ describe('settings', () => {
     expect(await db.getSettings()).toEqual(None)
     await db.putSettings({ ...DEFAULT_SETTINGS, size: 22 })
     expect(await db.getSettings()).toEqual(Some({ ...DEFAULT_SETTINGS, size: 22 }))
+  })
+})
+
+describe('sync meta (v2)', () => {
+  it('returns None before anything is saved, then the saved value', async () => {
+    expect(await db.getSyncMeta()).toEqual(None)
+    const meta = {
+      v: 1 as const,
+      library: { entries: [], dirty: true },
+      lastSyncAt: null,
+    }
+    await db.putSyncMeta(meta)
+    expect(await db.getSyncMeta()).toEqual(Some(meta))
+  })
+
+  it('upgrades a v1 database without losing books', async () => {
+    const name = `migrate-${++n}`
+    const v1 = await openDB(name, 1, {
+      upgrade(d) {
+        d.createObjectStore('books', { keyPath: 'id' })
+        d.createObjectStore('progress', { keyPath: 'fileId' })
+        d.createObjectStore('settings')
+      },
+    })
+    await v1.put('books', book('old'))
+    v1.close()
+
+    const upgraded = await openDb(name)
+    expect(await upgraded.getBook('old')).toEqual(Some(book('old')))
+    expect(await upgraded.getSyncMeta()).toEqual(None)
   })
 })

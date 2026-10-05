@@ -9,7 +9,16 @@ import { toNullable } from '@/shared/result'
 import BookCover from './BookCover.vue'
 import ProgressSegments from './ProgressSegments.vue'
 
-const { book, fraction } = defineProps<{ book: BookRecord; fraction: number }>()
+const {
+  book,
+  fraction,
+  lastRead = null,
+} = defineProps<{
+  book: BookRecord
+  fraction: number
+  /** "Last read on Phone, yesterday 23:10", when another device read it last. */
+  lastRead?: string | null
+}>()
 const emit = defineEmits<{ resume: [] }>()
 
 const starts = computed(() => book.toc.map((t) => t.start))
@@ -66,7 +75,12 @@ const pad = (n: number) => String(n).padStart(2, '0')
         <span class="ml-auto text-ink">{{ formatPercent(fraction) }}</span>
       </div>
     </div>
-    <div class="flex flex-col items-stretch justify-end sm:flex-[1_1_200px] sm:items-end">
+    <div
+      class="flex flex-col items-stretch justify-end gap-3 sm:flex-[1_1_200px] sm:items-end sm:justify-between"
+    >
+      <span v-if="lastRead" class="tabular font-mono text-xs text-ink2 sm:text-right">{{
+        lastRead
+      }}</span>
       <button
         type="button"
         class="flex h-12 items-center justify-center gap-3 rounded-ctl bg-ink pr-3 pl-[18px] font-medium text-paper sm:h-11"

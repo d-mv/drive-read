@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
+import { lastReadLabel, syncedLabel, syncNotice } from '@/app/copy'
 import { applyUpdate, updateAvailable } from '@/app/update'
 import { useImportFiles } from '@/app/useImportFiles'
 import AppIcon from '@/components/AppIcon.vue'
@@ -12,13 +13,26 @@ import BookRow from '@/components/BookRow.vue'
 import ContinueRow from '@/components/ContinueRow.vue'
 import { filterCounts, type LibraryFilter, type LibrarySort, selectBooks } from '@/domain/book'
 import { isSome } from '@/shared/result'
+import { useServices } from '@/services'
+import { useAuth } from '@/stores/auth'
 import { useLibrary } from '@/stores/library'
 import { useSettings } from '@/stores/settings'
+import { useSync } from '@/stores/sync'
 
 /** The library (canvas: "Library, light" and the phone "Library"). */
 const router = useRouter()
 const library = useLibrary()
 const settings = useSettings()
+const sync = useSync()
+const auth = useAuth()
+const syncDismissed = ref(false)
+const continueLastRead = computed(() => {
+  const rec = continueEntry.value && library.progress[continueEntry.value.id]
+  return rec ? lastReadLabel(rec, useServices().device.id) : null
+})
+const syncMessage = computed(() =>
+  syncDismissed.value ? null : syncNotice(sync.status, sync.pending),
+)
 const { busy, message, pick } = useImportFiles()
 
 const filter = ref<LibraryFilter>('all')
@@ -113,6 +127,16 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
         <AppIcon name="upload" />
       </button>
       <button
+        v-if="auth.status !== 'disconnected'"
+        type="button"
+        title="Sync now"
+        class="tabular h-11 px-1 font-mono text-xs text-ink2 underline-offset-[3px] hover:underline disabled:no-underline"
+        :disabled="sync.status === 'syncing'"
+        @click="sync.syncNow()"
+      >
+        {{ sync.status === 'syncing' ? 'Syncing…' : syncedLabel(sync.lastSyncAt) }}
+      </button>
+      <button
         type="button"
         aria-label="Switch theme"
         class="flex size-11 items-center justify-center rounded-ctl border border-rule"
@@ -121,6 +145,14 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
         <AppIcon name="theme" />
       </button>
     </header>
+
+    <AppNotice
+      v-if="syncMessage"
+      :message="syncMessage"
+      :action-label="sync.status === 'reconnect' ? 'Reconnect' : undefined"
+      @action="auth.connect()"
+      @dismiss="syncDismissed = true"
+    />
 
     <AppNotice v-if="message" :message="message" @dismiss="message = null" />
     <AppNotice
@@ -135,6 +167,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
       v-if="continueEntry && !query"
       :book="continueEntry.book"
       :fraction="continueEntry.fraction ?? 0"
+      :last-read="continueLastRead"
       @resume="open(continueEntry.id)"
     />
 

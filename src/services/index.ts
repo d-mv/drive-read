@@ -1,4 +1,5 @@
 import type { Gis } from './auth/gis'
+import type { AppData } from './drive/appdata'
 import type { DriveApi } from './drive/client'
 import type { BookEngine } from './engine/types'
 import type { BlobStore } from './storage/blobs'
@@ -17,6 +18,7 @@ export interface Services {
   device: { id: string; name: string }
   gis: Gis
   drive: DriveApi
+  appdata: AppData
 }
 
 let current: Services | undefined

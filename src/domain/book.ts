@@ -31,6 +31,10 @@ export interface ProgressRecord {
   device: { id: string; name: string }
   dirty: boolean
   bookmarks: []
+  /** The Drive appData file holding this record, once pushed. */
+  remoteId?: string
+  /** Drive's modifiedTime when this device last pushed or pulled it: detects remote change. */
+  remoteModifiedTime?: string
 }
 
 export type ReadingStatus = 'unread' | 'reading' | 'finished'

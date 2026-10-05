@@ -10,6 +10,7 @@ import { createApp } from 'vue'
 
 import { provideServices } from '@/services'
 import { createGis } from '@/services/auth/gis'
+import { createAppData } from '@/services/drive/appdata'
 import { createDriveApi } from '@/services/drive/client'
 import { createEpubEngine } from '@/services/engine/epub'
 import { logger } from '@/services/logger'
@@ -19,10 +20,12 @@ import { localBookId } from '@/services/storage/hash'
 import { useAuth } from '@/stores/auth'
 import { useLibrary } from '@/stores/library'
 import { useSettings } from '@/stores/settings'
+import { useSync } from '@/stores/sync'
 
 import App from './App.vue'
 import { currentDevice } from './device'
 import { router } from './router'
+import { startSyncTriggers } from './syncTriggers'
 import { registerServiceWorker } from './update'
 
 declare global {
@@ -42,11 +45,12 @@ async function start() {
     device: currentDevice(),
     gis: createGis(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''),
     drive: createDriveApi(),
+    appdata: createAppData(),
   })
 
   const app = createApp(App).use(createPinia())
   useAuth().restore()
-  await Promise.all([useSettings().load(), useLibrary().load()])
+  await Promise.all([useSettings().load(), useLibrary().load(), useSync().load()])
   app.use(router).mount('#app')
   logger.info('app started', { books: useLibrary().books.length })
 
@@ -57,6 +61,7 @@ async function start() {
     if (added[0]) await router.push({ name: 'reader', params: { id: added[0].id } })
   })
 
+  startSyncTriggers()
   void registerServiceWorker()
 }
 

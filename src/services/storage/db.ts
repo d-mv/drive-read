@@ -2,14 +2,29 @@ import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
 import type { BookRecord, ProgressRecord } from '@/domain/book'
 import type { Settings } from '@/domain/settings'
+import type { LibraryEntry } from '@/services/sync/merge'
 import { Err, Ok, type Option, option, type Result } from '@/shared/result'
 
 /** IndexedDB: the library, reading positions and settings. The source of truth for the UI. */
+
+/** Sync state (v2): this device's view of library.json and when it last synced. */
+export interface SyncMeta {
+  v: 1
+  library: {
+    entries: LibraryEntry[]
+    remoteId?: string
+    remoteModifiedTime?: string
+    /** Local changes not yet in Drive. */
+    dirty: boolean
+  }
+  lastSyncAt: string | null
+}
 
 interface Schema extends DBSchema {
   books: { key: string; value: BookRecord }
   progress: { key: string; value: ProgressRecord }
   settings: { key: string; value: Settings }
+  meta: { key: string; value: SyncMeta }
 }
 
 export type StorageError = { kind: 'quota' } | { kind: 'unknown'; message: string }
@@ -29,9 +44,10 @@ async function write(fn: () => Promise<unknown>): Promise<Result<void, StorageEr
 }
 
 const SETTINGS_KEY = 'settings'
+const SYNC_KEY = 'sync'
 
 export async function openDb(name = 'drive-read') {
-  const db: IDBPDatabase<Schema> = await openDB<Schema>(name, 1, {
+  const db: IDBPDatabase<Schema> = await openDB<Schema>(name, 2, {
     upgrade(db, oldVersion) {
       // Records carry `v`; later migrations go here, keyed on oldVersion.
       if (oldVersion < 1) {
@@ -39,6 +55,7 @@ export async function openDb(name = 'drive-read') {
         db.createObjectStore('progress', { keyPath: 'fileId' })
         db.createObjectStore('settings')
       }
+      if (oldVersion < 2) db.createObjectStore('meta')
     },
   })
 
@@ -65,6 +82,9 @@ export async function openDb(name = 'drive-read') {
     getSettings: async (): Promise<Option<Settings>> =>
       option(await db.get('settings', SETTINGS_KEY)),
     putSettings: (s: Settings) => write(() => db.put('settings', s, SETTINGS_KEY)),
+
+    getSyncMeta: async (): Promise<Option<SyncMeta>> => option(await db.get('meta', SYNC_KEY)),
+    putSyncMeta: (m: SyncMeta) => write(() => db.put('meta', m, SYNC_KEY)),
   }
 }
 

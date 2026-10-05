@@ -61,6 +61,14 @@ const asDrive = (f: FakeFile) => ({
   modifiedTime: '2026-10-01T00:00:00Z',
 })
 
+/** The Drive app folder (library.json, progress-*.json); share one between two "devices". */
+export interface AppDataStore {
+  files: Map<string, { id: string; name: string; modifiedTime: string; body: string }>
+  seq: number
+}
+
+export const appDataStore = (): AppDataStore => ({ files: new Map(), seq: 0 })
+
 export interface FakeGoogle {
   /** Status returned by the next downloads (200 serves the fixture EPUB). */
   downloadStatus: number
@@ -69,7 +77,10 @@ export interface FakeGoogle {
   searchDelayMs: number
 }
 
-export async function fakeGoogle(page: Page): Promise<FakeGoogle> {
+export async function fakeGoogle(
+  page: Page,
+  appData: AppDataStore = appDataStore(),
+): Promise<FakeGoogle> {
   const state: FakeGoogle = { downloadStatus: 200, downloads: [], searchDelayMs: 0 }
 
   await page.route('https://accounts.google.com/gsi/client', (route) =>
@@ -84,6 +95,20 @@ export async function fakeGoogle(page: Page): Promise<FakeGoogle> {
 
     const url = new URL(req.url())
     const id = /\/files\/([^/?]+)/.exec(url.pathname)?.[1]
+    if (url.searchParams.get('spaces') === 'appDataFolder') {
+      const files = [...appData.files.values()].map(({ id, name, modifiedTime }) => ({
+        id,
+        name,
+        modifiedTime,
+      }))
+      return route.fulfill({ headers: CORS, json: { files } })
+    }
+    if (id && appData.files.has(id) && url.searchParams.get('alt') === 'media') {
+      return route.fulfill({
+        headers: { ...CORS, 'content-type': 'application/json' },
+        body: appData.files.get(id)!.body,
+      })
+    }
     if (id && url.searchParams.get('alt') === 'media') {
       state.downloads.push(id)
       if (state.downloadStatus !== 200)
@@ -110,6 +135,35 @@ export async function fakeGoogle(page: Page): Promise<FakeGoogle> {
         : f.mimeType !== FOLDER && (!name || f.name.toLowerCase().includes(name)),
     )
     return route.fulfill({ headers: CORS, json: { files: files.map(asDrive) } })
+  })
+
+  await page.route('https://www.googleapis.com/upload/drive/v3/files**', async (route: Route) => {
+    const req = route.request()
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS })
+    if (req.headers()['authorization'] !== 'Bearer fake-token')
+      return route.fulfill({ status: 401, headers: CORS, json: { error: { code: 401 } } })
+    const url = new URL(req.url())
+    const modifiedTime = new Date(Date.now() + ++appData.seq).toISOString()
+    if (req.method() === 'POST') {
+      const form = await new Response(new Uint8Array(req.postDataBuffer() ?? []), {
+        headers: { 'content-type': req.headers()['content-type'] ?? '' },
+      }).formData()
+      const meta = JSON.parse(await (form.get('metadata') as Blob).text()) as { name: string }
+      const id = `appdata-${appData.seq}`
+      appData.files.set(id, {
+        id,
+        name: meta.name,
+        modifiedTime,
+        body: await (form.get('file') as Blob).text(),
+      })
+      return route.fulfill({ headers: CORS, json: { id, modifiedTime } })
+    }
+    const id = /\/files\/([^/?]+)/.exec(url.pathname)?.[1] ?? ''
+    const file = appData.files.get(id)
+    if (!file) return route.fulfill({ status: 404, headers: CORS, json: {} })
+    file.body = req.postData() ?? ''
+    file.modifiedTime = modifiedTime
+    return route.fulfill({ headers: CORS, json: { id, modifiedTime } })
   })
 
   return state

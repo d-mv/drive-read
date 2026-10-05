@@ -26,7 +26,10 @@ async function addVoyage(page: Page) {
 
 const row = (page: Page, title: string) => page.getByRole('listitem').filter({ hasText: title })
 const voyageLink = (page: Page) =>
-  page.getByRole('link', { name: /The Test Voyage/ }).filter({ visible: true }).first()
+  page
+    .getByRole('link', { name: /The Test Voyage/ })
+    .filter({ visible: true })
+    .first()
 
 test('opens on My Drive folders, with no all-books list', async ({ page }) => {
   await fakeGoogle(page)

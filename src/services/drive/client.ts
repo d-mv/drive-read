@@ -58,7 +58,7 @@ export function bookQuery(name: string): string {
   return n ? `${base} and name contains '${escapeQ(n)}'` : base
 }
 
-async function toError(res: Response): Promise<DriveError> {
+export async function toError(res: Response): Promise<DriveError> {
   if (res.status === 401) return { kind: 'auth-expired' }
   if (res.status === 404) return { kind: 'not-found' }
   if (res.status === 429) return { kind: 'rate-limited' }

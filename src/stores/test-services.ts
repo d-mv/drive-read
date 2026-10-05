@@ -2,7 +2,8 @@ import { type Mock, vi } from 'vitest'
 
 import { provideServices, type Services } from '@/services'
 import type { Gis } from '@/services/auth/gis'
-import type { DriveApi } from '@/services/drive/client'
+import type { AppData, AppDataFile } from '@/services/drive/appdata'
+import type { DriveApi, DriveError } from '@/services/drive/client'
 import type { BookEngine, BookMeta, OpenError, Relocation } from '@/services/engine/types'
 import { memoryBlobStore, type MemoryBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
@@ -41,6 +42,62 @@ export interface TestContext extends FakeEngine {
   blobs: MemoryBlobStore
   gis: MockGis
   drive: MockDrive
+  appdata: MemoryAppData
+  /** Moves this device's clock forward. */
+  advance: (ms: number) => void
+}
+
+/**
+ * The Drive app folder in memory, shareable between two "devices" in one test.
+ * `fail` makes every call fail with that error until cleared.
+ */
+export interface MemoryAppData extends AppData {
+  files: Map<string, AppDataFile & { body: unknown }>
+  fail: DriveError | null
+  calls: { op: 'list' | 'read' | 'create' | 'update'; name?: string; keepalive?: boolean }[]
+}
+
+export function memoryAppData(): MemoryAppData {
+  const files = new Map<string, AppDataFile & { body: unknown }>()
+  let clock = Date.parse('2026-10-05T08:00:00Z')
+  const stamp = () => new Date((clock += 1000)).toISOString()
+  let seq = 0
+  const store: MemoryAppData = {
+    files,
+    fail: null,
+    calls: [],
+    async list() {
+      store.calls.push({ op: 'list' })
+      if (store.fail) return Err(store.fail)
+      return Ok(
+        [...files.values()].map(({ id, name, modifiedTime }) => ({ id, name, modifiedTime })),
+      )
+    },
+    async read(_t, id) {
+      store.calls.push({ op: 'read', name: files.get(id)?.name })
+      if (store.fail) return Err(store.fail)
+      const f = files.get(id)
+      return f ? Ok(structuredClone(f.body)) : Err({ kind: 'not-found' as const })
+    },
+    async create(_t, name, body, opts = {}) {
+      store.calls.push({ op: 'create', name, keepalive: opts.keepalive })
+      if (store.fail) return Err(store.fail)
+      const id = `f${++seq}`
+      const modifiedTime = stamp()
+      files.set(id, { id, name, modifiedTime, body: structuredClone(body) })
+      return Ok({ id, modifiedTime })
+    },
+    async update(_t, id, body, opts = {}) {
+      store.calls.push({ op: 'update', name: files.get(id)?.name, keepalive: opts.keepalive })
+      if (store.fail) return Err(store.fail)
+      const f = files.get(id)
+      if (!f) return Err({ kind: 'not-found' as const })
+      f.body = structuredClone(body)
+      f.modifiedTime = stamp()
+      return Ok({ id, modifiedTime: f.modifiedTime })
+    },
+  }
+  return store
 }
 
 /** Drive mocks answer "nothing" until a test scripts them. */
@@ -71,7 +128,11 @@ export const epubFile = (content = 'epub-bytes', name = 'harbour_year.epub') =>
 let n = 0
 
 export async function setupServices(
-  opts: { meta?: Result<BookMeta, OpenError> } = {},
+  opts: {
+    meta?: Result<BookMeta, OpenError>
+    appdata?: MemoryAppData
+    device?: { id: string; name: string }
+  } = {},
 ): Promise<TestContext> {
   const fake = fakeEngine(opts.meta ?? Ok(META))
   let clock = Date.parse('2026-10-04T12:00:00Z')
@@ -86,12 +147,24 @@ export async function setupServices(
     createEngine: () => fake.engine,
     bookId: async (f) => `local-${await f.text()}`,
     now: () => new Date((clock += 1000)),
-    device: { id: 'dev1', name: 'Laptop' },
+    device: opts.device ?? { id: 'dev1', name: 'Laptop' },
     gis,
     drive,
+    appdata: opts.appdata ?? memoryAppData(),
   }
   provideServices(services)
-  return { services, blobs, gis, drive, ...fake }
+  const advance = (ms: number) => {
+    clock += ms
+  }
+  return {
+    services,
+    blobs,
+    gis,
+    drive,
+    appdata: services.appdata as MemoryAppData,
+    advance,
+    ...fake,
+  }
 }
 
 export { Err, Ok }

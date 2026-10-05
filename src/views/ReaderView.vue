@@ -13,8 +13,9 @@ import type { Locator } from '@/services/engine/types'
 import { isSome } from '@/shared/result'
 import { READER_FONTS } from '@/styles/fonts'
 import { readerCss } from '@/styles/reader-theme'
-import { authErrorCopy } from '@/app/copy'
+import { authErrorCopy, offerLabel } from '@/app/copy'
 import { useAuth } from '@/stores/auth'
+import { useSync } from '@/stores/sync'
 import { useLibrary } from '@/stores/library'
 import { type ReaderError, useReader } from '@/stores/reader'
 import { useSettings } from '@/stores/settings'
@@ -27,6 +28,15 @@ const reader = useReader()
 const settings = useSettings()
 const library = useLibrary()
 const auth = useAuth()
+const sync = useSync()
+
+/** Another device's newer position, or the losing side of a conflict: offered once. */
+const offer = computed(() => sync.offers[id])
+
+async function jumpToOffer() {
+  const o = sync.takeOffer(id)
+  if (o) await reader.goTo(o.locator)
+}
 
 const host = ref<HTMLElement>()
 const panel = ref<'none' | 'contents' | 'settings'>('none')
@@ -142,7 +152,8 @@ async function fix(action: 'reconnect' | 'retry' | 'remove') {
 
 onMounted(() => {
   addEventListener('keydown', onKeydown)
-  void open()
+  // Opening a book pulls, so a position read elsewhere is offered right away.
+  void open().then(() => sync.syncNow())
 })
 watch(() => id, open)
 onBeforeUnmount(() => {
@@ -223,6 +234,21 @@ onBeforeUnmount(() => {
       </div>
 
       <main class="relative min-w-0 flex-1 overflow-hidden">
+        <div
+          v-if="offer && reader.status.kind === 'ready'"
+          role="status"
+          class="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule bg-panel px-5 py-1.5 text-sm"
+        >
+          <span class="mr-auto py-2">{{ offerLabel(offer) }}</span>
+          <button
+            type="button"
+            class="h-11 font-medium underline underline-offset-[3px]"
+            @click="jumpToOffer"
+          >
+            Jump
+          </button>
+          <button type="button" class="h-11 text-ink2" @click="sync.takeOffer(id)">Stay</button>
+        </div>
         <div
           ref="host"
           class="absolute inset-0"

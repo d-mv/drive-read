@@ -114,6 +114,26 @@ describe('progress and the library view', () => {
     expect(library.continueBook?.id).toBe('local-a')
   })
 
+  it('continues the book read most recently on any device, opened here or not', async () => {
+    await setupServices()
+    const library = useLibrary()
+    await library.importFiles([epubFile('a'), epubFile('b')])
+    await library.markOpened('local-a')
+    await library.saveProgress('local-a', at(0.3))
+    // A position synced from another device; this device never opened the book.
+    await library.applyRemoteProgress({
+      v: 1,
+      fileId: 'local-b',
+      locator: at(0.5).locator,
+      fraction: 0.5,
+      updatedAt: '2030-01-01T00:00:00Z',
+      device: { id: 'phone', name: 'Phone' },
+      dirty: false,
+      bookmarks: [],
+    })
+    expect(library.continueBook?.id).toBe('local-b')
+  })
+
   it('has nothing to continue when nothing is in progress', async () => {
     await setupServices()
     const library = useLibrary()
@@ -206,5 +226,36 @@ describe('addFromDrive', () => {
       provisional: false,
     })
     expect(blobs.paths()).toEqual(['covers/d1'])
+  })
+})
+
+describe('persistence of updated records', () => {
+  it('saves real metadata and the downloaded flag to storage, not only in memory', async () => {
+    await setupServices()
+    const library = useLibrary()
+    await library.addFromDrive([
+      {
+        id: 'd1',
+        name: 'A.epub',
+        mimeType: 'application/epub+zip',
+        size: 1,
+        md5: null,
+        modifiedTime: '',
+      },
+    ])
+    await library.applyMeta('d1', META)
+    await library.setDownloaded('d1', true)
+    await library.markOpened('d1')
+
+    setActivePinia(createPinia())
+    const reloaded = useLibrary()
+    await reloaded.load()
+    expect(reloaded.books[0]).toMatchObject({
+      title: 'Harbour Year',
+      toc: META.toc,
+      downloaded: true,
+      provisional: false,
+      openedAt: expect.any(String),
+    })
   })
 })

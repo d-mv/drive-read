@@ -73,5 +73,7 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/*.test.ts'],
     setupFiles: ['fake-indexeddb/auto'],
+    // Vitest loads .env: unit tests must never write to the production log.
+    env: { VITE_LOGGER_INGEST_KEY: '' },
   },
 })
