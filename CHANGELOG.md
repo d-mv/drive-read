@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.2 — 2026-10-05
+
+- Fix: Reload on the update notice did nothing on the owner's phone (logs: six taps, same
+  session kept running the old version). The app now sends SKIP_WAITING to the waiting worker
+  itself and reloads on activation, on controller change, at once if nothing is waiting (an
+  earlier tap already activated it, leaving a stale notice), or after 4 s at the latest.
+- Diagnostics: `pwa.update_applied` records whether a worker was waiting and the page was
+  controlled; `pwa.reloading` records what triggered the reload; `app.started` adds a coarse
+  `browser` family (e.g. `ios-safari`, `android-chrome`).
+
 ## 0.8.1 — 2026-10-05
 
 - Update toast: after tapping Reload it says "Updating…" and ignores further taps (production

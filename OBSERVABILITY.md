@@ -21,7 +21,7 @@ URLs with paths, tokens or emails.
 
 | Event | Level | Fields | Answers |
 |---|---|---|---|
-| `app.started` | info | `books`, `boot_ms`, `installed`, `online`, `sw_controlled` | Active devices and users, start speed, installed vs browser |
+| `app.started` | info | `browser` (coarse family, e.g. `ios-safari`), `books`, `boot_ms`, `installed`, `online`, `sw_controlled` | Active devices and users, start speed, installed vs browser |
 | `auth.connected` | info | `first` | Drive connections, first-time vs returning |
 | `auth.connect_failed` | warn | `reason` (`popup-blocked`, `popup-closed`, `denied`, `scopes-missing`, `unavailable`) | Why sign-in fails |
 | `auth.expired` | warn | `where` (`expiry`, `sync`, `download`, `drive-browser`) | How often access lapses mid-use |
@@ -37,7 +37,7 @@ URLs with paths, tokens or emails.
 | `storage.persisted` | info | `granted`, `usage_mb`, `quota_mb` | Whether the browser keeps books under pressure, space used |
 | `storage.evicted` | info | `books` | Books whose file the browser deleted under storage pressure (back to "Drive only") |
 | `storage.write_failed` | warn | `what` (`progress`, `book`), `reason` (`quota`, `unknown`) | Lost writes |
-| `pwa.update_available`, `pwa.update_applied`, `pwa.updated` (`from`, `to`), `pwa.offline_ready` | info | | Update uptake: offered → applied → running |
+| `pwa.update_available`, `pwa.update_applied` (`waiting`, `controlled`), `pwa.reloading` (`trigger`: `activated`, `controllerchange`, `no-waiting`, `timeout`), `pwa.updated` (`from`, `to`), `pwa.offline_ready` | info | | Update uptake: offered → applied → reloaded → running |
 | `pwa.install_prompted`, `pwa.install_result` (`outcome`), `pwa.installed` | info | | Install funnel |
 | `error.uncaught` | error | `message` (≤300 chars), `source` (`chunk.js:line`, `promise` or `vue:<where>`) | Crashes, including Vue render and handler errors. The browser's "ResizeObserver loop" notice is ignored |
 | `csp.violation` | warn | `directive`, `blocked` (origin or kind only) | Blocked content, e.g. scripts inside books (`blob`) |

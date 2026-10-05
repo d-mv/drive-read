@@ -116,3 +116,32 @@ test('a new version is offered without interrupting the book, then loads with it
   await page.getByRole('button', { name: 'Back to library' }).click()
   await expect(page.getByText('Drive Read v2.0.0')).toBeVisible()
 })
+
+test('an update found more than a minute after start still reloads on one tap', async ({
+  page,
+}) => {
+  // workbox-window treats updates found >60 s after register() as "external" (the phone case:
+  // the app was open for minutes when a visibility check found the update).
+  publish(join(work, 'v1'))
+  await page.clock.install()
+  await page.goto(`${BASE}/`)
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready
+  })
+  await page.reload()
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller)
+  await expect(
+    page.getByRole('heading', { name: 'Read the books in your Google Drive' }),
+  ).toBeVisible()
+
+  await page.clock.fastForward('01:05')
+  publish(join(work, 'v2'))
+  await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.update())
+  const toast = page.getByRole('status').filter({ hasText: 'A new version is ready.' })
+  await expect(toast).toBeVisible({ timeout: 15_000 })
+
+  await toast.getByRole('button', { name: 'Reload' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Updated to v2.0.0.' })).toBeVisible({
+    timeout: 10_000,
+  })
+})

@@ -3,6 +3,7 @@ import { logger } from '@/services/logger'
 
 import type { Device } from './device'
 import { deviceLabel, loadUserId } from './identity'
+import { browserKind } from './update'
 
 /**
  * Observability wiring (OBSERVABILITY.md): who the events are about (pseudonymous), app start
@@ -68,6 +69,7 @@ export function startObservability(device: Device) {
 
 export function reportStarted(books: number) {
   track('app.started', {
+    browser: browserKind(navigator.userAgent),
     books,
     boot_ms: performance.now(),
     installed: matchMedia('(display-mode: standalone)').matches,

@@ -11,6 +11,7 @@ type Source = 'local' | 'drive'
 
 export interface Events {
   'app.started': {
+    browser: string
     books: number
     boot_ms: number
     installed: boolean
@@ -46,7 +47,8 @@ export interface Events {
   'storage.evicted': { books: number }
   'storage.persisted': { granted: boolean; usage_mb: number; quota_mb: number }
   'pwa.update_available': Record<string, never>
-  'pwa.update_applied': Record<string, never>
+  'pwa.update_applied': { waiting: boolean; controlled: boolean }
+  'pwa.reloading': { trigger: string }
   'pwa.updated': { from: string; to: string }
   'pwa.offline_ready': Record<string, never>
   'pwa.install_prompted': Record<string, never>

@@ -53,7 +53,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       v-if="message.action"
       type="button"
       class="h-11 px-2 font-medium underline underline-offset-[3px]"
-      @click="applyUpdate"
+      @click="applyUpdate()"
     >
       {{ message.action }}
     </button>

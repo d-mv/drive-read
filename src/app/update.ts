@@ -41,8 +41,6 @@ export function noteVersion(current: string): VersionChange {
   }
 }
 
-let apply: ((reload?: boolean) => Promise<void>) | null = null
-
 export async function registerServiceWorker() {
   const change = noteVersion(appVersion)
   if (change.kind === 'updated') {
@@ -52,7 +50,7 @@ export async function registerServiceWorker() {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
 
   const { registerSW } = await import('virtual:pwa-register')
-  apply = registerSW({
+  registerSW({
     onNeedRefresh: () => {
       updateAvailable.value = true
       track('pwa.update_available', {})
@@ -75,12 +73,71 @@ export async function registerServiceWorker() {
   })
 }
 
+interface WaitingWorker {
+  state: string
+  postMessage(message: unknown): void
+  addEventListener(type: 'statechange', cb: () => void): void
+}
+interface ServiceWorkers {
+  controller: unknown
+  getRegistration(): Promise<{ waiting: WaitingWorker | null } | undefined>
+  addEventListener(type: 'controllerchange', cb: () => void, opts?: { once: boolean }): void
+}
+
+/** If the browser never reports the switch, reload anyway after this long. */
+const RELOAD_FALLBACK_MS = 4000
+
+/**
+ * Makes the waiting version take over and reloads exactly once: when it is activated, when the
+ * page's controller changes, at once if nothing is waiting (an earlier tap already activated it),
+ * or after RELOAD_FALLBACK_MS. Does not rely on vite-plugin-pwa's reload path, which did not
+ * reload on the owner's phone (logs: six taps, no reload).
+ */
+export async function activateWaiting(sw: ServiceWorkers, reload: (trigger: string) => void) {
+  let done = false
+  const once = (trigger: string) => {
+    if (done) return
+    done = true
+    reload(trigger)
+  }
+  sw.addEventListener('controllerchange', () => once('controllerchange'), { once: true })
+  const waiting = (await sw.getRegistration().catch(() => undefined))?.waiting ?? null
+  track('pwa.update_applied', { waiting: !!waiting, controlled: !!sw.controller })
+  if (!waiting) return once('no-waiting')
+  waiting.addEventListener('statechange', () => {
+    if (waiting.state === 'activated') once('activated')
+  })
+  waiting.postMessage({ type: 'SKIP_WAITING' })
+  setTimeout(() => once('timeout'), RELOAD_FALLBACK_MS)
+}
+
+const reloadPage = (trigger: string) => {
+  track('pwa.reloading', { trigger })
+  void logger.flush({ keepalive: true })
+  location.reload()
+}
+
 /** Activates the waiting version and reloads. The URL keeps the open book; its place is saved. */
-export function applyUpdate() {
+export function applyUpdate(reload: (trigger: string) => void = reloadPage) {
   // One tap is enough: logs showed repeated taps while the phone was still activating.
   if (updating.value) return
   updating.value = true
-  track('pwa.update_applied', {})
-  void logger.flush({ keepalive: true })
-  void apply?.(true)
+  const sw = 'serviceWorker' in navigator ? navigator.serviceWorker : null
+  if (!sw) return reload('no-service-worker')
+  void activateWaiting(sw, reload)
+}
+
+/** Coarse browser family for the logs (debugging platform-specific behaviour); nothing finer. */
+export function browserKind(ua: string): string {
+  if (/iPhone|iPad|iPod/.test(ua))
+    return /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua) ? 'ios-other' : 'ios-safari'
+  if (/Android/.test(ua))
+    return /Chrome\//.test(ua) && !/SamsungBrowser|EdgA|OPR|Firefox/.test(ua)
+      ? 'android-chrome'
+      : 'android-other'
+  if (/Firefox\//.test(ua)) return 'desktop-firefox'
+  if (/Edg\//.test(ua)) return 'desktop-edge'
+  if (/Chrome\//.test(ua)) return 'desktop-chrome'
+  if (/Version\/.*Safari/.test(ua)) return 'desktop-safari'
+  return 'other'
 }
