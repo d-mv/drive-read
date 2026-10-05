@@ -13,6 +13,7 @@ import { createGis } from '@/services/auth/gis'
 import { createAppData } from '@/services/drive/appdata'
 import { createDriveApi } from '@/services/drive/client'
 import { createEpubEngine } from '@/services/engine/epub'
+import { createPdfEngine } from '@/services/engine/pdf'
 import { logger } from '@/services/logger'
 import { opfsBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
@@ -38,8 +39,8 @@ async function start() {
   provideServices({
     db: await openDb(),
     blobs: opfsBlobStore(),
-    // PDF arrives with build step 6; the library only lets EPUB in until then.
-    createEngine: () => createEpubEngine(),
+    // Each engine is a lazy chunk: pdf.js loads only when a PDF opens.
+    createEngine: (format) => (format === 'pdf' ? createPdfEngine() : createEpubEngine()),
     bookId: localBookId,
     now: () => new Date(),
     device: currentDevice(),

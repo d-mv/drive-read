@@ -27,7 +27,7 @@ export interface BrowserBook {
   format: 'EPUB' | 'PDF'
   size: number
   inLibrary: boolean
-  /** EPUB not yet in the library. PDF waits for build step 6. */
+  /** Not yet in the library. */
   addable: boolean
   selected: boolean
 }
@@ -67,7 +67,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
           format: isEpub ? 'EPUB' : 'PDF',
           size: f.size,
           inLibrary: owned,
-          addable: isEpub && !owned,
+          addable: !owned,
           selected: selectedIds.value.includes(f.id),
         }
       })
@@ -156,11 +156,11 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     selectedIds.value = []
   }
 
-  function summary(addedIds: string[], before: Set<string>, pdfs: number, truncated = false) {
+  function summary(addedIds: string[], before: Set<string>, skipped: number, truncated = false) {
     const fresh = addedIds.filter((id) => !before.has(id)).length
     return [
       `Added ${plural(fresh, 'book')}.`,
-      pdfs > 0 ? `${plural(pdfs, 'PDF')} skipped: PDF support comes later.` : '',
+      skipped > 0 ? `${plural(skipped, 'file')} skipped: not EPUB or PDF.` : '',
       truncated ? 'The folder is very large; add its subfolders separately for the rest.' : '',
     ]
       .filter(Boolean)
@@ -170,11 +170,11 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
   async function add(toAdd: DriveFile[], truncated = false): Promise<string> {
     const before = new Set(inLibrary.value)
     const result = await library.addFromDrive(toAdd)
-    const pdfs = result.failed.filter((f) => f.reason === 'unsupported').length
+    const skipped = result.failed.filter((f) => f.reason === 'unsupported').length
     return summary(
       result.added.map((b) => b.id),
       before,
-      pdfs,
+      skipped,
       truncated,
     )
   }

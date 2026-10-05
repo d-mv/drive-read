@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 — 2026-10-05
+
+Build step 6: PDF.
+
+- PDF engine on pdf.js 6 (`pdfjs-dist`, Apache-2.0) behind the same `BookEngine` interface,
+  loaded as a lazy chunk; its worker is served from the app origin (CSP unchanged, no violations).
+- Pages render to a canvas fitted to the reading width (Margins set the width); a tall page
+  scrolls before the next turns; Back lands at the bottom of the previous page; swipe on touch.
+  Position is page + offset; contents come from the PDF outline; title/author from its metadata;
+  the cover is page 1. Dark mode changes only the surround: pages keep their colours.
+- Reader footer shows "Page 3 of 120"; text settings for a PDF offer only Margins and Theme.
+- PDFs can be added from Drive (no more "PDF later") or from the device, and open from the OS.
+- Both engines are precached, so books of either format open offline.
+
 ## 0.4.0 — 2026-10-05
 
 Build step 5: sync through the Drive app folder.

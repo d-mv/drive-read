@@ -261,9 +261,6 @@ onBeforeUnmount(() => clearTimeout(debounce))
             }}</span>
             <span class="pr-2 text-right sm:pr-0">
               <span v-if="b.inLibrary" class="font-mono text-xs text-ink2">In library</span>
-              <span v-else-if="b.format === 'PDF'" class="font-mono text-xs text-ink2"
-                >PDF later</span
-              >
               <button
                 v-else
                 type="button"

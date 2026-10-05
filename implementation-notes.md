@@ -60,3 +60,13 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **Bug found through the remote log:** `{ ...reactiveBook }` keeps nested proxies, and IndexedDB can't clone them, so record updates failed silently. Records are now unwrapped with `toRaw` before writing, and the sync meta and library.json are copied as JSON. A regression test reloads from storage.
 - **Vitest loads `.env`,** so unit tests were sending to the production log. `test.env` now blanks the ingest key.
 - **Sync status in the header** ("Synced 14:02", click to sync now) is shown only once Drive has been connected.
+
+## 2026-10-05: Build step 6, PDF (v0.5.0)
+
+- **pdfjs-dist 6.4.299 from npm**, not foliate-js's experimental PDF adapter (the doc's choice). foliate's own vendored pdf.js chunk (~400 KB) is never loaded but is still precached; excluding it would need a custom chunk-naming rule.
+- **One page at a time, fitted to width.** A tall page scrolls before the page turns; there is no continuous scroll and no pinch-zoom yet, so text on a phone is small (Kairos task).
+- **No text layer:** PDF text can't be selected or searched yet.
+- **Standard fonts:** non-embedded standard fonts (e.g. Helvetica) map to system fonts; `standardFontDataUrl` isn't set. JPEG 2000 images need pdf.js's wasm decoder, which isn't served, so such images won't render.
+- **Text settings for a PDF show only Margins (page width) and Theme.**
+- **Precache is now ~2.9 MB**, mostly the pdf.js worker (1.2 MB), so both formats open offline as the doc requires.
+- **Test fixture:** `e2e/fixtures/build-pdf.ts` hand-writes a 6-page PDF with an outline and metadata, without adding a PDF library.

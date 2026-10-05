@@ -51,18 +51,19 @@ describe('importFiles', () => {
     expect(library.books).toHaveLength(1)
   })
 
-  it('rejects formats other than EPUB for now', async () => {
+  it('accepts PDF as well as EPUB, and rejects other formats', async () => {
     await setupServices()
     const library = useLibrary()
     const result = await library.importFiles([
       new File(['%PDF'], 'paper.pdf', { type: 'application/pdf' }),
+      new File(['%PDF2'], 'scan.PDF'),
       new File(['x'], 'notes.txt', { type: 'text/plain' }),
     ])
-    expect(result.added).toEqual([])
-    expect(result.failed).toEqual([
-      { name: 'paper.pdf', reason: 'unsupported' },
-      { name: 'notes.txt', reason: 'unsupported' },
+    expect(result.added.map((b) => [b.id, b.format])).toEqual([
+      ['local-%PDF', 'pdf'],
+      ['local-%PDF2', 'pdf'],
     ])
+    expect(result.failed).toEqual([{ name: 'notes.txt', reason: 'unsupported' }])
   })
 
   it('accepts an EPUB by extension when the browser gives no type', async () => {
@@ -200,17 +201,21 @@ describe('addFromDrive', () => {
     expect(engine.open).not.toHaveBeenCalled()
   })
 
-  it('skips books already in the library and refuses PDFs for now', async () => {
+  it('skips books already in the library and registers PDFs as PDF', async () => {
     await setupServices()
     const library = useLibrary()
     await library.addFromDrive([driveFile('d1', 'A.epub')])
     const again = await library.addFromDrive([
       driveFile('d1', 'A.epub'),
       driveFile('p1', 'Paper.pdf', 'application/pdf'),
+      driveFile('x1', 'Notes.txt', 'text/plain'),
     ])
-    expect(again.added.map((b) => b.id)).toEqual(['d1'])
-    expect(again.failed).toEqual([{ name: 'Paper.pdf', reason: 'unsupported' }])
-    expect(library.books).toHaveLength(1)
+    expect(again.added.map((b) => [b.id, b.format])).toEqual([
+      ['d1', 'epub'],
+      ['p1', 'pdf'],
+    ])
+    expect(again.failed).toEqual([{ name: 'Notes.txt', reason: 'unsupported' }])
+    expect(library.books).toHaveLength(2)
   })
 
   it('applies the real metadata once the book is opened', async () => {

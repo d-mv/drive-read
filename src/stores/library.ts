@@ -28,7 +28,12 @@ export interface ImportResult {
 
 export type LibraryEntry = LibraryItem & { book: BookRecord }
 
-const isEpub = (f: File) => f.type === 'application/epub+zip' || /\.epub$/i.test(f.name)
+/** EPUB or PDF, by type or extension (some browsers give no type); null for anything else. */
+function formatOf(f: { type: string; name: string }): BookRecord['format'] | null {
+  if (f.type === 'application/epub+zip' || /\.epub$/i.test(f.name)) return 'epub'
+  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) return 'pdf'
+  return null
+}
 
 /** The library: book records, reading positions, and importing files from this device. */
 export const useLibrary = defineStore('library', () => {
@@ -65,13 +70,14 @@ export const useLibrary = defineStore('library', () => {
 
   async function importOne(file: File): Promise<BookRecord | ImportFailure> {
     const { db, blobs, createEngine, bookId, now } = useServices()
-    if (!isEpub(file)) return 'unsupported'
+    const format = formatOf(file)
+    if (!format) return 'unsupported'
 
     const id = await bookId(file)
     const existing = books.value.find((b) => b.id === id)
     if (existing) return existing
 
-    const engine = createEngine('epub')
+    const engine = createEngine(format)
     const meta = await engine.open(file)
     engine.destroy()
     if (isErr(meta)) return 'unreadable'
@@ -86,7 +92,7 @@ export const useLibrary = defineStore('library', () => {
       v: 1,
       id,
       source: 'local',
-      format: 'epub',
+      format,
       fileName: file.name,
       title: meta.value.title.trim() || titleFromFileName(file.name),
       author: meta.value.author,
@@ -194,8 +200,8 @@ export const useLibrary = defineStore('library', () => {
         result.added.push(existing)
         continue
       }
-      // PDF arrives with build step 6.
-      if (file.mimeType !== 'application/epub+zip') {
+      const format = formatOf({ type: file.mimeType, name: file.name })
+      if (!format) {
         result.failed.push({ name: file.name, reason: 'unsupported' })
         continue
       }
@@ -204,7 +210,7 @@ export const useLibrary = defineStore('library', () => {
         v: 1,
         id: file.id,
         source: 'drive',
-        format: 'epub',
+        format,
         fileName: file.name,
         title: guess.title,
         author: guess.author,

@@ -51,6 +51,7 @@ export const useReader = defineStore('reader', () => {
   const status = ref<ReaderStatus>({ kind: 'idle' })
   const position = ref<Position | null>(null)
   const chapterMinutesLeft = ref<number | null>(null)
+  const page = ref<{ current: number; total: number } | null>(null)
   const toc = ref<TocEntry[]>([])
 
   // Not reactive: the engine owns DOM and a custom element.
@@ -113,6 +114,7 @@ export const useReader = defineStore('reader', () => {
     next.onRelocate((r) => {
       position.value = r.position
       chapterMinutesLeft.value = r.chapterMinutesLeft
+      page.value = r.page ?? null
       void library.saveProgress(id, r.position)
     })
     if (opts.onKeydown) next.onKeydown(opts.onKeydown)
@@ -140,7 +142,11 @@ export const useReader = defineStore('reader', () => {
     status.value = { kind: 'downloading', fraction: 0 }
     const blob = await drive.download(
       token.value,
-      { id, mimeType: 'application/epub+zip', size: record.size },
+      {
+        id,
+        mimeType: record.format === 'pdf' ? 'application/pdf' : 'application/epub+zip',
+        size: record.size,
+      },
       (fraction) => {
         if (mine === session) status.value = { kind: 'downloading', fraction }
       },
@@ -169,6 +175,7 @@ export const useReader = defineStore('reader', () => {
     bookId.value = null
     position.value = null
     chapterMinutesLeft.value = null
+    page.value = null
     toc.value = []
     status.value = { kind: 'idle' }
   }
@@ -193,6 +200,7 @@ export const useReader = defineStore('reader', () => {
     status,
     position,
     chapterMinutesLeft,
+    page,
     toc,
     book,
     chapter,

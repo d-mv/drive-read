@@ -43,6 +43,8 @@ export interface Relocation {
   position: Position
   /** Estimated minutes left in the current chapter, if known. */
   chapterMinutesLeft: number | null
+  /** Fixed-layout formats (PDF): the page shown, 1-based. */
+  page?: { current: number; total: number }
 }
 
 export interface TocEntry {

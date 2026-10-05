@@ -70,7 +70,7 @@ async function openFile() {
       </button>
       <p v-if="message" role="alert" class="text-center text-[13px] text-signal">{{ message }}</p>
       <p class="mt-2 text-center text-[13px] text-ink2">
-        EPUB for now, PDF later. Files with DRM will not open.
+        EPUB and PDF. Files with DRM will not open.
       </p>
     </div>
   </main>

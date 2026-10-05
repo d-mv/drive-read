@@ -49,13 +49,17 @@ export default defineConfig({
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
         // Not in the PWA plugin's manifest type yet.
         ...({
-          file_handlers: [{ action: '/', accept: { 'application/epub+zip': ['.epub'] } }],
+          file_handlers: [
+            {
+              action: '/',
+              accept: { 'application/epub+zip': ['.epub'], 'application/pdf': ['.pdf'] },
+            },
+          ],
         } as object),
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
-        // pdf.js arrives with the PDF engine (build step 6); keep its chunks out of the precache.
-        globIgnores: ['**/pdf*.js', '**/pdf.worker*'],
+        // Both engines (foliate-js, pdf.js and its worker) are precached: books open offline.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,woff2}'],
         navigateFallback: '/index.html',
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },

@@ -99,7 +99,7 @@ describe('selection', () => {
     expect(browser.books.filter((b) => b.inLibrary).map((b) => b.id)).toEqual(['a', 'c'])
   })
 
-  it('cannot select books already in the library or PDFs', async () => {
+  it('cannot select books already in the library; PDFs can be selected', async () => {
     const { drive } = await connected()
     await useLibrary().addFromDrive([f('a', 'A.epub')])
     drive.searchBooks.mockResolvedValue(Ok([f('a', 'A.epub'), f('p', 'P.pdf', 'application/pdf')]))
@@ -107,7 +107,8 @@ describe('selection', () => {
     await browser.search('')
     browser.toggle('a')
     browser.toggle('p')
-    expect(browser.selectedCount).toBe(0)
+    expect(browser.selectedCount).toBe(1)
+    expect(browser.books.find((b) => b.id === 'p')).toMatchObject({ format: 'PDF', addable: true })
   })
 })
 
@@ -132,7 +133,7 @@ describe('folders', () => {
     expect(browser.trail.map((t) => t.name)).toEqual(['My Drive'])
   })
 
-  it('adds every EPUB under a folder, at any depth', async () => {
+  it('adds every book under a folder, at any depth', async () => {
     const { drive } = await connected()
     drive.listBooksRecursive.mockResolvedValue(
       Ok({
@@ -142,8 +143,8 @@ describe('folders', () => {
     )
     const message = await useDriveBrowser().addFolder('books')
     expect(drive.listBooksRecursive).toHaveBeenCalledWith('tok', 'books')
-    expect(message).toBe('Added 2 books. 1 PDF skipped: PDF support comes later.')
-    expect(useLibrary().books).toHaveLength(2)
+    expect(message).toBe('Added 3 books.')
+    expect(useLibrary().books).toHaveLength(3)
   })
 
   it('says when a very large folder was cut short', async () => {

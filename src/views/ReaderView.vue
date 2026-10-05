@@ -314,6 +314,7 @@ onBeforeUnmount(() => {
       <TextSettings
         v-if="panel === 'settings'"
         :settings="settings.value"
+        :fixed-layout="reader.book?.format === 'pdf'"
         class="absolute right-0 bottom-0 left-0 z-20 shadow-[0_-8px_24px_rgb(0_0_0/0.12)] sm:top-2 sm:right-[clamp(8px,2vw,28px)] sm:bottom-auto sm:left-auto sm:rounded-ctl sm:shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
         @typeface="settings.setTypeface"
         @size="settings.stepSize"
@@ -338,7 +339,10 @@ onBeforeUnmount(() => {
         <span v-if="chapterLabel" class="hidden truncate font-ui text-[13px] sm:inline">{{
           chapterLabel
         }}</span>
-        <span v-if="reader.chapterMinutesLeft !== null" class="ml-auto">
+        <span v-if="reader.page" class="ml-auto"
+          >Page {{ reader.page.current }} of {{ reader.page.total }}</span
+        >
+        <span v-else-if="reader.chapterMinutesLeft !== null" class="ml-auto">
           {{
             reader.chapterMinutesLeft < 1 ? 'Under a minute' : `${reader.chapterMinutesLeft} min`
           }}
@@ -346,7 +350,7 @@ onBeforeUnmount(() => {
         </span>
         <span
           class="min-w-9 text-right text-ink"
-          :class="reader.chapterMinutesLeft === null && 'ml-auto'"
+          :class="reader.chapterMinutesLeft === null && !reader.page && 'ml-auto'"
           >{{ formatPercent(fraction) }}</span
         >
       </div>

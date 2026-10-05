@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { type ImportFailure, type ImportResult, useLibrary } from '@/stores/library'
 
 const FAILURE_COPY: Record<ImportFailure, string> = {
-  unsupported: 'Only EPUB files open for now.',
+  unsupported: 'Only EPUB and PDF files open.',
   unreadable: "This file can't be opened. It may be protected or damaged.",
   quota: 'Not enough space on this device.',
   storage: "The file couldn't be saved on this device.",
@@ -27,7 +27,7 @@ export function useImportFiles() {
     return new Promise((resolve) => {
       const input = document.createElement('input')
       input.type = 'file'
-      input.accept = '.epub,application/epub+zip'
+      input.accept = '.epub,.pdf,application/epub+zip,application/pdf'
       input.multiple = true
       input.addEventListener('change', async () => resolve(await run([...(input.files ?? [])])))
       input.addEventListener('cancel', () => resolve(null))

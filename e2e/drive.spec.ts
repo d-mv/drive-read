@@ -83,11 +83,7 @@ test('browses folders and adds everything under one, at any depth', async ({ pag
   await expect(page.getByText('fixture,-ada')).toBeVisible()
 
   await page.getByRole('button', { name: 'Add everything in this folder' }).click()
-  await expect(
-    page
-      .getByRole('status')
-      .filter({ hasText: 'Added 2 books. 1 PDF skipped: PDF support comes later.' }),
-  ).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Added 3 books.' })).toBeVisible()
 
   await page
     .getByRole('navigation', { name: 'Folder path' })

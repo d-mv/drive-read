@@ -15,7 +15,11 @@ import AppIcon from './AppIcon.vue'
 import SegmentedControl from './SegmentedControl.vue'
 
 /** The text settings panel from the canvas. Every change is an event; the view persists it. */
-const { settings } = defineProps<{ settings: Settings }>()
+const { settings, fixedLayout = false } = defineProps<{
+  settings: Settings
+  /** PDF: pages keep their own type, so only margins (page width) and theme apply. */
+  fixedLayout?: boolean
+}>()
 const emit = defineEmits<{
   typeface: [Typeface]
   size: [dir: 1 | -1]
@@ -76,7 +80,7 @@ function onKeydown(e: KeyboardEvent) {
       </button>
     </div>
 
-    <div class="flex flex-col gap-1.5">
+    <div v-if="!fixedLayout" class="flex flex-col gap-1.5">
       <div class="text-[13px] text-ink2">Typeface</div>
       <SegmentedControl
         label="Typeface"
@@ -86,7 +90,7 @@ function onKeydown(e: KeyboardEvent) {
       />
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div v-if="!fixedLayout" class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
         <div id="ts-size" class="text-[13px] text-ink2">Size</div>
         <div
@@ -158,7 +162,7 @@ function onKeydown(e: KeyboardEvent) {
         @update:model-value="emit('margins', $event)"
       />
     </div>
-    <div class="flex flex-col gap-1.5">
+    <div v-if="!fixedLayout" class="flex flex-col gap-1.5">
       <div class="text-[13px] text-ink2">Alignment</div>
       <SegmentedControl
         label="Alignment"
