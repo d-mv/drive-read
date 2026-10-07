@@ -2,6 +2,12 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-07: Custom typefaces & sync reliability (v0.12.0)
+
+- **Mount relocations do not save or dirty progress.** In both foliate and PDF engines, mounting fires an initial `relocate` at the restored location. `reader.ts` now distinguishes this initial restore and layout changes (window resize, device orientation) from real page turns. This prevents newly opened devices from generating false dirty records with newer timestamps that would otherwise win conflict resolution and overwrite newer progress from other devices.
+- **Pull on tab visibility.** When returning to a visible tab (`visibilitychange` with `visibilityState === 'visible'`) while connected, the app pulls sync so that progress made on another device while the tab was hidden is reflected immediately.
+- **Additional typefaces.** Added Cartisse, Libron, NV Jost, NV Zilla Slab, and Readerly to reader settings and theme injection.
+
 ## 2026-10-04 — Drive access spike
 
 - The Kairos project is under the **Apps** area: no "Projects" area exists, and every other app lives in Apps.

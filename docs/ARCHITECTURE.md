@@ -284,7 +284,7 @@ Nothing polls: sync runs only on the triggers below (`src/app/syncTriggers.ts`, 
 | Page turn | Write `progress` to IndexedDB, mark it dirty, restart a 20 s idle timer |
 | Idle timer fires | Push dirty records |
 | Tab hidden | Push now with `fetch` `keepalive` |
-| App start (connected), back online, (re)connected | Pull, then push |
+| App start (connected), back online, (re)connected, tab becomes visible | Pull, then push |
 | Book opened | Pull that book's record |
 
 ```mermaid
@@ -301,6 +301,7 @@ flowchart TD
   `modifiedTime`, a server clock) **and** the local record is dirty. The later `updatedAt` wins;
   the other position is offered once in the reader.
 - Latest write wins, not furthest position: flipping back to re-read must not be undone by sync.
+- Progress is saved only on true page turns or explicit navigations; initial mount/restore and layout reports (resize, orientation changes) do not mark records dirty or bump timestamps.
 - A push that fails (offline, expired token, rate limit) leaves the record dirty; the next
   trigger retries. `sync.failed` logs the reason and the backlog.
 - `library.json` merges per entry by `updatedAt`, with removal markers.
@@ -367,7 +368,7 @@ chrome and the book content; dark mode swaps token values.
 - `styles/reader-theme.ts` combines token values with the text settings into CSS that
   `engine.setTheme()` injects into the book frame. "Original" typeface injects no font override.
 - PDF pages keep their own colours; dark mode changes only the surround.
-- Space Grotesk, IBM Plex Mono and Literata are self-hosted `woff2`, precached.
+- Space Grotesk, IBM Plex Mono, Literata, Cartisse, Libron, NV Jost, NV Zilla Slab, and Readerly are self-hosted fonts, precached.
 
 ## Failure states
 
