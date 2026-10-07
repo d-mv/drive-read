@@ -200,7 +200,10 @@ onMounted(() => {
   // Opening a book pulls, so a position read elsewhere is offered right away.
   void open().then(() => sync.syncNow())
 })
-watch(() => id, open)
+watch(
+  () => id,
+  () => void open().then(() => sync.syncNow()),
+)
 onBeforeUnmount(() => {
   removeEventListener('keydown', onKeydown)
   document.removeEventListener('visibilitychange', onVisibility)

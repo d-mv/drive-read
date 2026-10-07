@@ -7,8 +7,8 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-import { CSP } from './csp'
-import { pdfjsAssets } from './scripts/pdfjs-assets'
+import { CSP } from './csp.ts'
+import { pdfjsAssets } from './scripts/pdfjs-assets.ts'
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
@@ -88,10 +88,13 @@ export default defineConfig({
           },
         ],
         navigateFallback: '/index.html',
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 6000,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

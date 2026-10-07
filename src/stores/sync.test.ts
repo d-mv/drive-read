@@ -197,9 +197,45 @@ describe('two devices', () => {
     on(laptop)
     laptop.ctx.drive.download.mockResolvedValue(Ok(new Blob(['epub'])))
     await useReader().open('b1', document.createElement('div'))
+    // Mount/restore does not dirty progress
+    expect(useLibrary().progress.b1?.dirty).toBe(false)
     await useSync().syncNow()
     expect(useLibrary().progress.b1).toMatchObject({ fraction: 0.2 })
     expect(useSync().takeOffer('b1')).toMatchObject({ fraction: 0.7, device: { name: 'Phone' } })
+
+    // Jumping to offer moves reader and saves the new progress
+    await useReader().goTo(at(0.7).locator)
+    laptop.ctx.relocate({ position: at(0.7), chapterMinutesLeft: 10 })
+    expect(useLibrary().progress.b1).toMatchObject({ fraction: 0.7, dirty: true })
+    await useSync().syncNow()
+    expect(useLibrary().progress.b1).toMatchObject({ fraction: 0.7, dirty: false })
+  })
+
+  it('opening a brand new book does not overwrite remote progress with 0', async () => {
+    const appdata = memoryAppData()
+    const phone = await device(appdata, 'Phone')
+    await useLibrary().addFromDrive([driveFile('b1')])
+    await useLibrary().saveProgress('b1', at(0.55))
+    await useSync().syncNow()
+
+    const laptop = await device(appdata, 'Laptop')
+    // Laptop syncs library, discovers b1
+    await useSync().syncNow()
+    expect(useLibrary().progress.b1).toMatchObject({ fraction: 0.55, dirty: false })
+
+    // Open reader on laptop
+    laptop.ctx.drive.download.mockResolvedValue(Ok(new Blob(['epub'])))
+    await useReader().open('b1', document.createElement('div'))
+    expect(useLibrary().progress.b1?.dirty).toBe(false)
+
+    // Syncing while reader is open should not push or overwrite
+    await useSync().syncNow()
+    expect(useLibrary().progress.b1).toMatchObject({ fraction: 0.55, dirty: false })
+
+    // Phone checks that remote progress was untouched
+    on(phone)
+    await useSync().syncNow()
+    expect(useLibrary().progress.b1).toMatchObject({ fraction: 0.55, dirty: false })
   })
 })
 

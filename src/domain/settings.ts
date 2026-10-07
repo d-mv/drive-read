@@ -1,6 +1,14 @@
 export type ThemeSetting = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
-export type Typeface = 'literata' | 'grotesk' | 'original'
+export type Typeface =
+  | 'literata'
+  | 'cartisse'
+  | 'libron'
+  | 'readerly'
+  | 'grotesk'
+  | 'jost'
+  | 'zilla-slab'
+  | 'original'
 export type Margins = 'narrow' | 'medium' | 'wide'
 export type Align = 'left' | 'justify'
 

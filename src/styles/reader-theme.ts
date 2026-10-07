@@ -1,4 +1,4 @@
-import type { Settings } from '@/domain/settings'
+import type { Settings, Typeface } from '@/domain/settings'
 
 /**
  * Builds the CSS injected into the book frame from the resolved theme colours and the text
@@ -16,15 +16,32 @@ export interface FontFace {
   family: string
   url: string
   style: 'normal' | 'italic'
+  weight?: string
+  format?: string
 }
 
-const FAMILY = {
+const FAMILY_NAME: Record<Exclude<Typeface, 'original'>, string> = {
+  literata: 'Literata Variable',
+  grotesk: 'Space Grotesk Variable',
+  cartisse: 'Cartisse',
+  libron: 'Libron',
+  jost: 'NV Jost',
+  'zilla-slab': 'NV Zilla Slab',
+  readerly: 'Readerly',
+}
+
+const FAMILY: Record<Exclude<Typeface, 'original'>, string> = {
   literata: "'Literata Variable', Georgia, serif",
   grotesk: "'Space Grotesk Variable', system-ui, sans-serif",
-} as const
+  cartisse: "'Cartisse', Georgia, serif",
+  libron: "'Libron', Georgia, serif",
+  jost: "'NV Jost', system-ui, sans-serif",
+  'zilla-slab': "'NV Zilla Slab', Georgia, serif",
+  readerly: "'Readerly', Georgia, serif",
+}
 
 const fontFaceCss = (f: FontFace) =>
-  `@font-face { font-family: '${f.family}'; font-style: ${f.style}; font-weight: 200 900; font-display: swap; src: url('${f.url}') format('woff2'); }`
+  `@font-face { font-family: '${f.family}'; font-style: ${f.style}; font-weight: ${f.weight ?? '200 900'}; font-display: swap; src: url('${f.url}') format('${f.format ?? 'woff2'}'); }`
 
 export function readerCss(
   colors: ReaderColors,
@@ -34,8 +51,11 @@ export function readerCss(
   const typeface = settings.typeface
   const override = typeface !== 'original'
   const family = typeface === 'original' ? '' : `font-family: ${FAMILY[typeface]} !important;`
+  const activeFamily = typeface !== 'original' ? FAMILY_NAME[typeface] : null
+  const activeFonts = activeFamily ? fonts.filter((f) => f.family === activeFamily) : []
+  const fontsToInject = activeFonts.length > 0 ? activeFonts : fonts
   return [
-    ...(override ? fonts.map(fontFaceCss) : []),
+    ...(override ? fontsToInject.map(fontFaceCss) : []),
     `html { color-scheme: light dark; color: ${colors.ink}; background: ${colors.paper}; }`,
     `body { ${family} font-size: ${settings.size}px !important; line-height: ${settings.lineHeight} !important; text-align: ${settings.align}; hyphens: auto; -webkit-hyphens: auto; }`,
     // Publisher colours would fight the theme; images keep theirs.

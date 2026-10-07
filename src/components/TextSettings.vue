@@ -32,7 +32,12 @@ const emit = defineEmits<{
 
 const TYPEFACES = [
   { value: 'literata', label: 'Literata' },
+  { value: 'cartisse', label: 'Cartisse' },
+  { value: 'libron', label: 'Libron' },
+  { value: 'readerly', label: 'Readerly' },
   { value: 'grotesk', label: 'Grotesk' },
+  { value: 'jost', label: 'Jost' },
+  { value: 'zilla-slab', label: 'Zilla Slab' },
   { value: 'original', label: 'Original' },
 ] as const
 const MARGINS = [
@@ -85,6 +90,7 @@ function onKeydown(e: KeyboardEvent) {
       <SegmentedControl
         label="Typeface"
         :options="TYPEFACES"
+        :cols="4"
         :model-value="settings.typeface"
         @update:model-value="emit('typeface', $event)"
       />

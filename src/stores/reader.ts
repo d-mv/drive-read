@@ -137,12 +137,22 @@ export const useReader = defineStore('reader', () => {
     toc.value = meta.value.toc
     if (record.provisional) await library.applyMeta(id, meta.value)
     next.onRelocate((r) => {
+      let pageChanged = false
       if (measure) {
         // Layout changes (resize, address bar, rotation) report the same position: not a page.
         const key = positionKey(r.position.locator)
-        if (measure.from === null) measure.from = r.position.fraction
-        else if (key !== measure.lastKey) measure.pages++
-        measure.lastKey = key
+        if (measure.from === null) {
+          measure.from = r.position.fraction
+          measure.lastKey = key
+          const savedLoc = library.progress[id]?.locator
+          if (savedLoc ? positionKey(savedLoc) !== key : r.position.fraction > 0) {
+            pageChanged = true
+          }
+        } else if (key !== measure.lastKey) {
+          measure.pages++
+          measure.lastKey = key
+          pageChanged = true
+        }
         measure.to = r.position.fraction
         const now = Date.now()
         measure.activeMs += Math.min(now - measure.lastAt, IDLE_MS)
@@ -151,7 +161,7 @@ export const useReader = defineStore('reader', () => {
       position.value = r.position
       chapterMinutesLeft.value = r.chapterMinutesLeft
       page.value = r.page ?? null
-      void library.saveProgress(id, r.position)
+      if (pageChanged) void library.saveProgress(id, r.position)
     })
     if (opts.onKeydown) next.onKeydown(opts.onKeydown)
     zoomable.value = !!next.setZoom

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 — 2026-10-07
+
+- Fix: between-device sync now accurately preserves latest progress. Reader mount no longer falsely marks progress dirty with a new timestamp, avoiding overwriting progress from other devices.
+- Sync on tab visibility: returning to a visible tab now pulls recent reading progress made on other devices.
+- Added custom typefaces: Cartisse, Libron, NV Jost, NV Zilla Slab, Readerly.
+
 ## 0.11.0 — 2026-10-05
 
 - PDF zoom: 100–300% of the fitted width with − / % / + in the footer, the keys `+` `-` `0`, or a

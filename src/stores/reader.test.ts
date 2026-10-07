@@ -39,14 +39,26 @@ describe('open', () => {
     expect(reader.toc).toEqual(META.toc)
   })
 
-  it('restores the saved position', async () => {
-    const { engine } = await withBook()
-    await useLibrary().saveProgress('local-abc', relocation(0.42).position)
+  it('restores the saved position without marking it dirty', async () => {
+    const { relocate } = await withBook()
+    const pos = {
+      v: 1 as const,
+      device: { id: 'dev1', name: 'Laptop' },
+      ...relocation(0.42).position,
+      fileId: 'local-abc',
+      updatedAt: '2026-10-04T12:00:00Z',
+      dirty: false,
+      bookmarks: [] as [],
+    }
+    await useLibrary().applyRemoteProgress(pos)
+    expect(useLibrary().progress['local-abc']?.dirty).toBe(false)
+    const originalTime = useLibrary().progress['local-abc']?.updatedAt
+
     await useReader().open('local-abc', document.createElement('div'))
-    expect(engine.mount).toHaveBeenCalledWith(expect.anything(), {
-      locator: relocation(0.42).position.locator,
-      fraction: 0.42,
-    })
+    // Mount report with restored position
+    relocate(relocation(0.42))
+    expect(useLibrary().progress['local-abc']?.dirty).toBe(false)
+    expect(useLibrary().progress['local-abc']?.updatedAt).toBe(originalTime)
   })
 
   it('marks the book opened', async () => {
@@ -72,16 +84,32 @@ describe('open', () => {
 })
 
 describe('reading', () => {
-  it('tracks the position and saves it on every relocate', async () => {
+  it('tracks the position and saves it on page turns, but ignores duplicate layout reports', async () => {
     const { relocate } = await withBook()
+    const pos = {
+      v: 1 as const,
+      device: { id: 'dev1', name: 'Laptop' },
+      ...relocation(0.3).position,
+      fileId: 'local-abc',
+      updatedAt: '2026-10-04T12:00:00Z',
+      dirty: false,
+      bookmarks: [] as [],
+    }
+    await useLibrary().applyRemoteProgress(pos)
+
     const reader = useReader()
     await reader.open('local-abc', document.createElement('div'))
-    relocate(relocation(0.6))
+    relocate(relocation(0.3)) // mount / restored position
+    relocate(relocation(0.3)) // window resize / layout report: no page turn
+    expect(useLibrary().progress['local-abc']?.dirty).toBe(false)
+
+    relocate(relocation(0.6)) // actual page turn
     await Promise.resolve()
 
     expect(reader.position?.fraction).toBe(0.6)
     expect(reader.chapterMinutesLeft).toBe(11)
     await expect.poll(() => useLibrary().items[0]!.fraction).toBe(0.6)
+    expect(useLibrary().progress['local-abc']?.dirty).toBe(true)
   })
 
   it('turns pages and follows contents links through the engine', async () => {

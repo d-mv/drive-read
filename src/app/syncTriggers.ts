@@ -19,6 +19,8 @@ export function startSyncTriggers() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && sync.pending > 0)
       void sync.push({ keepalive: true })
+    else if (document.visibilityState === 'visible' && auth.status === 'connected')
+      void sync.syncNow()
   })
 
   watch(
