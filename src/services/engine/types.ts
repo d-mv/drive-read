@@ -19,8 +19,23 @@ export interface BookEngine {
   setZoom?(zoom: number): Promise<void>
   /** PDF only: the zoom changed by a pinch. */
   onZoom?(cb: (zoom: number) => void): void
+  /** In-book full text search. */
+  search?(query: string): AsyncIterable<SearchYield>
+  clearSearch?(): void
   destroy(): void
 }
+
+export interface SearchSubitem {
+  locator: Locator
+  excerpt: string
+}
+
+export interface SearchResult {
+  label: string
+  subitems: SearchSubitem[]
+}
+
+export type SearchYield = SearchResult | { progress: number }
 
 export type Locator =
   | { kind: 'cfi'; cfi: string }

@@ -53,6 +53,8 @@ const THEMES = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
+  { value: 'low-contrast-light', label: 'Soft Light' },
+  { value: 'low-contrast-dark', label: 'Soft Dark' },
 ] as const
 
 const root = ref<HTMLElement>()

@@ -29,6 +29,8 @@ export function fakeEngine(meta: Result<BookMeta, OpenError>): FakeEngine {
       relocateCb = cb
     }),
     onKeydown: vi.fn<BookEngine['onKeydown']>(),
+    search: vi.fn<NonNullable<BookEngine['search']>>(async function* () {}),
+    clearSearch: vi.fn<NonNullable<BookEngine['clearSearch']>>(),
     destroy: vi.fn<BookEngine['destroy']>(),
   }
   return { engine, relocate: (r) => relocateCb?.(r) }

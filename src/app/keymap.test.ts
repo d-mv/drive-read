@@ -24,6 +24,8 @@ describe('keyAction in the reader', () => {
     ['c', 'contents'],
     ['a', 'settings'],
     ['t', 'theme'],
+    ['/', 'search'],
+    ['s', 'search'],
     ['Escape', 'back'],
   ] as const)('%s → %s', (k, action) => {
     expect(keyAction('reader', key(k))).toEqual(Some(action))

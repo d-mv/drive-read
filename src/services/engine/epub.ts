@@ -12,6 +12,7 @@ import type {
   ReaderTheme,
   Relocation,
   Restore,
+  SearchYield,
 } from './types'
 
 /**
@@ -140,6 +141,36 @@ export function createEpubEngine(): BookEngine {
     },
     onKeydown(cb) {
       keydownCb = cb
+    },
+    async *search(query: string): AsyncIterable<SearchYield> {
+      if (!view) return
+      const q = query.trim()
+      if (!q) return
+      const searchIter = (
+        view as unknown as { search(opts: { query: string }): AsyncIterable<unknown> }
+      ).search({ query: q })
+      for await (const res of searchIter) {
+        if (res === 'done') break
+        if (typeof res === 'object' && res !== null) {
+          if ('subitems' in res && Array.isArray(res.subitems)) {
+            yield {
+              label: (res as { label?: string }).label || '',
+              subitems: (res.subitems as { cfi: string; excerpt: string }[]).map((s) => ({
+                locator: { kind: 'cfi' as const, cfi: s.cfi },
+                excerpt: s.excerpt,
+              })),
+            }
+          } else if (
+            'progress' in res &&
+            typeof (res as { progress: number }).progress === 'number'
+          ) {
+            yield { progress: (res as { progress: number }).progress }
+          }
+        }
+      }
+    },
+    clearSearch() {
+      ;(view as unknown as { clearSearch?(): void })?.clearSearch?.()
     },
     destroy() {
       view?.close()

@@ -12,6 +12,7 @@ import type {
   Position,
   ReaderTheme,
   Restore,
+  SearchYield,
   TocEntry,
 } from '@/services/engine/types'
 import { track } from '@/services/events'
@@ -181,9 +182,9 @@ export const useReader = defineStore('reader', () => {
       activeMs: 0,
       lastAt: Date.now(),
     }
+    if (theme) next.setTheme(theme)
     await next.mount(el, restore)
     if (mine !== session) return
-    if (theme) next.setTheme(theme)
     await library.markOpened(id)
     status.value = { kind: 'ready' }
     track('book.opened', {
@@ -288,6 +289,7 @@ export const useReader = defineStore('reader', () => {
     flushSession()
     measure = null
     session++
+    engine?.clearSearch?.()
     engine?.destroy()
     engine = null
     bookId.value = null
@@ -323,6 +325,15 @@ export const useReader = defineStore('reader', () => {
     engine?.setTheme(t)
   }
 
+  async function* search(query: string): AsyncIterable<SearchYield> {
+    if (!engine?.search) return
+    yield* engine.search(query)
+  }
+
+  function clearSearch() {
+    engine?.clearSearch?.()
+  }
+
   return {
     bookId,
     status,
@@ -342,5 +353,7 @@ export const useReader = defineStore('reader', () => {
     zoom,
     zoomable,
     zoomBy,
+    search,
+    clearSearch,
   }
 })

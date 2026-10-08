@@ -1,5 +1,5 @@
-export type ThemeSetting = 'system' | 'light' | 'dark'
-export type ResolvedTheme = 'light' | 'dark'
+export type ThemeSetting = 'system' | 'light' | 'dark' | 'low-contrast-light' | 'low-contrast-dark'
+export type ResolvedTheme = 'light' | 'dark' | 'low-contrast-light' | 'low-contrast-dark'
 export type Typeface =
   | 'literata'
   | 'cartisse'
@@ -45,7 +45,18 @@ export function resolveTheme(setting: ThemeSetting, prefersDark: boolean): Resol
 
 /** The theme button flips what is on screen, leaving "system" for the settings panel. */
 export function nextTheme(setting: ThemeSetting, prefersDark: boolean): ResolvedTheme {
-  return resolveTheme(setting, prefersDark) === 'dark' ? 'light' : 'dark'
+  const current = resolveTheme(setting, prefersDark)
+  switch (current) {
+    case 'dark':
+      return 'light'
+    case 'low-contrast-dark':
+      return 'low-contrast-light'
+    case 'low-contrast-light':
+      return 'low-contrast-dark'
+    case 'light':
+    default:
+      return 'dark'
+  }
 }
 
 const clamp = (x: number, min: number, max: number) => Math.min(max, Math.max(min, x))

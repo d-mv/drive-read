@@ -15,6 +15,8 @@ describe('resolveTheme', () => {
     expect(resolveTheme('system', false)).toBe('light')
     expect(resolveTheme('light', true)).toBe('light')
     expect(resolveTheme('dark', false)).toBe('dark')
+    expect(resolveTheme('low-contrast-light', false)).toBe('low-contrast-light')
+    expect(resolveTheme('low-contrast-dark', true)).toBe('low-contrast-dark')
   })
 })
 
@@ -23,6 +25,9 @@ describe('nextTheme', () => {
     expect(nextTheme('system', true)).toBe('light')
     expect(nextTheme('system', false)).toBe('dark')
     expect(nextTheme('dark', false)).toBe('light')
+    expect(nextTheme('light', false)).toBe('dark')
+    expect(nextTheme('low-contrast-dark', true)).toBe('low-contrast-light')
+    expect(nextTheme('low-contrast-light', false)).toBe('low-contrast-dark')
   })
 })
 

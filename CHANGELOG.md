@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0 — 2026-10-08
+
+- In-book search: full-text search for both EPUB (via Foliate view search) and PDF (via pdf.js text layer). Includes live progress indicator, excerpt highlights, chapter/page grouping, and keyboard navigation (`/` or `s` shortcut).
+- Low-contrast themes: added Soft Light (`low-contrast-light`) and Soft Dark (`low-contrast-dark`) themes with reduced contrast to ease eyestrain.
+- Fix: sync reconnect from header. Clicking sync status ("Synced yesterday ...") or reconnect notice when token is expired prompts re-authentication and pulls latest progress from other devices.
+- Fix: PDF initial mount double-rendering eliminated by applying reader theme and text layout before mounting the engine.
+
 ## 0.12.0 — 2026-10-07
 
 - Fix: between-device sync now accurately preserves latest progress. Reader mount no longer falsely marks progress dirty with a new timestamp, avoiding overwriting progress from other devices.

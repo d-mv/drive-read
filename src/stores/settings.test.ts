@@ -81,5 +81,12 @@ describe('settings', () => {
     expect(settings.value.theme).toBe('dark')
     await settings.toggleTheme()
     expect(settings.value.theme).toBe('light')
+
+    await settings.setTheme('low-contrast-light')
+    expect(document.documentElement.dataset.theme).toBe('low-contrast-light')
+    expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('low-contrast-light')
+    await settings.toggleTheme()
+    expect(settings.value.theme).toBe('low-contrast-dark')
+    expect(document.documentElement.dataset.theme).toBe('low-contrast-dark')
   })
 })

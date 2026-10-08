@@ -37,6 +37,8 @@ const READER: Record<string, KeyAction> = {
   c: 'contents',
   a: 'settings',
   t: 'theme',
+  '/': 'search',
+  s: 'search',
   Escape: 'back',
   '+': 'zoom-in',
   '=': 'zoom-in',

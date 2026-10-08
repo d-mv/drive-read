@@ -5,11 +5,23 @@
   try {
     setting = localStorage.getItem('drive-read:theme') || 'system'
   } catch (e) {}
-  var dark =
+  var isDark =
     setting === 'dark' ||
+    setting === 'low-contrast-dark' ||
     (setting === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  var theme = dark ? 'dark' : 'light'
+  var theme =
+    setting === 'system'
+      ? (isDark ? 'dark' : 'light')
+      : (setting || 'light')
   document.documentElement.dataset.theme = theme
   var meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', dark ? '#171614' : '#F3F0E8')
+  if (meta) {
+    var colors = {
+      light: '#F3F0E8',
+      dark: '#171614',
+      'low-contrast-light': '#ECE7DC',
+      'low-contrast-dark': '#262422',
+    }
+    meta.setAttribute('content', colors[theme] || '#F3F0E8')
+  }
 })()

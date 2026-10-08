@@ -34,6 +34,28 @@
   color-scheme: dark;
 }
 
+[data-theme='low-contrast-light'] {
+  --color-paper: #ece7dc;
+  --color-panel: #e2dcd0;
+  --color-ink: #423e37;
+  --color-ink2: #706b60;
+  --color-rule: #c4beaf;
+  --color-track: #aaa495;
+  --color-signal: #c8501e;
+  color-scheme: light;
+}
+
+[data-theme='low-contrast-dark'] {
+  --color-paper: #262422;
+  --color-panel: #302d2a;
+  --color-ink: #b8b2a5;
+  --color-ink2: #807a70;
+  --color-rule: #45413a;
+  --color-track: #5e584f;
+  --color-signal: #e06c35;
+  color-scheme: dark;
+}
+
 @layer base {
   html,
   body,

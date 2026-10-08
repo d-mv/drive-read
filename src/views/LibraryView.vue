@@ -20,6 +20,7 @@ import { useAuth } from '@/stores/auth'
 import { useLibrary } from '@/stores/library'
 import { useSettings } from '@/stores/settings'
 import { useSync } from '@/stores/sync'
+import { isNone } from '@/shared/result'
 
 /** The library (canvas: "Library, light" and the phone "Library"). */
 const router = useRouter()
@@ -30,6 +31,20 @@ const sync = useSync()
 const auth = useAuth()
 const syncDismissed = ref(false)
 const online = useOnline()
+
+async function onSyncClick() {
+  if (isNone(auth.validToken())) {
+    const ok = await auth.connect()
+    if (!ok) return
+  }
+  await sync.syncNow()
+}
+
+async function reconnectSync() {
+  if (await auth.connect()) {
+    await sync.syncNow()
+  }
+}
 /** Space used on this device (books, covers, app), from navigator.storage.estimate(). */
 const usedBytes = ref<number | null>(null)
 async function refreshUsage() {
@@ -152,12 +167,12 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
       <button
         v-if="auth.status !== 'disconnected'"
         type="button"
-        title="Sync now"
+        :title="auth.status === 'expired' ? 'Connection expired. Reconnect and sync' : 'Sync now'"
         class="tabular h-11 px-1 font-mono text-xs text-ink2 underline-offset-[3px] hover:underline disabled:no-underline"
-        :disabled="sync.status === 'syncing'"
-        @click="sync.syncNow()"
+        :disabled="sync.status === 'syncing' || auth.busy"
+        @click="onSyncClick"
       >
-        {{ sync.status === 'syncing' ? 'Syncing…' : syncedLabel(sync.lastSyncAt) }}
+        {{ sync.status === 'syncing' || auth.busy ? 'Syncing…' : syncedLabel(sync.lastSyncAt) }}
       </button>
       <button
         type="button"
@@ -173,7 +188,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
       v-if="syncMessage"
       :message="syncMessage"
       :action-label="sync.status === 'reconnect' ? 'Reconnect' : undefined"
-      @action="auth.connect()"
+      @action="reconnectSync"
       @dismiss="syncDismissed = true"
     />
 

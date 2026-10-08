@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logger } from '@/services/logger'
+import type { BookEngine } from '@/services/engine/types'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
@@ -37,6 +38,23 @@ describe('open', () => {
     expect(engine.mount).toHaveBeenCalledWith(el, undefined)
     expect(reader.status).toEqual({ kind: 'ready' })
     expect(reader.toc).toEqual(META.toc)
+  })
+
+  it('applies theme before mount to prevent double-rendering', async () => {
+    const { engine } = await withBook()
+    const reader = useReader()
+    const order: string[] = []
+    engine.setTheme.mockImplementation(() => {
+      order.push('setTheme')
+    })
+    engine.mount.mockImplementation(async () => {
+      order.push('mount')
+    })
+
+    reader.setTheme({ css: 'body { color: black; }', maxInlineSize: 620 })
+    await reader.open('local-abc', document.createElement('div'))
+
+    expect(order).toEqual(['setTheme', 'mount'])
   })
 
   it('restores the saved position without marking it dirty', async () => {
@@ -345,5 +363,38 @@ describe('zoom (PDF)', () => {
     expect(reader.zoom).toBe(2)
     reader.close()
     expect(reader.zoom).toBe(1)
+  })
+})
+
+describe('search', () => {
+  it('delegates search and clearSearch to the underlying engine', async () => {
+    const { engine } = await withBook()
+    const reader = useReader()
+    engine.search = vi.fn<NonNullable<BookEngine['search']>>(async function* (q: string) {
+      yield {
+        label: 'Chapter 1',
+        subitems: [{ locator: { kind: 'cfi' as const, cfi: '/4/2' }, excerpt: `found ${q}` }],
+      }
+    })
+    await reader.open('local-abc', document.createElement('div'))
+
+    const results: any[] = []
+    for await (const r of reader.search('query')) {
+      results.push(r)
+    }
+
+    expect(engine.search).toHaveBeenCalledWith('query')
+    expect(results).toEqual([
+      {
+        label: 'Chapter 1',
+        subitems: [{ locator: { kind: 'cfi', cfi: '/4/2' }, excerpt: 'found query' }],
+      },
+    ])
+
+    reader.clearSearch()
+    expect(engine.clearSearch).toHaveBeenCalled()
+
+    reader.close()
+    expect(engine.clearSearch).toHaveBeenCalledTimes(2)
   })
 })

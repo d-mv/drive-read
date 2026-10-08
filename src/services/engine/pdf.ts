@@ -1,7 +1,7 @@
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-import { Err, Ok, type Result } from '@/shared/result'
+import { Err, isSome, Ok, type Result } from '@/shared/result'
 
 import './pdf-text-layer.css'
 import {
@@ -21,6 +21,8 @@ import type {
   ReaderTheme,
   Relocation,
   Restore,
+  SearchSubitem,
+  SearchYield,
   TocEntry,
 } from './types'
 
@@ -337,6 +339,41 @@ export function createPdfEngine(): BookEngine {
     setZoom,
     onZoom(cb) {
       zoomCb = cb
+    },
+    async *search(query: string): AsyncIterable<SearchYield> {
+      if (!doc) return
+      const q = query.trim().toLowerCase()
+      if (!q) return
+      const numPages = doc.numPages
+      for (let i = 1; i <= numPages; i++) {
+        const page = await doc.getPage(i)
+        const content = await page.getTextContent()
+        const fullText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ')
+        const lower = fullText.toLowerCase()
+        const subitems: SearchSubitem[] = []
+        let idx = lower.indexOf(q)
+        while (idx !== -1) {
+          const start = Math.max(0, idx - 40)
+          const end = Math.min(fullText.length, idx + q.length + 40)
+          const excerpt =
+            (start > 0 ? '…' : '') +
+            fullText.slice(start, end).trim() +
+            (end < fullText.length ? '…' : '')
+          subitems.push({
+            locator: { kind: 'page', page: i - 1, offset: 0 },
+            excerpt,
+          })
+          idx = lower.indexOf(q, idx + q.length || idx + 1)
+        }
+        yield { progress: i / numPages }
+        if (subitems.length > 0) {
+          const fraction = (i - 1) / numPages
+          const starts = toc.map((t) => t.start)
+          const ch = chapterAt(starts, fraction)
+          const label = isSome(ch) && toc[ch.value.index] ? toc[ch.value.index]!.label : `Page ${i}`
+          yield { label, subitems }
+        }
+      }
     },
     destroy() {
       task?.cancel()

@@ -7,6 +7,7 @@ import { browserWakeLock, createWakeLock } from '@/app/wakeLock'
 import AppIcon from '@/components/AppIcon.vue'
 import ContentsPanel from '@/components/ContentsPanel.vue'
 import ProgressSegments from '@/components/ProgressSegments.vue'
+import SearchPanel from '@/components/SearchPanel.vue'
 import TextSettings from '@/components/TextSettings.vue'
 import { formatPercent } from '@/domain/book'
 import { paginatorLayout } from '@/domain/settings'
@@ -50,9 +51,10 @@ async function jumpToOffer() {
 }
 
 const host = ref<HTMLElement>()
-const panel = ref<'none' | 'contents' | 'settings'>('none')
+const panel = ref<'none' | 'contents' | 'settings' | 'search'>('none')
 const contentsButton = ref<HTMLButtonElement>()
 const settingsButton = ref<HTMLButtonElement>()
+const searchButton = ref<HTMLButtonElement>()
 
 const starts = computed(() => reader.toc.map((t) => t.start))
 const fraction = computed(() => reader.position?.fraction ?? 0)
@@ -126,17 +128,19 @@ async function closePanel() {
   const was = panel.value
   panel.value = 'none'
   await nextTick()
-  ;(was === 'contents' ? contentsButton : settingsButton).value?.focus()
+  if (was === 'contents') contentsButton.value?.focus()
+  else if (was === 'settings') settingsButton.value?.focus()
+  else if (was === 'search') searchButton.value?.focus()
 }
 
-function togglePanel(p: 'contents' | 'settings') {
+function togglePanel(p: 'contents' | 'settings' | 'search') {
   if (panel.value === p) void closePanel()
   else panel.value = p
 }
 
 async function goTo(loc: Locator) {
   await reader.goTo(loc)
-  // On a phone the contents cover the page: close them so the reader sees where they went.
+  // On a phone the contents or search cover the page: close them so the reader sees where they went.
   if (matchMedia('(max-width: 767px)').matches) panel.value = 'none'
 }
 
@@ -150,6 +154,7 @@ function onKeydown(e: KeyboardEvent) {
     prev: () => void reader.prev(),
     contents: () => togglePanel('contents'),
     settings: () => togglePanel('settings'),
+    search: () => togglePanel('search'),
     theme: () => void settings.toggleTheme(),
     back: () => (panel.value !== 'none' ? void closePanel() : back()),
     ...(reader.zoomable && {
@@ -230,6 +235,18 @@ onBeforeUnmount(() => {
         <span class="hidden truncate text-sm text-ink2 sm:inline">{{ reader.book?.author }}</span>
       </div>
       <button
+        ref="searchButton"
+        type="button"
+        aria-label="Search"
+        :aria-pressed="panel === 'search'"
+        :disabled="reader.status.kind !== 'ready'"
+        class="flex size-11 flex-none items-center justify-center rounded-ctl disabled:opacity-40"
+        :class="panel === 'search' && 'bg-ink text-paper'"
+        @click="togglePanel('search')"
+      >
+        <AppIcon name="search" />
+      </button>
+      <button
         ref="contentsButton"
         type="button"
         aria-label="Contents"
@@ -263,6 +280,13 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="relative flex min-h-0 flex-1">
+      <SearchPanel
+        v-if="panel === 'search'"
+        class="absolute inset-0 z-10 md:static md:w-[320px] md:min-w-[240px] md:flex-none md:border-r md:border-rule"
+        @go="goTo"
+        @close="closePanel"
+      />
+
       <ContentsPanel
         v-if="panel === 'contents'"
         :toc="reader.toc"

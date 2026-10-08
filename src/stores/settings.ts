@@ -6,6 +6,7 @@ import {
   DEFAULT_SETTINGS,
   type Margins,
   nextTheme,
+  type ResolvedTheme,
   resolveTheme,
   type Settings,
   stepLineHeight as stepLineHeightOf,
@@ -18,8 +19,19 @@ import { unwrapOr } from '@/shared/result'
 
 /** Read by public/theme-init.js before first paint. */
 export const THEME_MIRROR_KEY = 'drive-read:theme'
-const THEME_COLOR = { light: '#F3F0E8', dark: '#171614' } as const
-const THEME_SETTINGS: readonly string[] = ['system', 'light', 'dark'] satisfies ThemeSetting[]
+const THEME_COLOR: Record<ResolvedTheme, string> = {
+  light: '#F3F0E8',
+  dark: '#171614',
+  'low-contrast-light': '#ECE7DC',
+  'low-contrast-dark': '#262422',
+} as const
+const THEME_SETTINGS: readonly string[] = [
+  'system',
+  'light',
+  'dark',
+  'low-contrast-light',
+  'low-contrast-dark',
+] satisfies ThemeSetting[]
 
 function readThemeMirror(): ThemeSetting | null {
   try {
