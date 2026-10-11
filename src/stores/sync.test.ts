@@ -136,6 +136,28 @@ describe('two devices', () => {
     void phone
   })
 
+  it('preserves PDF format when syncing added books across devices', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Laptop')
+    const pdfDriveFile: DriveFile = {
+      id: 'pdf1',
+      name: 'Document.pdf',
+      mimeType: 'application/pdf',
+      size: 100,
+      md5: 'md5-pdf1',
+      modifiedTime: '',
+    }
+    await useLibrary().addFromDrive([pdfDriveFile])
+    await useSync().syncNow()
+
+    await device(appdata, 'Phone')
+    await useSync().syncNow()
+
+    const syncedBook = useLibrary().books.find((b) => b.id === 'pdf1')
+    expect(syncedBook).toBeDefined()
+    expect(syncedBook?.format).toBe('pdf')
+  })
+
   it('a book removed on one device is removed on the other, not added back', async () => {
     const appdata = memoryAppData()
     const laptop = await device(appdata, 'Laptop')
@@ -240,6 +262,23 @@ describe('two devices', () => {
 })
 
 describe('failures', () => {
+  it('ignores corrupt remote library doc without crashing', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Laptop')
+    await appdata.create('tok', 'library.json', { invalid: 'payload' })
+    await useSync().syncNow()
+    expect(useSync().status).toBe('idle')
+  })
+
+  it('ignores corrupt remote progress doc without crashing', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Laptop')
+    await useLibrary().addFromDrive([driveFile('b1')])
+    await appdata.create('tok', 'progress-b1.json', { v: 99, missing: 'fields' })
+    await useSync().syncNow()
+    expect(useSync().status).toBe('idle')
+  })
+
   it('an expired token keeps changes waiting and asks to reconnect', async () => {
     const appdata = memoryAppData()
     await device(appdata, 'Laptop')

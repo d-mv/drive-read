@@ -137,6 +137,7 @@ export const useReader = defineStore('reader', () => {
     engine = next
     toc.value = meta.value.toc
     if (record.provisional) await library.applyMeta(id, meta.value)
+    let isMounting = true
     next.onRelocate((r) => {
       let pageChanged = false
       if (measure) {
@@ -145,14 +146,18 @@ export const useReader = defineStore('reader', () => {
         if (measure.from === null) {
           measure.from = r.position.fraction
           measure.lastKey = key
-          const savedLoc = library.progress[id]?.locator
-          if (savedLoc ? positionKey(savedLoc) !== key : r.position.fraction > 0) {
-            pageChanged = true
+          if (!isMounting) {
+            const savedLoc = library.progress[id]?.locator
+            if (savedLoc ? positionKey(savedLoc) !== key : r.position.fraction > 0) {
+              pageChanged = true
+            }
           }
         } else if (key !== measure.lastKey) {
           measure.pages++
           measure.lastKey = key
-          pageChanged = true
+          if (!isMounting) {
+            pageChanged = true
+          }
         }
         measure.to = r.position.fraction
         const now = Date.now()
@@ -183,7 +188,11 @@ export const useReader = defineStore('reader', () => {
       lastAt: Date.now(),
     }
     if (theme) next.setTheme(theme)
-    await next.mount(el, restore)
+    try {
+      await next.mount(el, restore)
+    } finally {
+      isMounting = false
+    }
     if (mine !== session) return
     await library.markOpened(id)
     status.value = { kind: 'ready' }

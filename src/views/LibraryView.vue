@@ -100,6 +100,17 @@ async function remove(id: string, title: string) {
   if (library.books.length === 0) await router.replace({ name: 'welcome' })
 }
 
+/** Tracks sm breakpoint (640px) so mobile never mounts desktop grid components and vice-versa */
+const isSmUp = ref(
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(min-width: 640px)').matches
+    : false,
+)
+let mql: MediaQueryList | null = null
+function onMqlChange(e: MediaQueryListEvent) {
+  isSmUp.value = e.matches
+}
+
 function onKeydown(e: KeyboardEvent) {
   const action = keyAction('library', keyInput(e))
   if (!isSome(action)) return
@@ -115,8 +126,18 @@ function onKeydown(e: KeyboardEvent) {
   fn()
 }
 
-onMounted(() => addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
+onMounted(() => {
+  addEventListener('keydown', onKeydown)
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    mql = window.matchMedia('(min-width: 640px)')
+    isSmUp.value = mql.matches
+    mql.addEventListener('change', onMqlChange)
+  }
+})
+onBeforeUnmount(() => {
+  removeEventListener('keydown', onKeydown)
+  mql?.removeEventListener('change', onMqlChange)
+})
 </script>
 
 <template>
@@ -286,8 +307,8 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
     </section>
 
     <main
-      v-else-if="settings.value.libraryView === 'grid'"
-      class="hidden grid-cols-[repeat(auto-fill,minmax(min(168px,100%),1fr))] gap-x-8 gap-y-10 px-[clamp(16px,3vw,40px)] pt-6 pb-12 sm:grid"
+      v-else-if="settings.value.libraryView === 'grid' && isSmUp"
+      class="grid grid-cols-[repeat(auto-fill,minmax(min(168px,100%),1fr))] gap-x-8 gap-y-10 px-[clamp(16px,3vw,40px)] pt-6 pb-12"
     >
       <BookCard
         v-for="entry in shown"
@@ -301,9 +322,8 @@ onBeforeUnmount(() => removeEventListener('keydown', onKeydown))
     </main>
     <!-- The phone always lists; the grid is a desktop layout. -->
     <ul
-      v-if="shown.length > 0 && filter !== 'downloaded'"
+      v-else
       class="m-0 list-none px-3 pt-2 pb-12 sm:px-[clamp(16px,3vw,40px)]"
-      :class="settings.value.libraryView === 'grid' && 'sm:hidden'"
     >
       <BookRow
         v-for="entry in shown"

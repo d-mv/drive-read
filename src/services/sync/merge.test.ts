@@ -4,6 +4,8 @@ import type { ProgressRecord } from '@/domain/book'
 
 import {
   decideProgress,
+  isValidLibraryDoc,
+  isValidSyncedProgress,
   type LibraryEntry,
   libraryChanges,
   mergeLibrary,
@@ -138,3 +140,70 @@ describe('libraryChanges', () => {
     })
   })
 })
+
+describe('schema validation', () => {
+  it('validates library doc schema', () => {
+    expect(isValidLibraryDoc(null)).toBe(false)
+    expect(isValidLibraryDoc({})).toBe(false)
+    expect(isValidLibraryDoc({ v: 2, entries: [] })).toBe(false)
+    expect(isValidLibraryDoc({ v: 1, entries: 'not-array' })).toBe(false)
+    expect(
+      isValidLibraryDoc({
+        v: 1,
+        entries: [
+          {
+            fileId: 'b1',
+            md5: null,
+            name: 'Book',
+            addedAt: '2026-10-01T00:00:00Z',
+            updatedAt: '2026-10-01T00:00:00Z',
+            removed: false,
+          },
+        ],
+      }),
+    ).toBe(true)
+    expect(
+      isValidLibraryDoc({
+        v: 1,
+        entries: [{ fileId: 123 }],
+      }),
+    ).toBe(false)
+  })
+
+  it('validates synced progress schema', () => {
+    expect(isValidSyncedProgress(null)).toBe(false)
+    expect(isValidSyncedProgress({})).toBe(false)
+    expect(isValidSyncedProgress({ v: 1, fileId: 'b1' })).toBe(false)
+    expect(
+      isValidSyncedProgress({
+        v: 1,
+        fileId: 'b1',
+        fraction: 0.5,
+        updatedAt: '2026-10-01T00:00:00Z',
+        device: { id: 'd1', name: 'Laptop' },
+        locator: { kind: 'cfi', cfi: 'epubcfi(/6/2)' },
+      }),
+    ).toBe(true)
+    expect(
+      isValidSyncedProgress({
+        v: 1,
+        fileId: 'b1',
+        fraction: 0.5,
+        updatedAt: '2026-10-01T00:00:00Z',
+        device: { id: 'd1', name: 'Laptop' },
+        locator: { kind: 'page', page: 3, offset: 0.2 },
+      }),
+    ).toBe(true)
+    expect(
+      isValidSyncedProgress({
+        v: 1,
+        fileId: 'b1',
+        fraction: 0.5,
+        updatedAt: '2026-10-01T00:00:00Z',
+        device: { id: 'd1', name: 'Laptop' },
+        locator: { kind: 'unknown' },
+      }),
+    ).toBe(false)
+  })
+})
+

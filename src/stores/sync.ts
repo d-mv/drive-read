@@ -10,12 +10,13 @@ import type { SyncMeta } from '@/services/storage/db'
 import { compareWithDrive } from '@/services/sync/driveCheck'
 import {
   decideProgress,
+  isValidLibraryDoc,
+  isValidSyncedProgress,
   type LibraryDoc,
   type LibraryEntry,
   libraryChanges,
   mergeLibrary,
   type RemoteProgress,
-  type SyncedProgress,
   toSynced,
 } from '@/services/sync/merge'
 import { isNone, unwrapOr } from '@/shared/result'
@@ -160,13 +161,17 @@ export const useSync = defineStore('sync', () => {
     if (remote && remote.modifiedTime !== meta.value.library.remoteModifiedTime) {
       const r = await appdata.read(tok, remote.id)
       if (r._tag === 'Err') return r.error
-      const remoteEntries = (r.value as Partial<LibraryDoc>).entries ?? []
-      const merged = mergeLibrary(meta.value.library.entries, remoteEntries)
-      meta.value.library = {
-        entries: merged,
-        remoteId: remote.id,
-        remoteModifiedTime: remote.modifiedTime,
-        dirty: meta.value.library.dirty || !sameEntries(merged, remoteEntries),
+      if (!isValidLibraryDoc(r.value)) {
+        track('sync.failed', { reason: 'corrupt-library-doc', pending: pending.value })
+      } else {
+        const remoteEntries = r.value.entries
+        const merged = mergeLibrary(meta.value.library.entries, remoteEntries)
+        meta.value.library = {
+          entries: merged,
+          remoteId: remote.id,
+          remoteModifiedTime: remote.modifiedTime,
+          dirty: meta.value.library.dirty || !sameEntries(merged, remoteEntries),
+        }
       }
     }
 
@@ -178,7 +183,7 @@ export const useSync = defineStore('sync', () => {
       const asFiles: DriveFile[] = changes.toAdd.map((e) => ({
         id: e.fileId,
         name: e.name,
-        mimeType: 'application/epub+zip',
+        mimeType: /\.pdf$/i.test(e.name) ? 'application/pdf' : 'application/epub+zip',
         size: 0,
         md5: e.md5,
         modifiedTime: '',
@@ -206,10 +211,14 @@ export const useSync = defineStore('sync', () => {
 
       const r = await appdata.read(tok, file.id)
       if (r._tag === 'Err') return r.error
+      if (!isValidSyncedProgress(r.value)) {
+        track('sync.failed', { reason: 'corrupt-progress-doc', pending: pending.value })
+        continue
+      }
       const remote: RemoteProgress = {
         id: file.id,
         modifiedTime: file.modifiedTime,
-        record: r.value as SyncedProgress,
+        record: r.value,
       }
       const decision = decideProgress(local, remote)
 

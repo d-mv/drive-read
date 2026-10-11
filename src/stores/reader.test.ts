@@ -79,6 +79,43 @@ describe('open', () => {
     expect(useLibrary().progress['local-abc']?.updatedAt).toBe(originalTime)
   })
 
+  it('mount relocation with normalized CFI during mount does not mark progress dirty', async () => {
+    const { engine } = await withBook()
+    const pos = {
+      v: 1 as const,
+      device: { id: 'dev1', name: 'Laptop' },
+      locator: { kind: 'cfi' as const, cfi: 'epubcfi(/6/4!/4/2/1:0.42)' },
+      fraction: 0.42,
+      chapterIndex: 0,
+      chapterFraction: 0.5,
+      fileId: 'local-abc',
+      updatedAt: '2026-10-04T12:00:00Z',
+      dirty: false,
+      bookmarks: [] as [],
+    }
+    await useLibrary().applyRemoteProgress(pos)
+
+    // Simulate real engine behavior: engine.mount emits relocate during mount with normalized CFI
+    let relocateCb: ((r: any) => void) | undefined
+    engine.onRelocate.mockImplementation((cb) => {
+      relocateCb = cb
+    })
+    engine.mount.mockImplementation(async () => {
+      relocateCb?.({
+        position: {
+          locator: { kind: 'cfi', cfi: 'epubcfi(/6/4[chap1]!/4/2/1:0.42)' },
+          fraction: 0.42,
+          chapterIndex: 0,
+          chapterFraction: 0.5,
+        },
+        chapterMinutesLeft: 10,
+      })
+    })
+
+    await useReader().open('local-abc', document.createElement('div'))
+    expect(useLibrary().progress['local-abc']?.dirty).toBe(false)
+  })
+
   it('marks the book opened', async () => {
     await withBook()
     await useReader().open('local-abc', document.createElement('div'))

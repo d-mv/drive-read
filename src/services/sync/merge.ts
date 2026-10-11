@@ -84,3 +84,49 @@ export function libraryChanges(
     toRemove: merged.filter((e) => e.removed && here.has(e.fileId)).map((e) => e.fileId),
   }
 }
+
+export function isValidLibraryDoc(raw: unknown): raw is LibraryDoc {
+  if (!raw || typeof raw !== 'object') return false
+  const doc = raw as Record<string, unknown>
+  if (doc.v !== 1 || !Array.isArray(doc.entries)) return false
+  return doc.entries.every((e) => {
+    if (!e || typeof e !== 'object') return false
+    const entry = e as Record<string, unknown>
+    return (
+      typeof entry.fileId === 'string' &&
+      (entry.md5 === null || typeof entry.md5 === 'string') &&
+      typeof entry.name === 'string' &&
+      typeof entry.addedAt === 'string' &&
+      typeof entry.updatedAt === 'string' &&
+      typeof entry.removed === 'boolean'
+    )
+  })
+}
+
+export function isValidSyncedProgress(raw: unknown): raw is SyncedProgress {
+  if (!raw || typeof raw !== 'object') return false
+  const p = raw as Record<string, unknown>
+  if (
+    p.v !== 1 ||
+    typeof p.fileId !== 'string' ||
+    typeof p.fraction !== 'number' ||
+    typeof p.updatedAt !== 'string' ||
+    !p.device ||
+    typeof p.device !== 'object'
+  ) {
+    return false
+  }
+  const device = p.device as Record<string, unknown>
+  if (typeof device.id !== 'string' || typeof device.name !== 'string') return false
+  if (!p.locator || typeof p.locator !== 'object') return false
+  const loc = p.locator as Record<string, unknown>
+  if (loc.kind === 'cfi') {
+    if (typeof loc.cfi !== 'string') return false
+  } else if (loc.kind === 'page') {
+    if (typeof loc.page !== 'number' || typeof loc.offset !== 'number') return false
+  } else {
+    return false
+  }
+  return true
+}
+

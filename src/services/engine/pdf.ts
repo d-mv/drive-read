@@ -69,19 +69,25 @@ async function pageIndexOf(doc: PDFDocumentProxy, item: OutlineItem): Promise<nu
 }
 
 async function renderCover(doc: PDFDocumentProxy): Promise<Blob | undefined> {
+  const page = await doc.getPage(1).catch(() => null)
+  if (!page) return undefined
   try {
-    const page = await doc.getPage(1)
     const base = page.getViewport({ scale: 1 })
     const viewport = page.getViewport({ scale: COVER_WIDTH / base.width })
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(viewport.width)
     canvas.height = Math.round(viewport.height)
     await page.render({ canvas, viewport }).promise
-    return await new Promise<Blob | undefined>((r) =>
+    const blob = await new Promise<Blob | undefined>((r) =>
       canvas.toBlob((b) => r(b ?? undefined), 'image/jpeg', 0.85),
     )
+    canvas.width = 0
+    canvas.height = 0
+    return blob
   } catch {
     return undefined
+  } finally {
+    page.cleanup()
   }
 }
 
@@ -97,12 +103,15 @@ export function createPdfEngine(): BookEngine {
   let scroller: HTMLDivElement | null = null
   /** The page shown: canvas plus text layer. */
   let pageEl: HTMLElement | null = null
+  let activePage: { cleanup: () => boolean } | null = null
+  let activeCanvas: HTMLCanvasElement | null = null
   let task: RenderTask | null = null
   let zoom = 1
   let zoomCb: ((zoom: number) => void) | undefined
   let resize: ResizeObserver | null = null
   let lastWidth = 0
   const cleanup: (() => void)[] = []
+  const pageTextCache = new Map<number, string>()
 
   async function open(file: File): Promise<Result<BookMeta, OpenError>> {
     try {
@@ -188,6 +197,9 @@ export function createPdfEngine(): BookEngine {
     try {
       await task.promise
     } catch {
+      canvas.width = 0
+      canvas.height = 0
+      page.cleanup()
       return // cancelled by a newer render
     }
     if (pdfjs)
@@ -203,6 +215,16 @@ export function createPdfEngine(): BookEngine {
       scroller.scrollWidth > scroller.clientWidth
         ? scroller.scrollLeft / (scroller.scrollWidth - scroller.clientWidth)
         : 0.5
+
+    // Release old canvas backing store and page resources
+    if (activeCanvas) {
+      activeCanvas.width = 0
+      activeCanvas.height = 0
+    }
+    activePage?.cleanup()
+    activeCanvas = canvas
+    activePage = page
+
     pageEl.replaceWith(next)
     pageEl = next
     at = { page: pageIndex, offset }
@@ -346,9 +368,14 @@ export function createPdfEngine(): BookEngine {
       if (!q) return
       const numPages = doc.numPages
       for (let i = 1; i <= numPages; i++) {
-        const page = await doc.getPage(i)
-        const content = await page.getTextContent()
-        const fullText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ')
+        let fullText = pageTextCache.get(i)
+        if (fullText === undefined) {
+          const page = await doc.getPage(i)
+          const content = await page.getTextContent()
+          fullText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ')
+          pageTextCache.set(i, fullText)
+          page.cleanup()
+        }
         const lower = fullText.toLowerCase()
         const subitems: SearchSubitem[] = []
         let idx = lower.indexOf(q)
@@ -379,9 +406,18 @@ export function createPdfEngine(): BookEngine {
       task?.cancel()
       resize?.disconnect()
       for (const fn of cleanup.splice(0)) fn()
+      pageTextCache.clear()
+      if (activeCanvas) {
+        activeCanvas.width = 0
+        activeCanvas.height = 0
+        activeCanvas = null
+      }
+      activePage?.cleanup()
+      activePage = null
       scroller?.remove()
       scroller = pageEl = null
       pdfjs = null
+      void doc?.cleanup()
       void loading?.destroy()
       loading = null
       doc = null

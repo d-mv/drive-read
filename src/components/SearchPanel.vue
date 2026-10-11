@@ -77,6 +77,27 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+function splitExcerpt(excerpt: string, q: string): { text: string; match: boolean }[] {
+  const needle = q.trim()
+  if (!needle) return [{ text: excerpt, match: false }]
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(escaped, 'gi')
+  const parts: { text: string; match: boolean }[] = []
+  let lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = regex.exec(excerpt)) !== null) {
+    if (m.index > lastIndex) {
+      parts.push({ text: excerpt.slice(lastIndex, m.index), match: false })
+    }
+    parts.push({ text: m[0], match: true })
+    lastIndex = regex.lastIndex
+  }
+  if (lastIndex < excerpt.length) {
+    parts.push({ text: excerpt.slice(lastIndex), match: false })
+  }
+  return parts
+}
+
 onMounted(() => {
   input.value?.focus()
 })
@@ -157,7 +178,10 @@ onBeforeUnmount(() => {
             class="rounded-ctl border border-rule/60 bg-paper p-2.5 text-left text-xs leading-relaxed text-ink transition-colors hover:border-signal/80 focus:border-signal focus:outline-none"
             @click="emit('go', sub.locator)"
           >
-            {{ sub.excerpt }}
+            <template v-for="(chunk, cIdx) in splitExcerpt(sub.excerpt, query)" :key="cIdx">
+              <mark v-if="chunk.match" class="rounded-[2px] bg-signal/25 px-0.5 text-ink font-medium">{{ chunk.text }}</mark>
+              <span v-else>{{ chunk.text }}</span>
+            </template>
           </button>
         </div>
       </div>
