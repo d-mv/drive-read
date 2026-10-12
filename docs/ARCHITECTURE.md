@@ -115,6 +115,10 @@ interface BookEngine {
   setTheme(theme: ReaderTheme): void
   onRelocate(cb: (r: Relocation) => void): void
   onKeydown(cb: (e: KeyboardEvent) => void): void   // keys pressed inside the book frame
+  setZoom?(zoom: number): Promise<void>            // PDF only
+  onZoom?(cb: (zoom: number) => void): void        // PDF only
+  search?(query: string): AsyncIterable<SearchYield> // in-book full text search
+  clearSearch?(): void
   destroy(): void
 }
 
@@ -304,7 +308,7 @@ flowchart TD
 - Progress is saved only on true page turns or explicit navigations; initial mount/restore and layout reports (resize, orientation changes) do not mark records dirty or bump timestamps.
 - A push that fails (offline, expired token, rate limit) leaves the record dirty; the next
   trigger retries. `sync.failed` logs the reason and the backlog.
-- `library.json` merges per entry by `updatedAt`, with removal markers.
+- `library.json` merges per entry by `updatedAt`, with removal markers. Remote `library.json` and `progress-<fileId>.json` are strictly validated at runtime with type guards (`isValidLibraryDoc`, `isValidSyncedProgress`); corrupt payloads are logged and dropped to prevent client state corruption.
 - Passes run under a `navigator.locks` lock, so two tabs never sync at once.
 
 ## Offline, service worker and updates

@@ -2,6 +2,14 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-12: Sync hardening, PDF engine memory lifecycle, and UI performance (v0.13.1)
+
+- **Mount-time relocation isolation:** Foliate's engine normalizes CFIs upon rendering (e.g. adding or altering step identifiers). If emitted during mount, an initial relocation with a normalized CFI could differ from the stored raw locator string and falsely mark the record `dirty`. We introduced an `isMounting` guard across `engine.mount(el, restore)`: any relocation received while `isMounting` is active updates the reader state without triggering `library.saveProgress()`.
+- **Runtime validation of remote appData:** Drive sync accepts arbitrary JSON from `library.json` and `progress-<fileId>.json`. To prevent crashes from corrupt files or schema drifts, `isValidLibraryDoc` and `isValidSyncedProgress` validate payloads at runtime, logging a warning and safely ignoring invalid records.
+- **MIME type detection on cross-device sync:** `libraryChanges` previously defaulted added Drive entries to `application/epub+zip`. It now checks for `.pdf` extensions and assigns `application/pdf`, ensuring synced PDFs download with proper headers and open in `pdfjs`.
+- **PDF GPU and DOM cleanup:** Canvas elements retain GPU backing stores even after removal from DOM if not explicitly resized to `0x0`. The PDF engine now sets `width = 0; height = 0` on superseded canvases, calls `page.cleanup()` on replaced pages, and invokes `doc.cleanup()` when destroying the engine. Search also maintains an in-memory page text cache to avoid re-extracting text across subsequent search operations.
+- **Responsive LibraryView rendering:** Instead of mounting both desktop grid and mobile list simultaneously and toggling visibility via CSS media queries, `LibraryView` checks `matchMedia('(min-width: 640px)')` to conditionally mount either `BookCard` or `BookRow`, halving OPFS blob cover fetches and memory footprint.
+
 ## 2026-10-07: Custom typefaces & sync reliability (v0.12.0)
 
 - **Mount relocations do not save or dirty progress.** In both foliate and PDF engines, mounting fires an initial `relocate` at the restored location. `reader.ts` now distinguishes this initial restore and layout changes (window resize, device orientation) from real page turns. This prevents newly opened devices from generating false dirty records with newer timestamps that would otherwise win conflict resolution and overwrite newer progress from other devices.

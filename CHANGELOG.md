@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.1 — 2026-10-12
+
+- Fix: prevent false dirty progress flags on reader mount due to CFI normalization. Initial restoration relocations during mount are isolated from user-driven page turns, preventing normalized CFIs from dirtying records.
+- Fix: cross-device library sync now properly identifies and sets MIME types for PDF books added from Drive (`application/pdf`) rather than defaulting to EPUB.
+- Security & Resilience: runtime schema validation for remote Google Drive appData JSON (`library.json` and `progress-<id>.json`) with type guards `isValidLibraryDoc` and `isValidSyncedProgress` to reject corrupt or malformed remote files safely.
+- Performance: deduplicate `<BookCover>` mounts and OPFS blob URL allocations in `LibraryView` by conditionally rendering between desktop grid and mobile list based on the responsive breakpoint.
+- Memory: clean up canvas GPU backing stores (zeroing width/height on page replace) and invoke `page.cleanup()` and `doc.cleanup()` in the PDF engine to release resources promptly.
+- Performance: cache extracted PDF page text tokens in memory for in-book search, avoiding repetitive page decoding on multi-page search queries.
+- UI/UX: highlight matching search query keywords in `SearchPanel` result excerpts using styled `<mark>` elements.
+
 ## 0.13.0 — 2026-10-08
 
 - In-book search: full-text search for both EPUB (via Foliate view search) and PDF (via pdf.js text layer). Includes live progress indicator, excerpt highlights, chapter/page grouping, and keyboard navigation (`/` or `s` shortcut).
