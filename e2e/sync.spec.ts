@@ -39,6 +39,24 @@ async function syncNow(page: Page) {
   await expect(page.getByRole('button', { name: /^Synced/ })).toBeVisible()
 }
 
+/** Whether this device still has library changes to push (IndexedDB `meta`). */
+const libraryDirty = (page: Page) =>
+  page.evaluate(async () => {
+    const name = (await indexedDB.databases())[0]?.name
+    if (!name) return true
+    const db = await new Promise<IDBDatabase>((res, rej) => {
+      const r = indexedDB.open(name)
+      r.onsuccess = () => res(r.result)
+      r.onerror = () => rej(r.error)
+    })
+    const metas = await new Promise<{ library: { dirty: boolean } }[]>((res) => {
+      const r = db.transaction('meta').objectStore('meta').getAll()
+      r.onsuccess = () => res(r.result)
+    })
+    db.close()
+    return metas.some((m) => m.library?.dirty)
+  })
+
 const openVoyage = (page: Page) =>
   page
     .getByRole('link', { name: /The Test Voyage/ })
@@ -90,4 +108,26 @@ test('a newer position from another device is offered in the open book', async (
   await offer.getByRole('button', { name: 'Jump' }).click()
   await expect.poll(() => percent(laptop)).toBe(further)
   await expect(offer).toHaveCount(0)
+})
+
+test('a new session with lapsed Drive access asks to reconnect, though nothing is waiting', async ({
+  page,
+}) => {
+  await fakeGoogle(page)
+  await connect(page)
+  await addVoyage(page)
+  await page.getByRole('button', { name: 'Back to library' }).click()
+  await page.getByRole('button', { name: /^(Synced|Not synced yet)/ }).click()
+  // "Synced" may still be the label from connecting: wait until the added book is pushed.
+  await expect.poll(() => libraryDirty(page)).toBe(false)
+
+  // The token lives in sessionStorage: a new browser session starts without it.
+  await page.evaluate(() => sessionStorage.removeItem('drive-read:token'))
+  await page.reload()
+  await expect(page.getByText('Reconnect to get progress from your other devices')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reconnect to sync' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Reconnect', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^Synced/ })).toBeVisible()
+  await expect(page.getByText('Reconnect to get progress from your other devices')).toBeHidden()
 })

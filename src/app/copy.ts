@@ -64,10 +64,17 @@ export function offerLabel(
 
 const changes = (n: number) => `${n} change${n === 1 ? '' : 's'}`
 
-export function syncNotice(status: string, pending: number): string | null {
-  if (pending === 0) return null
+/**
+ * `expired`: the Drive token lapsed while online. Without it nothing is pulled either, so a
+ * device with nothing to push still needs telling, or it shows stale progress as current.
+ */
+export function syncNotice(status: string, pending: number, expired = false): string | null {
+  if (pending === 0)
+    return expired
+      ? 'Drive access expired. Reconnect to get progress from your other devices.'
+      : null
   if (status === 'offline') return `Offline. ${changes(pending)} will sync when you're back online.`
-  if (status === 'reconnect') return `Reconnect Drive to sync ${changes(pending)}.`
+  if (status === 'reconnect' || expired) return `Reconnect Drive to sync ${changes(pending)}.`
   return null
 }
 

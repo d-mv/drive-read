@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix: a device whose Drive access lapsed showed stale progress as current. The Library now says "Drive access expired. Reconnect to get progress from your other devices." with a Reconnect button even when nothing is waiting to send, and the header reads "Reconnect to sync" instead of the last sync time.
+
 ## 0.13.1 — 2026-10-12
 
 - Fix: prevent false dirty progress flags on reader mount due to CFI normalization. Initial restoration relocations during mount are isolated from user-driven page turns, preventing normalized CFIs from dirtying records.

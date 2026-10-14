@@ -57,6 +57,14 @@ describe('sync copy', () => {
     expect(syncNotice('offline', 0)).toBeNull()
     expect(syncNotice('idle', 4)).toBeNull()
   })
+
+  it('asks to reconnect when access expired, even with nothing waiting', () => {
+    expect(syncNotice('idle', 0, true)).toBe(
+      'Drive access expired. Reconnect to get progress from your other devices.',
+    )
+    expect(syncNotice('idle', 2, true)).toBe('Reconnect Drive to sync 2 changes.')
+    expect(syncNotice('idle', 0, false)).toBeNull()
+  })
 })
 
 describe('lastReadLabel', () => {

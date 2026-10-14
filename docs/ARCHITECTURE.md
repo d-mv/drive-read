@@ -308,6 +308,9 @@ flowchart TD
 - Progress is saved only on true page turns or explicit navigations; initial mount/restore and layout reports (resize, orientation changes) do not mark records dirty or bump timestamps.
 - A push that fails (offline, expired token, rate limit) leaves the record dirty; the next
   trigger retries. `sync.failed` logs the reason and the backlog.
+- Without a valid token no trigger syncs, pulls included. So while online, an expired token
+  always shows a Reconnect notice in the Library (and "Reconnect to sync" in the header), even
+  with nothing to push: otherwise a device would show stale progress as current.
 - `library.json` merges per entry by `updatedAt`, with removal markers. Remote `library.json` and `progress-<fileId>.json` are strictly validated at runtime with type guards (`isValidLibraryDoc`, `isValidSyncedProgress`); corrupt payloads are logged and dropped to prevent client state corruption.
 - Passes run under a `navigator.locks` lock, so two tabs never sync at once.
 

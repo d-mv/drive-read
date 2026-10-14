@@ -56,8 +56,12 @@ const continueLastRead = computed(() => {
   const rec = continueEntry.value && library.progress[continueEntry.value.id]
   return rec ? lastReadLabel(rec, useServices().device.id) : null
 })
+/** Expired while online: reconnecting would work now, so say so (offline has its own notice). */
+const needsReconnect = computed(
+  () => online.value && (auth.status === 'expired' || sync.status === 'reconnect'),
+)
 const syncMessage = computed(() =>
-  syncDismissed.value ? null : syncNotice(sync.status, sync.pending),
+  syncDismissed.value ? null : syncNotice(sync.status, sync.pending, needsReconnect.value),
 )
 const { busy, message, pick } = useImportFiles()
 
@@ -193,7 +197,13 @@ onBeforeUnmount(() => {
         :disabled="sync.status === 'syncing' || auth.busy"
         @click="onSyncClick"
       >
-        {{ sync.status === 'syncing' || auth.busy ? 'Syncing…' : syncedLabel(sync.lastSyncAt) }}
+        {{
+          sync.status === 'syncing' || auth.busy
+            ? 'Syncing…'
+            : auth.status === 'expired'
+              ? 'Reconnect to sync'
+              : syncedLabel(sync.lastSyncAt)
+        }}
       </button>
       <button
         type="button"
@@ -208,7 +218,7 @@ onBeforeUnmount(() => {
     <AppNotice
       v-if="syncMessage"
       :message="syncMessage"
-      :action-label="sync.status === 'reconnect' ? 'Reconnect' : undefined"
+      :action-label="needsReconnect ? 'Reconnect' : undefined"
       @action="reconnectSync"
       @dismiss="syncDismissed = true"
     />
@@ -321,10 +331,7 @@ onBeforeUnmount(() => {
       />
     </main>
     <!-- The phone always lists; the grid is a desktop layout. -->
-    <ul
-      v-else
-      class="m-0 list-none px-3 pt-2 pb-12 sm:px-[clamp(16px,3vw,40px)]"
-    >
+    <ul v-else class="m-0 list-none px-3 pt-2 pb-12 sm:px-[clamp(16px,3vw,40px)]">
       <BookRow
         v-for="entry in shown"
         :key="entry.id"
