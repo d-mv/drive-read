@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.13.2 — 2026-10-14
 
+- Release: includes the 0.13.1 fixes below; `package.json` was never bumped to 0.13.1, so devices kept reporting 0.13.0.
 - Fix: a device whose Drive access lapsed showed stale progress as current. The Library now says "Drive access expired. Reconnect to get progress from your other devices." with a Reconnect button even when nothing is waiting to send, and the header reads "Reconnect to sync" instead of the last sync time.
 
 ## 0.13.1 — 2026-10-12
