@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 — 2026-10-16
 
 - Fix: a typeface switch applies in one step. The faces are registered once per book page with the FontFace API instead of re-parsing ~1 MB of inline `@font-face` CSS on every settings change, and the new face loads before the CSS names it, so the fallback font no longer flashes.
 - Fix: after following a footnote or other in-book link, a "Back to text" button returns to where you were.
