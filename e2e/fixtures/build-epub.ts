@@ -1,6 +1,7 @@
 /**
  * Builds e2e/fixtures/test-voyage.epub: four chapters with a TOC, long enough to paginate.
- * Chapter 3 carries a script that must NOT run (the CSP blocks it).
+ * Chapter 3 carries a script that must NOT run (the CSP blocks it). Chapter 1 opens with a
+ * footnote reference whose note lives in chapter 4.
  * Run: bun e2e/fixtures/build-epub.ts (needs the `zip` CLI)
  */
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -17,10 +18,13 @@ const write = (p: string, s: string) => {
 const chapters = ['Departure', 'The Long Calm', 'Signals', 'Landfall']
 const sentence = (c: number, i: number) =>
   `Chapter ${c + 1}, line ${i + 1}: the ship kept its heading while the crew counted the hours and wrote them down in the log.`
+const NOTEREF = ` <a epub:type="noteref" href="c4.xhtml#note-1">1</a>`
+const NOTE = `<aside epub:type="footnote" id="note-1"><p>1. The log was kept in pencil.</p></aside>`
 const body = (c: number) =>
   Array.from(
     { length: 40 },
-    (_, p) => `<p>${Array.from({ length: 6 }, (_, i) => sentence(c, p * 6 + i)).join(' ')}</p>`,
+    (_, p) =>
+      `<p>${Array.from({ length: 6 }, (_, i) => sentence(c, p * 6 + i)).join(' ')}${c === 0 && p === 0 ? NOTEREF : ''}</p>`,
   ).join('\n')
 
 write('mimetype', 'application/epub+zip')
@@ -60,8 +64,8 @@ chapters.forEach((title, i) => {
   write(
     `OEBPS/c${i + 1}.xhtml`,
     `<?xml version="1.0" encoding="utf-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${title}</title>${script}</head>
-<body><h1>${title}</h1>\n${body(i)}</body></html>`,
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>${title}</title>${script}</head>
+<body><h1>${title}</h1>\n${i === 3 ? NOTE : ''}${body(i)}</body></html>`,
   )
 })
 

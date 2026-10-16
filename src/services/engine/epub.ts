@@ -9,6 +9,7 @@ import type {
   BookMeta,
   Locator,
   OpenError,
+  ReaderFont,
   ReaderTheme,
   Relocation,
   Restore,
@@ -31,7 +32,36 @@ export function createEpubEngine(): BookEngine {
   let starts: number[] = []
   let relocateCb: ((r: Relocation) => void) | undefined
   let keydownCb: ((e: KeyboardEvent) => void) | undefined
+  let linkCb: (() => void) | undefined
   let theme: ReaderTheme | null = null
+  const registered = new WeakMap<Document, Map<string, FontFace>>()
+
+  /**
+   * FontFace objects belong to one document and every section is a new frame document, so each
+   * face is registered once per document. A typeface switch then only changes the CSS, instead of
+   * re-parsing megabytes of inline @font-face data.
+   */
+  function registerFonts(doc: Document, fonts: readonly ReaderFont[]): FontFace[] {
+    let faces = registered.get(doc)
+    if (!faces) registered.set(doc, (faces = new Map()))
+    const Face = (doc.defaultView as (Window & typeof globalThis) | null)?.FontFace ?? FontFace
+    return fonts.map((f) => {
+      const key = `${f.family}|${f.style}|${f.weight ?? ''}|${f.unicodeRange ?? ''}`
+      let face = faces.get(key)
+      if (!face) {
+        face = new Face(f.family, `url("${f.url}") format('${f.format ?? 'woff2'}')`, {
+          style: f.style,
+          weight: f.weight ?? '200 900',
+          unicodeRange: f.unicodeRange ?? 'U+0-10FFFF',
+          // Data URLs load at once: block hides the fallback for that moment instead of flashing it.
+          display: 'block',
+        })
+        doc.fonts.add(face)
+        faces.set(key, face)
+      }
+      return face
+    })
+  }
 
   async function open(file: File): Promise<Result<BookMeta, OpenError>> {
     try {
@@ -82,8 +112,15 @@ export function createEpubEngine(): BookEngine {
     return Math.max(0, Math.round(((1 - fraction) * length) / SIZE_PER_MINUTE))
   }
 
-  function applyTheme() {
+  async function applyTheme() {
     if (!view?.renderer || !theme) return
+    const t = theme
+    // Load the body-text faces before the CSS names them, so a switch is one reflow with no
+    // fallback flash. Bold and italic load when the text uses them.
+    const faces = view.renderer.getContents().flatMap(({ doc }) => registerFonts(doc, t.fonts))
+    const body = faces.filter((f) => f.style === 'normal' && f.weight !== '700')
+    await Promise.all(body.map((f) => f.load().catch(() => undefined)))
+    if (t !== theme || !view?.renderer) return
     view.renderer.setAttribute('max-inline-size', `${theme.maxInlineSize}px`)
     view.renderer.setAttribute('gap', '6%')
     view.renderer.setAttribute('margin', '32px')
@@ -104,10 +141,13 @@ export function createEpubEngine(): BookEngine {
     view.addEventListener('load', (e) => {
       const { doc } = (e as CustomEvent<{ doc: Document }>).detail
       doc.addEventListener('keydown', (ev) => keydownCb?.(ev))
+      // Fires before the section is laid out, so the faces are there for the first layout.
+      registerFonts(doc, theme?.fonts ?? [])
     })
+    view.addEventListener('link', () => linkCb?.())
     await view.open(book)
     view.renderer.setAttribute('flow', 'paginated')
-    applyTheme()
+    await applyTheme()
 
     const cfi = at?.locator.kind === 'cfi' ? at.locator.cfi : undefined
     // A CFI that no longer resolves (file replaced) falls back to the fraction.
@@ -134,13 +174,19 @@ export function createEpubEngine(): BookEngine {
     goTo,
     setTheme(t) {
       theme = t
-      applyTheme()
+      void applyTheme()
     },
     onRelocate(cb) {
       relocateCb = cb
     },
     onKeydown(cb) {
       keydownCb = cb
+    },
+    onLink(cb) {
+      linkCb = cb
+    },
+    back() {
+      view?.history.back()
     },
     async *search(query: string): AsyncIterable<SearchYield> {
       if (!view) return

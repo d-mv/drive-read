@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fix: a typeface switch applies in one step. The faces are registered once per book page with the FontFace API instead of re-parsing ~1 MB of inline `@font-face` CSS on every settings change, and the new face loads before the CSS names it, so the fallback font no longer flashes.
+- Fix: after following a footnote or other in-book link, a "Back to text" button returns to where you were.
+- Literata, the default typeface, now includes Cyrillic, so Russian books no longer fall back to Georgia.
+- Tooling: `format:check` passes again; the E2E text-settings test no longer matches both "Dark" and "Soft Dark".
+
 ## 0.13.2 — 2026-10-14
 
 - Release: includes the 0.13.1 fixes below; `package.json` was never bumped to 0.13.1, so devices kept reporting 0.13.0.

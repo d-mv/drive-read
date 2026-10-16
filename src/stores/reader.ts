@@ -62,6 +62,8 @@ export const useReader = defineStore('reader', () => {
   /** PDF zoom, relative to the page fitted to the width; only zoomable engines offer it. */
   const zoom = ref(1)
   const zoomable = ref(false)
+  /** In-book links followed since the last other jump; while > 0 the reader offers Back. */
+  const linkDepth = ref(0)
 
   // Not reactive: the engine owns DOM and a custom element.
   let engine: BookEngine | null = null
@@ -170,6 +172,7 @@ export const useReader = defineStore('reader', () => {
       if (pageChanged) void library.saveProgress(id, r.position)
     })
     if (opts.onKeydown) next.onKeydown(opts.onKeydown)
+    next.onLink?.(() => linkDepth.value++)
     zoomable.value = !!next.setZoom
     next.onZoom?.((z) => (zoom.value = z))
 
@@ -308,6 +311,7 @@ export const useReader = defineStore('reader', () => {
     toc.value = []
     zoom.value = 1
     zoomable.value = false
+    linkDepth.value = 0
     status.value = { kind: 'idle' }
   }
 
@@ -318,7 +322,14 @@ export const useReader = defineStore('reader', () => {
     await engine?.prev()
   }
   const goTo = async (loc: Locator) => {
+    linkDepth.value = 0
     await engine?.goTo(loc)
+  }
+  /** Returns from a followed link (a footnote) to where the reader was. */
+  const back = () => {
+    if (linkDepth.value === 0) return
+    linkDepth.value--
+    engine?.back?.()
   }
 
   /** One zoom level in or out, or back to fitting the width (0). */
@@ -357,6 +368,8 @@ export const useReader = defineStore('reader', () => {
     next,
     prev,
     goTo,
+    linkDepth,
+    back,
     setTheme,
     flushSession,
     zoom,

@@ -14,7 +14,7 @@ import { paginatorLayout } from '@/domain/settings'
 import type { Locator } from '@/services/engine/types'
 import { isSome } from '@/shared/result'
 import { READER_FONTS } from '@/styles/fonts'
-import { readerCss } from '@/styles/reader-theme'
+import { readerCss, readerFonts } from '@/styles/reader-theme'
 import { authErrorCopy, offerLabel } from '@/app/copy'
 import { useAuth } from '@/stores/auth'
 import { useSync } from '@/stores/sync'
@@ -108,8 +108,8 @@ function applyTheme() {
         signal: token('--color-signal'),
       },
       s,
-      READER_FONTS,
     ),
+    fonts: readerFonts(s.typeface, READER_FONTS),
     maxInlineSize: paginatorLayout(s.margins).maxInlineSize,
   })
 }
@@ -345,6 +345,15 @@ onBeforeUnmount(() => {
           class="absolute inset-0"
           :aria-busy="reader.status.kind === 'loading' || reader.status.kind === 'downloading'"
         />
+        <button
+          v-if="reader.linkDepth > 0 && reader.status.kind === 'ready'"
+          type="button"
+          class="absolute bottom-3 left-1/2 z-10 flex h-11 -translate-x-1/2 items-center gap-1 rounded-ctl border border-rule bg-panel pr-4 pl-2.5 text-sm font-medium shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
+          @click="reader.back()"
+        >
+          <AppIcon name="chevron-left" :size="16" />
+          Back to text
+        </button>
         <div
           v-if="reader.status.kind === 'downloading'"
           role="status"

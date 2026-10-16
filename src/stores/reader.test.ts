@@ -51,7 +51,7 @@ describe('open', () => {
       order.push('mount')
     })
 
-    reader.setTheme({ css: 'body { color: black; }', maxInlineSize: 620 })
+    reader.setTheme({ css: 'body { color: black; }', fonts: [], maxInlineSize: 620 })
     await reader.open('local-abc', document.createElement('div'))
 
     expect(order).toEqual(['setTheme', 'mount'])

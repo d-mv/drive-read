@@ -129,4 +129,3 @@ export function isValidSyncedProgress(raw: unknown): raw is SyncedProgress {
   }
   return true
 }
-

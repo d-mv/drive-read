@@ -179,7 +179,11 @@ onBeforeUnmount(() => {
             @click="emit('go', sub.locator)"
           >
             <template v-for="(chunk, cIdx) in splitExcerpt(sub.excerpt, query)" :key="cIdx">
-              <mark v-if="chunk.match" class="rounded-[2px] bg-signal/25 px-0.5 text-ink font-medium">{{ chunk.text }}</mark>
+              <mark
+                v-if="chunk.match"
+                class="rounded-[2px] bg-signal/25 px-0.5 text-ink font-medium"
+                >{{ chunk.text }}</mark
+              >
               <span v-else>{{ chunk.text }}</span>
             </template>
           </button>

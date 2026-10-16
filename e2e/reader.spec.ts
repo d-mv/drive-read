@@ -52,6 +52,23 @@ test('jumps to a chapter from the contents and comes back to it', async ({ page 
   await expect(page.getByText('03 / 04')).toBeVisible()
 })
 
+test('follows a footnote and comes back to the text', async ({ page }) => {
+  await addBook(page)
+  // The book frame sits in foliate's closed shadow root, so find it among the page's frames.
+  // The column layout puts the link outside Playwright's idea of the viewport: dispatch the click.
+  const noteref = page.frames().map((f) => f.locator('a[href$="#note-1"]'))
+  await expect
+    .poll(async () => (await Promise.all(noteref.map((l) => l.count()))).indexOf(1))
+    .not.toBe(-1)
+  const counts = await Promise.all(noteref.map((l) => l.count()))
+  await noteref[counts.indexOf(1)].dispatchEvent('click')
+  await expect(page.getByText('04 / 04')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Back to text' }).click()
+  await expect(page.getByText('01 / 04')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Back to text' })).toBeHidden()
+})
+
 test('a script inside the book does not run', async ({ page }) => {
   const violations: string[] = []
   page.on('console', (m) => {
@@ -76,7 +93,10 @@ test('text settings change the book and persist', async ({ page }) => {
   const panel = page.getByRole('region', { name: 'Text settings' })
   await panel.getByRole('button', { name: 'Larger text' }).click()
   await expect(panel.getByText('20 px')).toBeVisible()
-  await panel.getByRole('group', { name: 'Theme' }).getByRole('button', { name: 'Dark' }).click()
+  await panel
+    .getByRole('group', { name: 'Theme' })
+    .getByRole('button', { name: 'Dark', exact: true })
+    .click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 
   await page.reload()

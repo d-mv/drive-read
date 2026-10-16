@@ -206,4 +206,3 @@ describe('schema validation', () => {
     ).toBe(false)
   })
 })
-

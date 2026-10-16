@@ -15,6 +15,10 @@ export interface BookEngine {
   onRelocate(cb: (r: Relocation) => void): void
   /** Keys pressed inside the book frame, which do not reach the app document. */
   onKeydown(cb: (e: KeyboardEvent) => void): void
+  /** EPUB only: an in-book link (a footnote, a cross-reference) was followed. */
+  onLink?(cb: () => void): void
+  /** EPUB only: returns to where the reader was before the last followed link. */
+  back?(): void
   /** PDF only: zoom relative to the page fitted to the reading width (1 = fit). */
   setZoom?(zoom: number): Promise<void>
   /** PDF only: the zoom changed by a pinch. */
@@ -80,9 +84,21 @@ export interface BookMeta {
   toc: TocEntry[]
 }
 
+/** A self-hosted face for the book frame, which does not see the app's fonts. */
+export interface ReaderFont {
+  family: string
+  url: string
+  style: 'normal' | 'italic'
+  weight?: string
+  format?: string
+  unicodeRange?: string
+}
+
 export interface ReaderTheme {
   /** CSS injected into the book frame. */
   css: string
+  /** The faces `css` uses; loaded into the frame before `css` applies, so a switch never flashes. */
+  fonts: readonly ReaderFont[]
   /** Max width of the text column, px. */
   maxInlineSize: number
 }

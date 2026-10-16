@@ -374,6 +374,13 @@ chrome and the book content; dark mode swaps token values.
   CSP needs no inline script) sets `data-theme` before first paint from a localStorage mirror.
 - `styles/reader-theme.ts` combines token values with the text settings into CSS that
   `engine.setTheme()` injects into the book frame. "Original" typeface injects no font override.
+  The CSS only names the family: `readerFonts()` picks the typeface's faces, and the EPUB engine
+  registers them per frame document with the FontFace API and loads the regular face before
+  applying the CSS, so a typeface switch is one reflow with no fallback flash.
+- Literata carries its Cyrillic subsets (with fontsource's `unicode-range`); Cartisse and NV Jost
+  have Cyrillic too. Libron, NV Zilla Slab and Readerly are Latin only.
+- After an in-book link (a footnote), the reader shows "Back to text", which steps back through
+  foliate's history (`engine.back()`); any other jump (contents, search) clears it.
 - PDF pages keep their own colours; dark mode changes only the surround.
 - Space Grotesk, IBM Plex Mono, Literata, Cartisse, Libron, NV Jost, NV Zilla Slab, and Readerly are self-hosted fonts, precached.
 

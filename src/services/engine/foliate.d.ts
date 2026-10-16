@@ -30,6 +30,8 @@ declare module '@foliate/view.js' {
 
   export interface FoliateRenderer extends HTMLElement {
     setStyles(css: string | [string, string]): void
+    /** The section documents on screen (one in paginated mode). */
+    getContents(): { doc: Document; index: number }[]
     next(): Promise<void>
     prev(): Promise<void>
   }
@@ -40,6 +42,8 @@ declare module '@foliate/view.js' {
     book: FoliateBook
     renderer: FoliateRenderer
     lastLocation: FoliateRelocate | null
+    /** Links, TOC and fraction jumps push entries; page turns replace the current one. */
+    history: { back(): void; canGoBack: boolean }
     open(book: FoliateBook | File | Blob): Promise<void>
     init(opts: {
       lastLocation?: string | { fraction: number }
