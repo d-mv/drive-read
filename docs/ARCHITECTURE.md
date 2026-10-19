@@ -1,9 +1,10 @@
 # Drive Read: Architecture
 
-As built at v0.8.2 (October 2026). A static, client-only PWA that reads EPUB and PDF files from
-the reader's Google Drive, keeps them on the device for offline reading, and syncs the reading
-position through Drive. There is no backend: Google is the only remote party besides the log
-collector.
+As built at v0.21.0 (October 2026). A static, client-only PWA that reads EPUB, FB2 and PDF files
+from the reader's Google Drive or the device, keeps them on the device for offline reading, and
+syncs the reading position through Drive. The same app also runs as a macOS desktop app (Electron)
+that reads local files where they sit: see [`DESKTOP.md`](DESKTOP.md). There is no backend: Google
+is the only remote party besides the log collector.
 
 Live at https://drive-read.mlnkv.net. Related docs: [`OBSERVABILITY.md`](../OBSERVABILITY.md)
 (event catalogue), [`implementation-notes.md`](../implementation-notes.md) (deviations and
@@ -52,9 +53,11 @@ flowchart LR
   HOST -- "app shell with CSP" --> SW
 ```
 
-Views call stores, and stores call services. Only services talk to the outside. Book files and
-records stay in browser storage. The host only delivers the app shell, which the service worker
-keeps for offline starts.
+Views call stores, and stores call services. Only services talk to the outside. In the desktop app
+the same build runs in an Electron window from `app://drive-read/`; a typed bridge
+(`window.driveReadDesktop`) adds reading local files in place, and there is no service worker. Book
+files and records stay in browser storage. The host only delivers the app shell, which the service
+worker keeps for offline starts.
 
 ## Module structure
 
@@ -67,7 +70,8 @@ reached through `useServices()` (`src/services/index.ts`), which tests replace w
 src/
   app/          main.ts, router.ts (/, /welcome, /drive, /read/:id), App.vue, keymap.ts,
                 update.ts (PWA updates), install.ts, observability.ts, identity.ts,
-                device.ts, wakeLock.ts, syncTriggers.ts, useOnline.ts, useImportFiles.ts, copy.ts
+                device.ts, wakeLock.ts, syncTriggers.ts, useOnline.ts, useImportFiles.ts, copy.ts,
+                desktopOpen.ts (desktop: books from Finder, drop, File › Open…)
   domain/       book.ts, settings.ts, reading.ts          pure types and rules
   views/        LibraryView, ReaderView, DriveView, ConnectView
   components/   BookCard, BookRow, BookCover, ContinueRow, ProgressSegments, ContentsPanel,
@@ -79,21 +83,25 @@ src/
                 appdata.ts       library.json and progress-<fileId>.json
                 names.ts         titles and authors from Calibre file and folder names
     engine/     types.ts         BookEngine interface
-                epub.ts          foliate-js adapter (epub-meta.ts: title, author, cover)
+                sniff.ts         format from a file's first bytes (EPUB, FB2, PDF), then its name
+                epub.ts          foliate-js adapter for EPUB and FB2 (epub-meta.ts: title, author, cover)
                 pdf.ts           pdf.js adapter (pdf-layout.ts: layout maths)
                 progress.ts      chapter and progress maths
     storage/    db.ts            IndexedDB (raw, via idb.ts): books, progress, settings, meta
                 blobs.ts         OPFS reads; writes through blobs.worker.ts
                 hash.ts          content hash for local files
+                localFiles.ts    desktop: files read in place through the bridge (null on the web)
                 persist.ts       storage.persist() and usage
     sync/       merge.ts         conflict rule and library merge
     events.ts                    typed event catalogue (OBSERVABILITY.md)
     logger.ts                    Logger API client, batching, identity
   shared/       result.ts        Result / Option
+                desktop.ts       the desktop bridge contract (types and IPC channel names)
   styles/       tokens.css, reader-theme.ts, fonts.ts
 vendor/foliate-js/               git submodule, pinned commit
+desktop/                         Electron main, preload, kept-file allowlist, e2e (DESKTOP.md)
 csp.ts                           the one CSP: vite preview, e2e, container Caddy
-scripts/                         caddyfile.ts, icons.ts, check-build-args.sh
+scripts/                         caddyfile.ts, icons.ts, check-build-args.sh, package-desktop.ts
 e2e/                             Playwright specs + fake-google.ts + fixture builders
 ```
 
@@ -161,15 +169,15 @@ devices. The Drive file ID is a book's key everywhere.
 
 | Where | What | Key | Leaves the device |
 | --- | --- | --- | --- |
-| IndexedDB `books` | Title, author, format, size, md5, contents, download state, `provisional` until first opened, opened time | Drive file ID, or `local-<sha256>` | Via `library.json`, Drive books only |
-| IndexedDB `progress` | Locator, fraction, updatedAt, device, dirty flag, Drive record ID and the `modifiedTime` last seen | book ID | Yes, Drive books only |
+| IndexedDB `books` | Title, author, format (`epub`, `pdf`, `fb2`), size, md5, contents, download state, `provisional` until first opened, opened time; desktop: `path` of a file read in place | Drive file ID, or `local-<sha256>` | Via `library.json`, Drive books only |
+| IndexedDB `progress` | Locator, fraction, updatedAt, device, dirty flag, Drive record ID and the `modifiedTime` last seen | book ID | Drive books; in the desktop app local books too |
 | IndexedDB `settings` | Theme, typeface, size, line spacing, margins, alignment, library view | fixed key | No |
 | IndexedDB `meta` (v2) | `library.json` entries as last merged, last sync time | fixed key | No |
 | localStorage | Theme mirror, device ID and kind, hashed user ID, last version run | fixed keys | Device and user ID only, as log fields |
 | sessionStorage | Access token and expiry | fixed key | No |
 | OPFS `/books/<id>` | The book file as downloaded (desktop: local books are not copied; the record holds their `path`) | path | No (Drive already has it) |
 | OPFS `/covers/<id>` | Cover image from the first open | path | No |
-| Drive appDataFolder | `library.json` and `progress-<fileId>.json` | file name | n/a |
+| Drive appDataFolder | `library.json`, `progress-<fileId>.json`, and from the desktop app `progress-local-<sha256>.json` | file name | n/a |
 
 **Progress record** (`progress-<fileId>.json`; locally the same plus `dirty`, `remoteId`, `remoteModifiedTime`):
 
@@ -190,8 +198,8 @@ Removal sets `removed: true` instead of deleting the entry, so another device do
 book back on merge.
 
 - md5 comes from Drive's file metadata and is stored, for detecting a replaced file (planned).
-- Local books are keyed `local-` + the first 32 hex digits of SHA-256 (Web Crypto has no MD5) and
-  never leave the device.
+- Local books are keyed `local-` + the first 32 hex digits of SHA-256 (Web Crypto has no MD5).
+  Their files never leave the device; the desktop app syncs their position only.
 - OPFS writes go through a worker using a sync access handle; a failed write removes the partial
   file.
 - Once books are added the app calls `navigator.storage.persist()` and logs the answer with
@@ -206,6 +214,10 @@ Sign-in uses the Google Identity Services **token model**: no backend, no refres
 app asks for an access token on a tap, keeps it in memory and sessionStorage until it expires
 (about an hour), and asks again with one tap when Drive is next needed. Books on the device
 keep working without a token.
+
+The desktop app cannot use this flow: Google does not accept `app://drive-read` as an origin.
+Its own sign-in (the desktop OAuth flow with a refresh token) is phase 3 in
+[`DESKTOP.md`](DESKTOP.md) and not built yet, so for now the desktop app reads local books only.
 
 | Scope | Why | Google's class |
 | --- | --- | --- |
@@ -267,8 +279,9 @@ flowchart LR
    "Drive only".
 3. **Download.** On first open the file streams from Drive into OPFS with a progress bar. A
    failure leaves no partial file.
-4. **Open.** The engine reads the stored file. On first open the real title, author, contents
-   and cover replace the provisional ones.
+4. **Open.** The format is checked against the file's bytes (`engine/sniff.ts`) and corrected on the
+   record if the name was wrong; then the engine reads the stored file. On first open the real
+   title, author, contents and cover replace the provisional ones.
 5. **Read offline.** From then on the book opens without network or token.
 
 | Format | Engine | Notes |
@@ -332,7 +345,7 @@ The service worker caches only the app shell; books and sync records never pass 
 | Engine chunks (foliate-js, pdf.js and its worker) | Cache Storage | Precached, so both formats open offline |
 | pdf.js data: standard fonts, ICC profiles, WebAssembly decoders | Cache Storage | Precached (`scripts/pdfjs-assets.ts` emits them to `/pdfjs/`) |
 | pdf.js CMaps (CJK text, 1.6 MB) | Cache Storage | Cached on first use |
-| Book files and covers | OPFS | Written by the app |
+| Book files and covers | OPFS | Written by the app (desktop: local book files stay where they are) |
 | Drive API responses | Not cached | Network only |
 | Google Identity script | Not cached | Loaded on demand |
 
@@ -359,8 +372,9 @@ Each step is logged: `pwa.update_available` → `pwa.update_applied` → `pwa.re
 trigger) → `pwa.updated`. If no worker is waiting (the update already took over), the tap
 reloads at once.
 
-**Manifest:** `display: standalone`, theme colours per scheme, `file_handlers` for `.epub` and
-`.pdf` where supported. **Wake lock** keeps the screen on while reading and is released after
+**Manifest:** `display: standalone`, theme colours per scheme, `file_handlers` for `.epub`,
+`.pdf`, `.fb2` and `.fbz` where supported. The desktop app registers no service worker; it is
+updated by rebuilding it. **Wake lock** keeps the screen on while reading and is released after
 5 minutes without a page turn.
 
 ## Theming
@@ -406,20 +420,22 @@ No failure blocks reading a book already on the device. Each shows one notice or
 | File deleted or access lost in Drive | Daily Drive check (below), or 404 / 403 on download | "Missing in Drive" on the row; a downloaded copy still opens | Remove the book |
 | File replaced in Drive | Daily Drive check: md5 differs from the downloaded file | "New version" on the row; the reader offers "Get it" | Old file removed, new one downloaded; position falls back to `fraction` if the CFI no longer resolves |
 | Protected or damaged file | `engine.open` fails | "This file can't be opened…" | None |
+| Not an e-book | Neither its bytes nor its name say EPUB, FB2 or PDF | "Only EPUB, FB2 and PDF files open." | None |
+| Desktop: file moved, renamed or deleted | The kept path no longer reads | "The file for this book isn't where it was" with **Locate file…** | Choose the file again; only the same bytes are accepted. A Drive book downloads instead |
 | Storage full | `QuotaExceededError` | "Not enough space" with **Free space** | Opens the library's Downloaded view (`/?show=downloaded`): Drive books on the device, largest first; "Remove download" frees the file and keeps the book and place |
 | Storage evicted by the browser | Record says downloaded, OPFS file missing | Row back to "Drive only" | Downloads again on open |
 
 Each state is covered by end-to-end tests against a fake Google (`e2e/fake-google.ts`).
 
-**Daily Drive check** (`services/sync/driveCheck.ts`, run by `stores/sync.ts` after a full sync,
-at most once a day and only with a valid token): one paged `files.list` of every EPUB and PDF in
-Drive (the search query with no name) is compared with the library's Drive books. A book the
-listing lacks is marked missing; one listed again is cleared; a downloaded book whose md5
+**Daily Drive check** (`services/sync/driveCheck.ts`, run by `stores/sync.ts` after a full sync, at
+most once a day and only with a valid token): one paged `files.list` of every book in Drive
+(`drive.listAllBooks`: the book query with no name) is compared with the library's Drive books. A
+book the listing lacks is marked missing; one listed again is cleared; a downloaded book whose md5
 changed gets a `driveVersion` offer; a book not downloaded just takes the new md5 and size. A
-listing that reaches the 5000-file cap may be cut short, so then nothing is marked missing. A
-failed check never fails the sync. fast-check properties pin this down: one pass settles (a
-second changes nothing), local books are never touched, and after a complete pass "missing"
-means exactly "not listed".
+listing that stops at the 5000-file cap while Drive still has pages is incomplete (`complete:
+false`, from Drive's `nextPageToken`), so then nothing is marked missing. A failed check never fails
+the sync. fast-check properties pin this down: one pass settles (a second changes nothing), local
+books are never touched, and after a complete pass "missing" means exactly "not listed".
 
 ## Observability
 
@@ -493,9 +509,11 @@ in testing mode with scopes `drive.readonly` and `drive.appdata`.
 | Layer | Tool | Covers |
 | --- | --- | --- |
 | Unit | Vitest 5, happy-dom, fake-indexeddb | Domain rules, services, stores (with fake services), events |
-| End-to-end | Playwright, fake Google (`e2e/fake-google.ts`) | Reader, Drive browsing, sync across two devices, PDF, offline, failure states, PWA update flow |
+| End-to-end | Playwright, fake Google (`e2e/fake-google.ts`) | Reader, Drive browsing (FB2 included), sync across two devices, PDF, FB2, offline, failure states, PWA update flow |
+| Desktop end-to-end | Playwright `_electron` (`desktop/e2e/`) | Files read in place, Locate file…, the page denied unchosen files, Finder / launch / second-instance / drop / File › Open… opens, the EPUB default hint |
 
-Gates before a release: unit tests, e2e, `vue-tsc` typecheck, oxlint, `bun audit`.
+Gates before a release: unit tests, e2e (`bun run test:e2e`, and `bun run test:desktop` when
+desktop code changed), `vue-tsc` typecheck, oxlint, oxfmt, `bun audit`.
 
 ## Decisions
 
@@ -505,7 +523,9 @@ Gates before a release: unit tests, e2e, `vue-tsc` typecheck, oxlint, `bun audit
 | Scopes | `drive.readonly` + `drive.appdata` | Browsing needs read access beyond `drive.file` |
 | Backend | None; one tap to reconnect | No secret, no server state |
 | EPUB engine | foliate-js as a pinned git submodule | Maintained, no npm package |
-| Local books | Stay on the device, no sync | Owner decision |
+| Local books | Files stay on the device; the web app doesn't sync them, the desktop app syncs their position | Owner decisions (2026-10-05, 2026-10-19) |
+| Formats | EPUB, FB2, PDF; detected by content | FB2 is common for Russian books and often misnamed; foliate-js reads it |
+| Desktop | Electron, macOS arm64, built locally, never distributed | Same Chromium engine as the web app; owner decision |
 | Drive screen | Folders first, alphabetical, no "All books" list | Owner decision |
 | Updates | Prompted, never mid-book | Never lose the reader's place |
 | Log identity | Random device id + hashed Drive permission id | Measurable per user without personal data |
@@ -521,5 +541,8 @@ Gates before a release: unit tests, e2e, `vue-tsc` typecheck, oxlint, `bun audit
 7. Offline and failure states.
 8. PWA install and updates.
 9. Hardening, observability and deployment.
+10. Desktop app: Electron shell, local files read in place, Finder and file types, local
+    progress sync, local packaging (v0.14–0.19).
+11. FB2 from the device and from Drive, with format detection by content (v0.20–0.21).
 
 Open work is tracked in Kairos (project in `kairos.id`).

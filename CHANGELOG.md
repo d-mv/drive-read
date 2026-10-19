@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.1 — 2026-10-19
+
+- Docs: `ARCHITECTURE.md` brought up to v0.21 (desktop app, files read in place, FB2 and format detection, Drive listing changes, desktop tests); `DESKTOP.md` rewritten from a plan into how the desktop app is built, works and is installed, with phase status.
+
 ## 0.21.0 — 2026-10-19
 
 - FB2 books in Google Drive: folders and search list them whatever MIME type Drive gave them (often a generic one), add and sync like other Drive books, and open after download. A Drive book whose name says EPUB but which is really FB2 opens too; its format is corrected on first open. Non-book files in a folder stay hidden.

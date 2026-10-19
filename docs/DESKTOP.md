@@ -1,9 +1,37 @@
-# Drive Read Desktop: Plan
+# Drive Read Desktop
 
-Planned October 2026. A macOS (Apple Silicon only) desktop app built from the same Vue code as
-the PWA. It reads local EPUB and PDF files where they sit, is the default app for `.epub`, appears
-in "Open With" for `.pdf`, and syncs reading positions for local files too. The web build is
-unchanged. Related: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+A macOS app (Apple Silicon only) built from the same Vue code as the web app, for the owner's
+Mac only. It reads local EPUB, FB2 and PDF files where they sit, is the default app for `.epub`
+once chosen in Finder, appears in "Open With" for `.pdf`, `.fb2` and `.fbz`, and syncs reading
+positions for local files through Drive. Related: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+**Status (v0.21.0, 2026-10-19):** phases 0, 1, 2, 4 and 5 are done. Phase 3 (Google sign-in in
+the desktop app) waits for a "Desktop app" OAuth client from the owner; until then Drive
+browsing and sync do not work in the desktop app, and local books work fully.
+
+## Build and install
+
+Needs Bun, the repo's dependencies (`bun install`) and a `.env` with `VITE_GOOGLE_CLIENT_ID`
+(and `VITE_LOGGER_INGEST_KEY` for logs), as for the web app.
+
+```sh
+bun run desktop:package -- --install   # build, sign ad hoc, copy to /Applications
+bun run desktop:package                # build only: desktop/release/mac-arm64/Drive Read.app
+bun run desktop                        # run from the repo without packaging
+bun run test:desktop                   # desktop end-to-end tests
+```
+
+- **Update:** quit the app and run the install command again. `--install` refuses while the
+  installed copy is running.
+- **EPUB default:** macOS keeps the current EPUB app until you change it once: select an EPUB in
+  Finder → File › Get Info → Open with: Drive Read → Change All. The Library shows these steps
+  once.
+- **Keychain:** an ad-hoc signature changes with every build. Once desktop sign-in (phase 3)
+  stores its token in the keychain, macOS will ask once after each rebuild whether Drive Read
+  may use it.
+- **Web deploys:** `.dockerignore` keeps `desktop/out` and `desktop/release` out of the web
+  image, but the deploy skill's rsync uploads the repo, so move `desktop/release` (about 300 MB)
+  aside while deploying.
 
 ## Decisions
 
@@ -13,103 +41,70 @@ unchanged. Related: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 | Platforms | macOS, `arm64` only |
 | Distribution | None: built and installed on the owner's Mac only |
 | Signing | Ad hoc (`codesign -s -`); no certificate, no notarisation |
-| Updates | Rebuild and reinstall (`bun run desktop:package -- --install`); no update check |
+| Updates | Rebuild and reinstall; no update check |
 | Local files | Read in place by path; no copy into OPFS |
-| Local progress | Synced: by Drive identity when the file's MD5 matches a Drive book, otherwise as `progress-local-<sha256>.json` |
-| File types | Owner of `.epub` (`org.idpf.epub-container`), alternate for `.pdf` (`com.adobe.pdf`) |
+| Local progress | Synced: as that Drive book when the file's MD5 matches one, otherwise as `progress-local-<sha256>.json` |
+| File types | Owner of `.epub` (`org.idpf.epub-container`); alternate for `.pdf` (`com.adobe.pdf`), `.fb2` and `.fbz` (declared UTIs `ru.gribuser.fictionbook.fb2` / `.fbz`) |
+| Build | One web build for both; the page detects the desktop bridge at run time |
 | CI | None. Everything is built and packaged locally |
 
-## Shape
+## How it works
 
 ```text
 desktop/
-  main.ts        app lifecycle, window, app:// protocol, file opens, IPC handlers
-  preload.ts     contextBridge: the typed `window.driveReadDesktop` API, nothing else
-  files.ts       path allowlist, reading, hashing (MD5 + SHA-256)
-  oauth.ts       desktop OAuth: system browser, loopback redirect, PKCE, refresh token
-  build.ts       bun build for main (ESM) and preload (CJS, required by the sandbox)
-src/
-  shared/desktop.ts   the bridge contract, shared by preload and renderer
-  services/...        desktop implementations behind the existing Services interface
+  main.ts        app lifecycle, window, app:// protocol, file opens, menu, IPC handlers
+  preload.ts     contextBridge: `window.driveReadDesktop`, nothing else (CommonJS: sandboxed)
+  files.ts       kept-file allowlist (kept-files.json), reading, MD5
+  opens.ts       queue for files that arrive before the page listens; launch arguments
+  menu.ts        File › Open… (⌘O) and Open Recent
+  build.ts       bun build: main (ESM) and preload (CJS) into desktop/out/
+  e2e/           Playwright `_electron` tests
+src/shared/desktop.ts               the bridge contract and IPC channel names
+src/services/storage/localFiles.ts  `Services.files`: keep, read, md5 (null on the web)
+src/app/desktopOpen.ts              books from Finder, drop and the menu; the EPUB hint
+scripts/package-desktop.ts          `bun run desktop:package`
+electron-builder.yml                .app layout, icon, document types
 ```
 
-- The renderer is the existing app, served from `app://drive-read/` (a privileged standard,
-  secure scheme) so storage, `fetch` and the CSP behave like a real origin. The CSP comes from
-  `csp.ts`.
-- `contextIsolation`, `sandbox` on; no Node in the renderer. Every IPC argument is validated.
-- Main reads only paths the user granted: picker, drag-and-drop, Finder opens, and paths already
-  in the library.
-- The desktop build turns off the service worker and the PWA update toast.
-
-## Book records
-
-A book read in place keeps `source: 'local'` and gains `path` (absolute). Opening reads the bytes
-from main as a `File`, so engines and the reader do not change. A file no longer at its path
-fails with `file-moved`: "Locate file…" re-links it, accepting only the same bytes (content hash).
-The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches a Drive book
-(phase 4, which reuses `path` on a Drive record).
-
-## As built (phase 1, v0.15.0)
-
-- **One web build.** The app detects `window.driveReadDesktop` at run time: no desktop Vite mode.
-  On desktop it skips the service worker; Electron never fires the install prompt.
-- **`Services.files`** (`services/storage/localFiles.ts`): `keep(file)` and `read(path, type)`;
-  null on the web. The existing hidden file input still picks files; the preload gets each
-  File's path from Electron (`webUtils.getPathForFile`).
-- **Main** (`desktop/files.ts`) keeps the chosen paths in `kept-files.json` in the app profile
-  and reads only those, compared as given (no `..` tricks), EPUB and PDF only, and answers IPC
-  only from `app://drive-read/`. Navigation away from the origin is blocked; web links open in
-  the browser; the only permission granted is the screen wake lock.
-- **Opening from outside (phase 2, v0.16.0):** main queues paths from `open-file` (Finder, Dock,
-  Open Recent; may fire before `ready`), launch arguments and `second-instance`, keeps them and
-  sends them once the page registers `onOpenPaths`. The page reads them in place
-  (`app/desktopOpen.ts`), adds them and opens the first. Drop and File › Open… go the same way.
-  Open Recent entries are written only by the packaged app.
-- **Packaging:** `electron-builder.yml`; `bun run desktop:package` → `desktop/release/`. The
-  document types are written as `CFBundleDocumentTypes` with system UTIs (EPUB `Owner`, PDF
-  `Alternate`) rather than electron-builder's extension-based `fileAssociations`.
-- **Local progress sync (phase 4, v0.17.0):** on import, main hashes a kept file with MD5
-  (`files:md5`); a Drive book in the library with that `md5` gains the file's `path` and the
-  import returns it. Sync already adds every `library.json` entry to the library, so that list
-  covers books from other devices. In the desktop app `sync` treats local books as synced for
-  progress only (`progress-local-<sha256[0..32]>.json`); `library.json` stays Drive-only. A Drive
-  book whose file is gone falls back to OPFS, then to downloading.
-- **Packaging (phase 5, v0.19.0):** `bun run desktop:package` runs `scripts/package-desktop.ts`:
-  web build (with `.env`), main bundle, `.app` (electron-builder, target `dir`), ad-hoc
-  `codesign`; `--install` copies it to /Applications. No installer, no update check: the app is
-  never distributed.
-- **Run:** `bun run desktop`. **Test:** `bun run test:desktop` (Playwright `_electron`,
-  `desktop/e2e/`); unit tests in `desktop/*.test.ts` run with the rest.
+- **Origin:** the web build is served from `app://drive-read/` (a privileged standard, secure
+  scheme), with the CSP from `csp.ts` as a header, so storage, `fetch` and the CSP behave as on
+  the web. No service worker registers there.
+- **Isolation:** `contextIsolation` and `sandbox` on, no Node in the page. Navigation away from
+  the origin is blocked; web links open in the browser. The only permission granted is the
+  screen wake lock. IPC is answered only for `app://drive-read/` and every argument is checked.
+- **File access:** the page never names a path to grant. It hands over a `File` the user chose;
+  the preload gets its path from Electron (`webUtils.getPathForFile`), and main keeps it in
+  `kept-files.json` in the app profile. Main reads only kept paths, exactly as kept (a path that
+  only normalises to a kept one is refused), and only book names (`.epub`, `.pdf`, `.fb2`,
+  `.fbz`, `.fb2.zip`). Files from Finder, the Dock, Open Recent and launch arguments are the
+  user's choice too, and main keeps them itself.
+- **Books read in place:** such a book keeps `source: 'local'` and gains `path`. Opening reads
+  the bytes from main as a `File`, so the engines and the reader do not change. A file no longer
+  at its path fails with `file-moved`: "Locate file…" re-links it, accepting only the same bytes
+  (same `local-<sha256>` key).
+- **Opening from outside:** main queues paths from `open-file` (Finder, Dock, Open Recent; it can
+  fire before `ready`), launch arguments and `second-instance` until the page registers
+  `onOpenPaths`. The page reads them, adds them and opens the first; drop and File › Open… go the
+  same way. Open Recent entries are written only by the packaged app.
+- **Local progress sync:** on import, main hashes a kept file with MD5. If a Drive book in the
+  library has that MD5, the file becomes that book: the Drive record gains `path` and shares its
+  synced position with every device. Other local books sync their position as
+  `progress-local-<sha256[0..32]>.json`, so the same file on another Mac picks up the place; they
+  never join `library.json`. A Drive book whose file is gone falls back to its OPFS copy, then to
+  downloading.
+- **Formats:** every import and open checks the bytes (`engine/sniff.ts`), so a zipped FB2 saved
+  as `.epub` opens as FB2.
 
 ## Phases
 
-| # | Phase | Done when |
+| # | Phase | State |
 | --- | --- | --- |
-| 0 | Spike (`spikes/desktop/`): Electron loads the current build over `app://` | EPUB and PDF open; OPFS and IndexedDB persist across restarts; CSP is clean |
-| 1 | Desktop shell, desktop services, local files read in place, missing-file handling | Open, close and reopen a local book with no copy; unit tests cover the `'file'` source |
-| 2 | File association, single instance, drag-and-drop (window and Dock), recents, default-app hint | Double-clicking an `.epub` opens it cold and while running; `.pdf` is listed in "Open With" |
-| 3 | Desktop OAuth with the refresh token in the keychain (`safeStorage`) | Drive browse and sync survive a restart with no reconnect |
-| 4 | Local-file progress sync (MD5 match, `progress-local-*`) | The same file on two Macs keeps its position; a Drive-matched local file syncs with the phone |
-| 5 | Packaging: self-signed `arm64` `.dmg`, version check, docs | A fresh install registers the file types; the update notice shows when the version file is bumped |
-
-Needs from the owner: a "Desktop app" OAuth client in Google Cloud Console (phase 3), and a
-self-signed code-signing certificate in Keychain Access (phase 5).
-
-## Build and install (this Mac)
-
-Needs Bun, the repo's dependencies (`bun install`) and a `.env` with `VITE_GOOGLE_CLIENT_ID`
-(and `VITE_LOGGER_INGEST_KEY` for logs), as for the web app.
-
-```sh
-bun run desktop:package -- --install   # build, sign ad hoc, copy to /Applications
-```
-
-The first launch registers Drive Read for EPUB and PDF. To make it the EPUB default: select an
-EPUB in Finder → File › Get Info → Open with: Drive Read → Change All. To update, quit the app
-and run the same command again. `bun run desktop` runs it from the repo without packaging.
-
-An ad-hoc signature changes with every build, so once desktop sign-in (phase 3) stores its token
-in the keychain, macOS asks once after each rebuild whether Drive Read may use it.
+| 0 | Spike: the web build in Electron over `app://` | Done (v0.14.1); spike removed |
+| 1 | Desktop shell, local files read in place, "Locate file…" | Done (v0.15.0) |
+| 2 | File types, single instance, Finder / Dock / drop / File › Open…, Recents, EPUB hint | Done (v0.16.0); Finder opens checked on the packaged app |
+| 3 | Desktop OAuth (system browser, loopback redirect, PKCE) with the refresh token in the keychain (`safeStorage`) | Waiting for the owner's "Desktop app" OAuth client |
+| 4 | Local-file progress sync (MD5 match, `progress-local-*`) | Done (v0.17.0); end-to-end against Drive waits for phase 3 |
+| 5 | Local packaging and install | Done (v0.19.0). The `.dmg`, certificate and update check of v0.18.0 were removed: the app is never distributed |
 
 ## Dependencies
 
@@ -118,5 +113,5 @@ in the keychain, macOS asks once after each rebuild whether Drive Read may use i
 | electron 44.9.0 | Active, released 2026-10-17 | MIT |
 | electron-builder 26.15.3 | Active, last push 2026-10-18 | MIT |
 
-The main process (ESM) and the sandboxed preload (CommonJS) are bundled with `bun build`
-(`desktop/build.ts`); no extra bundler.
+The main process and the preload are bundled with `bun build` (`desktop/build.ts`); no extra
+bundler.
