@@ -522,3 +522,33 @@ describe('open, desktop: a Drive book read from disk', () => {
     expect(drive.download).toHaveBeenCalled()
   })
 })
+
+describe('open: the format is checked against the downloaded bytes', () => {
+  it('a Drive book named .epub that is really FB2 opens as FB2 and is recorded so', async () => {
+    const ctx = await setupServices()
+    ctx.gis.requestToken.mockResolvedValue(
+      Ok({ accessToken: 'tok', expiresAt: Date.now() + 3_600_000 }),
+    )
+    await useAuth().connect()
+    await useLibrary().addFromDrive([
+      {
+        id: 'x',
+        name: 'Пламя (epub).epub',
+        mimeType: 'application/epub+zip',
+        size: 3,
+        md5: 'm',
+        modifiedTime: '',
+      },
+    ])
+    ctx.drive.download.mockResolvedValue(
+      Ok(new Blob(['<?xml version="1.0"?><FictionBook></FictionBook>'])),
+    )
+    const createEngine = vi.spyOn(ctx.services, 'createEngine')
+    const reader = useReader()
+    await reader.open('x', document.createElement('div'))
+
+    expect(createEngine).toHaveBeenLastCalledWith('fb2')
+    expect(useLibrary().books[0]?.format).toBe('fb2')
+    expect(reader.status).toEqual({ kind: 'ready' })
+  })
+})

@@ -110,6 +110,17 @@ describe('selection', () => {
     expect(browser.selectedCount).toBe(1)
     expect(browser.books.find((b) => b.id === 'p')).toMatchObject({ format: 'PDF', addable: true })
   })
+
+  it('labels and adds an FB2, whatever MIME type Drive gave it', async () => {
+    const { drive } = await connected()
+    drive.searchBooks.mockResolvedValue(Ok([f('b', 'Пламя.fb2', 'application/octet-stream')]))
+    const browser = useDriveBrowser()
+    await browser.search('')
+    expect(browser.books[0]).toMatchObject({ format: 'FB2', addable: true })
+    browser.toggle('b')
+    await browser.addSelected()
+    expect(useLibrary().books[0]).toMatchObject({ id: 'b', format: 'fb2', source: 'drive' })
+  })
 })
 
 describe('folders', () => {

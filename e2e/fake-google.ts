@@ -9,6 +9,12 @@ import type { Page, Route } from '@playwright/test'
  */
 
 const EPUB = readFileSync('e2e/fixtures/test-voyage.epub')
+/** File bodies other than the fixture EPUB, by file id. */
+const BODIES: Record<string, Buffer> = {
+  flame: readFileSync('e2e/fixtures/test-flame.fb2'),
+  'flame-zip': readFileSync('e2e/fixtures/test-flame-fb2.epub'),
+}
+const bodyOf = (id: string) => BODIES[id] ?? EPUB
 const FOLDER = 'application/vnd.google-apps.folder'
 
 interface FakeFile {
@@ -36,6 +42,21 @@ const TREE: FakeFile[] = [
     parent: 'tess',
   },
   { id: 'notes', name: 'Ship Notes.pdf', mimeType: 'application/pdf', parent: 'tess' },
+  // FB2 as Drive really holds it: a generic MIME type, and a zipped FB2 misnamed .epub.
+  { id: 'russian', name: 'Русское', mimeType: FOLDER, parent: 'root' },
+  {
+    id: 'flame',
+    name: 'Тестовое пламя - Ада Фикстурова.fb2',
+    mimeType: 'application/octet-stream',
+    parent: 'russian',
+  },
+  {
+    id: 'flame-zip',
+    name: 'Пламя (epub).epub',
+    mimeType: 'application/epub+zip',
+    parent: 'russian',
+  },
+  { id: 'cover', name: 'cover.jpg', mimeType: 'image/jpeg', parent: 'russian' },
 ]
 
 const GIS = `
@@ -59,7 +80,7 @@ const asDrive = (f: FakeFile, md5: Record<string, string>) => ({
   mimeType: f.mimeType,
   ...(f.mimeType === FOLDER
     ? {}
-    : { size: String(EPUB.length), md5Checksum: md5[f.id] ?? `md5-${f.id}` }),
+    : { size: String(bodyOf(f.id).length), md5Checksum: md5[f.id] ?? `md5-${f.id}` }),
   modifiedTime: '2026-10-01T00:00:00Z',
 })
 
@@ -135,16 +156,24 @@ export async function fakeGoogle(
         status: 200,
         headers: {
           ...CORS,
-          'content-type': 'application/epub+zip',
-          'content-length': String(EPUB.length),
+          'content-type': TREE.find((f) => f.id === id)?.mimeType ?? 'application/epub+zip',
+          'content-length': String(bodyOf(id).length),
         },
-        body: EPUB,
+        body: bodyOf(id),
       })
     }
 
     const q = url.searchParams.get('q') ?? ''
     const parent = /'([^']+)' in parents/.exec(q)?.[1]
-    const name = /name contains '([^']+)'/.exec(q)?.[1]?.toLowerCase()
+    // Book search: `trashed = false and (<mimeType = … or name contains …>) [and name contains 'q']`.
+    const group = /\(([^)]*)\)/.exec(q)?.[1] ?? ''
+    const mimes = [...group.matchAll(/mimeType = '([^']+)'/g)].map((m) => m[1])
+    const terms = [...group.matchAll(/name contains '([^']+)'/g)].map((m) => m[1]!.toLowerCase())
+    const name = /\) and name contains '([^']+)'/.exec(q)?.[1]?.toLowerCase()
+    // Drive matches name terms by word prefix.
+    const words = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u)
+    const isBook = (f: FakeFile) =>
+      mimes.includes(f.mimeType) || words(f.name).some((w) => terms.some((t) => w.startsWith(t)))
     if (parent === undefined && state.searchDelayMs > 0)
       await new Promise((r) => setTimeout(r, state.searchDelayMs))
     const files = TREE.filter(
@@ -152,7 +181,7 @@ export async function fakeGoogle(
         !state.deleted.includes(f.id) &&
         (parent !== undefined
           ? f.parent === parent
-          : f.mimeType !== FOLDER && (!name || f.name.toLowerCase().includes(name))),
+          : f.mimeType !== FOLDER && isBook(f) && (!name || f.name.toLowerCase().includes(name))),
     )
     return route.fulfill({
       headers: CORS,

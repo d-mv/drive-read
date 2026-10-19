@@ -1,3 +1,4 @@
+import type { BookFormat } from '@/domain/book'
 import { Err, Ok, type Result } from '@/shared/result'
 
 /**
@@ -7,6 +8,17 @@ import { Err, Ok, type Result } from '@/shared/result'
 
 export const FOLDER_MIME = 'application/vnd.google-apps.folder'
 export const BOOK_MIMES = ['application/epub+zip', 'application/pdf'] as const
+/**
+ * FB2 has no settled MIME type: Drive keeps what the uploader sent, often
+ * application/octet-stream or application/zip. Queries add these and names containing
+ * "fb2"/"fbz"; `driveFormat` then keeps only real books.
+ */
+const FB2_MIMES = [
+  'application/x-fictionbook+xml',
+  'application/x-fictionbook',
+  'application/x-zip-compressed-fb2',
+] as const
+const FB2_NAME_TERMS = ['fb2', 'fbz'] as const
 
 const API = 'https://www.googleapis.com/drive/v3'
 const FILE_FIELDS = 'id,name,mimeType,size,md5Checksum,modifiedTime'
@@ -51,9 +63,24 @@ const toDriveFile = (f: RawFile): DriveFile => ({
 const escapeQ = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 const mimeIn = (mimes: readonly string[]) => mimes.map((m) => `mimeType = '${m}'`).join(' or ')
 
+/** A Drive file's book format by name and MIME type; null for anything else. */
+export function driveFormat(f: { name: string; mimeType: string }): BookFormat | null {
+  if (f.mimeType === 'application/epub+zip' || /\.epub$/i.test(f.name)) return 'epub'
+  if (f.mimeType === 'application/pdf' || /\.pdf$/i.test(f.name)) return 'pdf'
+  if (
+    (FB2_MIMES as readonly string[]).includes(f.mimeType) ||
+    /\.(fb2|fbz|fb2\.zip)$/i.test(f.name)
+  )
+    return 'fb2'
+  return null
+}
+
+const keepBooks = (files: DriveFile[]) => files.filter((f) => driveFormat(f) !== null)
+
 /** Drive `q` for books, optionally filtered by name. */
 export function bookQuery(name: string): string {
-  const base = `trashed = false and (${mimeIn(BOOK_MIMES)})`
+  const names = FB2_NAME_TERMS.map((t) => `name contains '${t}'`).join(' or ')
+  const base = `trashed = false and (${mimeIn([...BOOK_MIMES, ...FB2_MIMES])} or ${names})`
   const n = name.trim()
   return n ? `${base} and name contains '${escapeQ(n)}'` : base
 }
@@ -80,12 +107,12 @@ export function createDriveApi(fetchFn: FetchFn = (i, init) => fetch(i, init)) {
     return res.ok ? Ok(res) : Err(await toError(res))
   }
 
-  /** files.list for `q`, following pages up to `max` files. */
+  /** files.list for `q`, following pages up to `max` files; `more` when Drive had more. */
   async function list(
     token: string,
     q: string,
     opts: { orderBy: string; max?: number },
-  ): Promise<Result<DriveFile[], DriveError>> {
+  ): Promise<Result<{ files: DriveFile[]; more: boolean }, DriveError>> {
     const files: DriveFile[] = []
     let pageToken = ''
     const max = opts.max ?? 5000
@@ -103,20 +130,38 @@ export function createDriveApi(fetchFn: FetchFn = (i, init) => fetch(i, init)) {
       files.push(...body.files.map(toDriveFile))
       pageToken = body.nextPageToken ?? ''
     } while (pageToken && files.length < max)
-    return Ok(files)
+    return Ok({ files, more: pageToken !== '' })
   }
 
-  /** Every EPUB and PDF in Drive whose name contains `query` (all of them when empty). */
-  const searchBooks = (token: string, query: string) =>
-    list(token, bookQuery(query), { orderBy: 'name' })
+  /** Every book in Drive whose name contains `query` (all of them when empty). */
+  async function searchBooks(token: string, query: string) {
+    const r = await list(token, bookQuery(query), { orderBy: 'name' })
+    return r._tag === 'Ok' ? Ok(keepBooks(r.value.files)) : r
+  }
 
-  /** Folders and books directly inside a folder ('root' for My Drive), folders first. */
-  const listChildren = (token: string, folderId: string) =>
-    list(
-      token,
-      `'${escapeQ(folderId)}' in parents and trashed = false and (${mimeIn([FOLDER_MIME, ...BOOK_MIMES])})`,
-      { orderBy: 'folder,name' },
-    )
+  /**
+   * Every book in Drive, for the daily check. `complete` is false when Drive had more than was
+   * fetched: a book missing from an incomplete listing may still be there.
+   */
+  async function listAllBooks(
+    token: string,
+  ): Promise<Result<{ books: DriveFile[]; complete: boolean }, DriveError>> {
+    const r = await list(token, bookQuery(''), { orderBy: 'name' })
+    return r._tag === 'Ok' ? Ok({ books: keepBooks(r.value.files), complete: !r.value.more }) : r
+  }
+
+  /**
+   * Folders and books directly inside a folder ('root' for My Drive), folders first. Lists every
+   * child: an FB2 can carry any MIME type, so books are picked by name here, not by Drive.
+   */
+  async function listChildren(token: string, folderId: string) {
+    const r = await list(token, `'${escapeQ(folderId)}' in parents and trashed = false`, {
+      orderBy: 'folder,name',
+    })
+    return r._tag === 'Ok'
+      ? Ok(r.value.files.filter((f) => f.mimeType === FOLDER_MIME || driveFormat(f) !== null))
+      : r
+  }
 
   /**
    * Every book under a folder, at any depth (Calibre keeps books in author folders).
@@ -187,7 +232,7 @@ export function createDriveApi(fetchFn: FetchFn = (i, init) => fetch(i, init)) {
     return id ? Ok({ permissionId: id }) : Err({ kind: 'http', status: 422 })
   }
 
-  return { searchBooks, listChildren, listBooksRecursive, download, aboutUser }
+  return { searchBooks, listAllBooks, listChildren, listBooksRecursive, download, aboutUser }
 }
 
 export type DriveApi = ReturnType<typeof createDriveApi>

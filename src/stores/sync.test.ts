@@ -363,11 +363,11 @@ describe('Drive file changes', () => {
 
   it('marks a book Drive no longer lists, once a day, without failing the sync', async () => {
     const d = await withDriveBooks('a', 'b')
-    d.ctx.drive.searchBooks.mockResolvedValue(Ok([driveFile('a')]))
+    d.ctx.drive.listAllBooks.mockResolvedValue(Ok({ books: [driveFile('a')], complete: true }))
     const info = vi.spyOn(logger, 'info')
 
     await useSync().syncNow()
-    expect(d.ctx.drive.searchBooks).toHaveBeenCalledWith('tok', '')
+    expect(d.ctx.drive.listAllBooks).toHaveBeenCalledWith('tok')
     expect(useLibrary().books.find((b) => b.id === 'b')?.missingInDrive).toBe(true)
     expect(useLibrary().books.find((b) => b.id === 'a')?.missingInDrive).toBeUndefined()
     expect(info).toHaveBeenCalledWith(
@@ -377,35 +377,35 @@ describe('Drive file changes', () => {
     expect(useSync().status).toBe('idle')
 
     await useSync().syncNow()
-    expect(d.ctx.drive.searchBooks).toHaveBeenCalledTimes(1)
+    expect(d.ctx.drive.listAllBooks).toHaveBeenCalledTimes(1)
     d.ctx.advance(24 * 3_600_000)
     await useSync().syncNow()
-    expect(d.ctx.drive.searchBooks).toHaveBeenCalledTimes(2)
+    expect(d.ctx.drive.listAllBooks).toHaveBeenCalledTimes(2)
   })
 
   it('offers a new version of a downloaded book', async () => {
     const d = await withDriveBooks('a')
     await d.ctx.blobs.put('books/a', new Blob(['old']))
     await useLibrary().setDownloaded('a', true)
-    d.ctx.drive.searchBooks.mockResolvedValue(Ok([{ ...driveFile('a'), md5: 'md5-v2', size: 99 }]))
+    d.ctx.drive.listAllBooks.mockResolvedValue(
+      Ok({ books: [{ ...driveFile('a'), md5: 'md5-v2', size: 99 }], complete: true }),
+    )
     await useSync().syncNow()
     expect(useLibrary().books[0]!.driveVersion).toEqual({ md5: 'md5-v2', size: 99 })
   })
 
   it('keeps the sync healthy when the check fails, and tries again on the next pass', async () => {
     const d = await withDriveBooks('a')
-    d.ctx.drive.searchBooks.mockResolvedValue({ _tag: 'Err', error: { kind: 'rate-limited' } })
+    d.ctx.drive.listAllBooks.mockResolvedValue({ _tag: 'Err', error: { kind: 'rate-limited' } })
     await useSync().syncNow()
     expect(useSync().status).toBe('idle')
     await useSync().syncNow()
-    expect(d.ctx.drive.searchBooks).toHaveBeenCalledTimes(2)
+    expect(d.ctx.drive.listAllBooks).toHaveBeenCalledTimes(2)
   })
 
   it('marks nothing missing when the listing may be cut short', async () => {
     const d = await withDriveBooks('a')
-    d.ctx.drive.searchBooks.mockResolvedValue(
-      Ok(Array.from({ length: 5000 }, (_, i) => driveFile(`other-${i}`))),
-    )
+    d.ctx.drive.listAllBooks.mockResolvedValue(Ok({ books: [], complete: false }))
     await useSync().syncNow()
     expect(useLibrary().books[0]!.missingInDrive).toBeUndefined()
   })
@@ -458,5 +458,20 @@ describe('desktop: local files', () => {
     await useSync().syncNow()
     expect(useLibrary().progress['local-y']).toBeUndefined()
     expect(useLibrary().books.map((b) => b.id)).toEqual(['local-y'])
+  })
+})
+
+describe('FB2 from another device', () => {
+  it('a Drive FB2 in library.json joins as an FB2', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Phone')
+    await useLibrary().addFromDrive([
+      { ...driveFile('f1'), name: 'Пламя.fb2', mimeType: 'application/octet-stream' },
+    ])
+    await useSync().syncNow()
+
+    await device(appdata, 'Laptop')
+    await useSync().syncNow()
+    expect(useLibrary().books[0]).toMatchObject({ id: 'f1', format: 'fb2' })
   })
 })

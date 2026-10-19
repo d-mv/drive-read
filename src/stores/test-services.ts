@@ -107,6 +107,7 @@ export function memoryAppData(): MemoryAppData {
 function fakeDrive(): MockDrive {
   return {
     searchBooks: vi.fn<DriveApi['searchBooks']>(async () => Ok([])),
+    listAllBooks: vi.fn<DriveApi['listAllBooks']>(async () => Ok({ books: [], complete: true })),
     listChildren: vi.fn<DriveApi['listChildren']>(async () => Ok([])),
     listBooksRecursive: vi.fn<DriveApi['listBooksRecursive']>(async () =>
       Ok({ books: [], truncated: false }),

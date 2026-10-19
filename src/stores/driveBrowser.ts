@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
 import { track } from '@/services/events'
-import { type DriveError, type DriveFile, FOLDER_MIME } from '@/services/drive/client'
+import { type DriveError, type DriveFile, driveFormat, FOLDER_MIME } from '@/services/drive/client'
 import { bookFromFileName, folderLabel } from '@/services/drive/names'
 import { isNone, type Result } from '@/shared/result'
 
@@ -24,7 +24,7 @@ export interface BrowserBook {
   name: string
   title: string
   author: string
-  format: 'EPUB' | 'PDF'
+  format: 'EPUB' | 'PDF' | 'FB2'
   size: number
   inLibrary: boolean
   /** Not yet in the library. */
@@ -44,6 +44,8 @@ const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: tr
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
+const FORMAT_LABEL = { epub: 'EPUB', pdf: 'PDF', fb2: 'FB2' } as const
+
 export const useDriveBrowser = defineStore('driveBrowser', () => {
   const status = ref<BrowserStatus>({ kind: 'idle' })
   const files = ref<DriveFile[]>([])
@@ -58,13 +60,12 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     files.value
       .filter((f) => f.mimeType !== FOLDER_MIME)
       .map((f): BrowserBook => {
-        const isEpub = f.mimeType === 'application/epub+zip'
         const owned = inLibrary.value.has(f.id)
         return {
           id: f.id,
           name: f.name,
           ...bookFromFileName(f.name),
-          format: isEpub ? 'EPUB' : 'PDF',
+          format: FORMAT_LABEL[driveFormat(f) ?? 'epub'],
           size: f.size,
           inLibrary: owned,
           addable: !owned,
@@ -131,7 +132,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     status.value = { kind: 'ready' }
   }
 
-  /** Every EPUB and PDF in Drive whose name contains `query`. */
+  /** Every book in Drive whose name contains `query`. */
   function search(query: string) {
     // The folder trail stays: clearing the search returns to the same folder.
     return load('search', (token) => useServices().drive.searchBooks(token, query))
@@ -160,7 +161,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     const fresh = addedIds.filter((id) => !before.has(id)).length
     return [
       `Added ${plural(fresh, 'book')}.`,
-      skipped > 0 ? `${plural(skipped, 'file')} skipped: not EPUB or PDF.` : '',
+      skipped > 0 ? `${plural(skipped, 'file')} skipped: not EPUB, FB2 or PDF.` : '',
       truncated ? 'The folder is very large; add its subfolders separately for the rest.' : '',
     ]
       .filter(Boolean)

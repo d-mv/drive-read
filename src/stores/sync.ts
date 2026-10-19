@@ -4,7 +4,7 @@ import { computed, ref, toRaw } from 'vue'
 import type { BookRecord, ProgressRecord } from '@/domain/book'
 import { useServices } from '@/services'
 import type { AppDataFile } from '@/services/drive/appdata'
-import type { DriveError, DriveFile } from '@/services/drive/client'
+import { type DriveError, type DriveFile, driveFormat } from '@/services/drive/client'
 import { track } from '@/services/events'
 import type { SyncMeta } from '@/services/storage/db'
 import { compareWithDrive } from '@/services/sync/driveCheck'
@@ -41,8 +41,6 @@ export type Offer = Pick<ProgressRecord, 'locator' | 'fraction' | 'device' | 'up
 
 const IDLE_MS = 20_000
 const DRIVE_CHECK_EVERY_MS = 24 * 3_600_000
-/** searchBooks stops here; a listing this long may be cut short. */
-const DRIVE_LIST_MAX = 5000
 const LIBRARY_FILE = 'library.json'
 const progressFile = (id: string) => `progress-${id}.json`
 const LOCK = 'drive-read-sync'
@@ -68,6 +66,13 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
   const locks = (navigator as Navigator & { locks?: LockManager }).locks
   return locks ? (locks.request(LOCK, fn) as Promise<T>) : fn()
 }
+
+/** library.json keeps names only: the type a synced entry is added with, by its name. */
+const ENTRY_MIME = {
+  epub: 'application/epub+zip',
+  pdf: 'application/pdf',
+  fb2: 'application/x-fictionbook+xml',
+} as const
 
 export const useSync = defineStore('sync', () => {
   const status = ref<SyncStatus>('idle')
@@ -193,7 +198,7 @@ export const useSync = defineStore('sync', () => {
       const asFiles: DriveFile[] = changes.toAdd.map((e) => ({
         id: e.fileId,
         name: e.name,
-        mimeType: /\.pdf$/i.test(e.name) ? 'application/pdf' : 'application/epub+zip',
+        mimeType: ENTRY_MIME[driveFormat({ name: e.name, mimeType: '' }) ?? 'epub'],
         size: 0,
         md5: e.md5,
         modifiedTime: '',
@@ -355,14 +360,14 @@ export const useSync = defineStore('sync', () => {
     const books = driveBooks()
     if (books.length === 0) return
     const started = performance.now()
-    const listed = await drive.searchBooks(tok, '')
+    const listed = await drive.listAllBooks(tok)
     if (listed._tag === 'Err') {
       if (listed.error.kind === 'auth-expired') useAuth().markExpired('sync')
       track('drive.check_failed', { reason: listed.error.kind })
       return
     }
-    const complete = listed.value.length < DRIVE_LIST_MAX
-    const changes = compareWithDrive(books, listed.value, complete)
+    const { complete } = listed.value
+    const changes = compareWithDrive(books, listed.value.books, complete)
     await library.applyDriveChanges(changes)
     meta.value.driveCheckedAt = now().toISOString()
     track('drive.checked', {

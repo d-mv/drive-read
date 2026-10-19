@@ -2,12 +2,21 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: FB2 in Google Drive (v0.21.0)
+
+- **Drive's MIME type for FB2 can't be trusted** (it keeps what the uploader sent: often `application/octet-stream` or `application/zip`), and `q` can't filter by extension. So:
+  - **Folders** list every child (`'<id>' in parents and trashed = false`) and the app keeps folders and books by `driveFormat` (MIME or name).
+  - **Search and the daily check** query EPUB/PDF/FB2 MIME types plus `name contains 'fb2'` / `'fbz'` (Drive matches word prefixes), then drop non-books by name. Generic zip/binary types are not queried, to keep whole-Drive listings small.
+- **`listAllBooks` replaces `searchBooks('')` for the daily check** and returns `complete` from Drive's `nextPageToken`. Counting results after dropping non-books could have made a cut-short listing look complete.
+- **The reader re-detects the format from the downloaded bytes** and records it (`library.setFormat`), so a Drive file misnamed `.epub` opens as FB2 and stays so.
+- **Fake Drive (E2E)** now honours the book query (MIME list, name-prefix terms, the user's name filter), serves each file's own bytes, and has an `Русское` folder with an octet-stream FB2, a zipped FB2 named `.epub` and a `cover.jpg`.
+
 ## 2026-10-19: FB2 (v0.20.0)
 
 - **Asked for by the owner** after a zipped FB2 saved as `.epub` failed to open. foliate-js already reads FB2; the app now accepts it from the device.
 - **Format by content, then name** (`services/engine/sniff.ts`): `%PDF`, the first zip entry (`mimetype` → EPUB, `*.fb2` → FB2), or a `<FictionBook` tag; otherwise by extension/type, so a damaged book still reaches its engine and reads as damaged, not unsupported.
 - **foliate-js picks its reader by file name**, so `foliateFile` hands it `book.fb2` or `book.fbz`.
-- **Not in Drive yet:** Drive reports FB2 under several MIME types and its name search can't match an extension, so browsing and search stay EPUB/PDF.
+- **Not in Drive yet** (added in v0.21.0, above).
 - **Desktop Open With only** for `.fb2`/`.fbz` (imported UTIs `ru.gribuser.fictionbook.fb2|fbz`); `.fb2.zip` can't be claimed without claiming `.zip`.
 - **Bug found on the way:** foliate's FB2 `getCover()` returns `null`, not a promise, and `.catch` on it threw outside the engine's try, so the import never finished and showed nothing. The whole `open` is now inside the try. Fixtures: `bun e2e/fixtures/build-fb2.ts`.
 

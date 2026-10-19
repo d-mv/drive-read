@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Err, isOk } from '@/shared/result'
 
-import { createDriveApi, type FetchFn, bookQuery } from './client'
+import { createDriveApi, driveFormat, type FetchFn, bookQuery } from './client'
 
 type Route = (url: URL, init: RequestInit) => Response | Promise<Response>
 
@@ -29,9 +29,12 @@ const file = (id: string, name: string, mimeType = 'application/epub+zip') => ({
 })
 
 describe('bookQuery', () => {
-  it('matches EPUB and PDF files that are not trashed', () => {
+  it('matches EPUB, PDF and FB2 files that are not trashed', () => {
     expect(bookQuery('')).toBe(
-      "trashed = false and (mimeType = 'application/epub+zip' or mimeType = 'application/pdf')",
+      "trashed = false and (mimeType = 'application/epub+zip' or mimeType = 'application/pdf'" +
+        " or mimeType = 'application/x-fictionbook+xml' or mimeType = 'application/x-fictionbook'" +
+        " or mimeType = 'application/x-zip-compressed-fb2'" +
+        " or name contains 'fb2' or name contains 'fbz')",
     )
   })
 
@@ -100,7 +103,54 @@ describe('searchBooks', () => {
   })
 })
 
+describe('driveFormat', () => {
+  it.each([
+    [{ name: 'A.epub', mimeType: 'application/epub+zip' }, 'epub'],
+    [{ name: 'A.pdf', mimeType: 'application/pdf' }, 'pdf'],
+    [{ name: 'Пламя.fb2', mimeType: 'application/octet-stream' }, 'fb2'],
+    [{ name: 'Пламя.fb2.zip', mimeType: 'application/zip' }, 'fb2'],
+    [{ name: 'Пламя.fbz', mimeType: 'application/octet-stream' }, 'fb2'],
+    [{ name: 'Book', mimeType: 'application/x-fictionbook+xml' }, 'fb2'],
+    [{ name: 'fb2 notes.txt', mimeType: 'text/plain' }, null],
+    [{ name: 'cover.jpg', mimeType: 'image/jpeg' }, null],
+  ])('%o → %s', (f, format) => {
+    expect(driveFormat(f)).toBe(format)
+  })
+})
+
+describe('searchBooks keeps only books', () => {
+  it('drops files that matched "fb2" in their name but are not books', async () => {
+    const f = fakeFetch(() =>
+      json({
+        files: [
+          file('a', 'A.epub'),
+          file('b', 'Пламя.fb2', 'application/octet-stream'),
+          file('n', 'fb2 reading list.txt', 'text/plain'),
+        ],
+      }),
+    )
+    const r = await createDriveApi(f.fn).searchBooks('t', '')
+    expect(isOk(r) && r.value.map((x) => x.id)).toEqual(['a', 'b'])
+  })
+})
+
 describe('listChildren', () => {
+  it('lists every child and keeps folders and books, whatever MIME type Drive gave them', async () => {
+    const f = fakeFetch(() =>
+      json({
+        files: [
+          file('f1', 'dippel,-julia', 'application/vnd.google-apps.folder'),
+          file('a', 'A.epub'),
+          file('b', 'Пламя.fb2', 'application/octet-stream'),
+          file('c', 'cover.jpg', 'image/jpeg'),
+        ],
+      }),
+    )
+    const r = await createDriveApi(f.fn).listChildren('t', 'root')
+    expect(isOk(r) && r.value.map((x) => x.id)).toEqual(['f1', 'a', 'b'])
+    expect(f.calls[0]!.url.searchParams.get('q')).toBe("'root' in parents and trashed = false")
+  })
+
   it('lists folders and books in a folder', async () => {
     const f = fakeFetch(() =>
       json({
@@ -173,5 +223,36 @@ describe('aboutUser', () => {
       _tag: 'Ok',
       value: { permissionId: '0123' },
     })
+  })
+})
+
+describe('listAllBooks', () => {
+  it('lists every book and says the listing is complete', async () => {
+    const f = fakeFetch(() =>
+      json({ files: [file('a', 'A.epub'), file('n', 'fb2 list.txt', 'text/plain')] }),
+    )
+    const r = await createDriveApi(f.fn).listAllBooks('t')
+    expect(r).toEqual({
+      _tag: 'Ok',
+      value: { books: [expect.objectContaining({ id: 'a' })], complete: true },
+    })
+  })
+
+  it('is not complete when Drive had more than it fetched, even after dropping non-books', async () => {
+    let page = 0
+    const f = fakeFetch(() => {
+      page++
+      const files = Array.from({ length: 1000 }, (_, i) =>
+        file(
+          `p${page}-${i}`,
+          i % 2 ? `x${i}.fb2` : `fb2 note ${i}.txt`,
+          i % 2 ? 'application/octet-stream' : 'text/plain',
+        ),
+      )
+      return json({ files, nextPageToken: `p${page + 1}` })
+    })
+    const r = await createDriveApi(f.fn).listAllBooks('t')
+    expect(r._tag === 'Ok' && r.value.complete).toBe(false)
+    expect(r._tag === 'Ok' && r.value.books.length).toBe(2500)
   })
 })

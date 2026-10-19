@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, toRaw } from 'vue'
 
 import {
+  type BookFormat,
   type BookRecord,
   type LibraryItem,
   type ProgressRecord,
@@ -9,7 +10,7 @@ import {
   titleFromFileName,
 } from '@/domain/book'
 import { useServices } from '@/services'
-import type { DriveFile } from '@/services/drive/client'
+import { type DriveFile, driveFormat } from '@/services/drive/client'
 import { bookFromFileName } from '@/services/drive/names'
 import { detectFormat } from '@/services/engine/sniff'
 import type { BookMeta, Position } from '@/services/engine/types'
@@ -30,13 +31,6 @@ export interface ImportResult {
 }
 
 export type LibraryEntry = LibraryItem & { book: BookRecord }
-
-/** A Drive file's format: EPUB or PDF, by type or extension; null for anything else. */
-function formatOf(f: { type: string; name: string }): BookRecord['format'] | null {
-  if (f.type === 'application/epub+zip' || /\.epub$/i.test(f.name)) return 'epub'
-  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) return 'pdf'
-  return null
-}
 
 /** The library: book records, reading positions, and importing files from this device. */
 export const useLibrary = defineStore('library', () => {
@@ -244,7 +238,7 @@ export const useLibrary = defineStore('library', () => {
         result.added.push(existing)
         continue
       }
-      const format = formatOf({ type: file.mimeType, name: file.name })
+      const format = driveFormat(file)
       if (!format) {
         result.failed.push({ name: file.name, reason: 'unsupported' })
         continue
@@ -301,6 +295,9 @@ export const useLibrary = defineStore('library', () => {
     const saved = await useServices().db.putBook({ ...toRaw(book) })
     if (isErr(saved)) track('storage.write_failed', { what: 'book', reason: saved.error.kind })
   }
+
+  /** The file turned out to be another format than its name said (checked on open). */
+  const setFormat = (id: string, format: BookFormat) => update(id, { format })
 
   /** The file is (or is no longer) on this device. */
   const setDownloaded = (id: string, downloaded: boolean) => update(id, { downloaded })
@@ -389,6 +386,7 @@ export const useLibrary = defineStore('library', () => {
     relink,
     addFromDrive,
     setDownloaded,
+    setFormat,
     removeDownload,
     applyDriveChanges,
     acceptNewVersion,

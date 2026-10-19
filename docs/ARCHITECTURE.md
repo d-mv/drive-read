@@ -19,7 +19,7 @@ no "All books" tab).
 - Few dependencies; native browser APIs where they exist.
 
 Not in scope: files with DRM, highlights and notes (the sync record leaves room for them),
-formats beyond EPUB, FB2 (from the device only) and PDF, storage providers other than Google
+formats beyond EPUB, FB2 and PDF, storage providers other than Google
 Drive.
 
 | Constraint | Consequence |
@@ -243,8 +243,8 @@ sequenceDiagram
 
 | Call | Used for |
 | --- | --- |
-| `files.list` with `'<folder>' in parents` | Browse a folder: folders first, then books, alphabetical |
-| `files.list` with `name contains` | Search by name across Drive (EPUB and PDF only) |
+| `files.list` with `'<folder>' in parents` | Browse a folder: every child is listed and the app keeps folders and books (`driveFormat`: by MIME type or name), folders first |
+| `files.list` with `name contains` | Search by name across Drive: EPUB/PDF/FB2 MIME types or names with an `fb2`/`fbz` word, then non-books dropped; the daily check uses the same query (`listAllBooks`, which says whether Drive had more than it fetched) |
 | `files.get?alt=media` | Download a book, streamed with progress |
 | `about.get?fields=user(permissionId)` | Pseudonymous user id for the logs |
 | `files.list` / `create` / `update` in `appDataFolder` | `library.json` and `progress-<fileId>.json` |
@@ -274,7 +274,7 @@ flowchart LR
 | Format | Engine | Notes |
 | --- | --- | --- |
 | EPUB | foliate-js (git submodule, pinned commit) | Paginated, reader themes and typefaces, CFI positions; book scripts blocked by CSP |
-| FB2 | foliate-js (`fb2.js`) | From the device only (not Drive). `.fb2`, `.fbz`, `.fb2.zip`; detected by content (`engine/sniff.ts`), so a misnamed zipped FB2 opens; renamed to `book.fb2`/`book.fbz` for foliate, which picks its reader by name |
+| FB2 | foliate-js (`fb2.js`) | From the device and Drive (any MIME type Drive gave it). `.fb2`, `.fbz`, `.fb2.zip`; detected by content (`engine/sniff.ts`), so a misnamed zipped FB2 opens, and a Drive book's format is corrected from its bytes on first open; renamed to `book.fb2`/`book.fbz` for foliate, which picks its reader by name |
 | PDF | pdfjs-dist 6 | Pages fitted to width and scrolled; zoom 100–300% (buttons, `+` `-` `0`, pinch); a text layer makes text selectable; standard fonts, CMaps, ICC profiles and WebAssembly image decoders (JPEG 2000, JBIG2) served from `/pdfjs/`; position is page + offset |
 
 Local books (opened from the device) go straight to OPFS, keyed by a content hash. They stay on

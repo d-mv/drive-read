@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0 — 2026-10-19
+
+- FB2 books in Google Drive: folders and search list them whatever MIME type Drive gave them (often a generic one), add and sync like other Drive books, and open after download. A Drive book whose name says EPUB but which is really FB2 opens too; its format is corrected on first open. Non-book files in a folder stay hidden.
+- The daily Drive check now knows when Drive had more books than it fetched, instead of guessing from the count, so it never marks books missing from an incomplete listing.
+
 ## 0.20.0 — 2026-10-19
 
 - FB2 books open from the device (web and desktop): plain `.fb2`, zipped `.fbz` / `.fb2.zip`, in UTF-8 or windows-1251. The format is read from the file's contents, so a zipped FB2 saved as `.epub` opens too. FB2 renders in foliate-js like EPUB (themes, typefaces, contents, positions, local progress sync). The desktop app lists FB2 under Open With. FB2 in Google Drive is not supported yet.

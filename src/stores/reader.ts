@@ -17,6 +17,7 @@ import type {
   TocEntry,
 } from '@/services/engine/types'
 import { track } from '@/services/events'
+import { detectFormat } from '@/services/engine/sniff'
 import { bookPath } from '@/services/storage/blobs'
 import { isErr, isNone, type Option, Some, toNullable } from '@/shared/result'
 
@@ -148,7 +149,11 @@ export const useReader = defineStore('reader', () => {
     }
     if (isNone(file)) return fail('missing-file')
 
-    const next = createEngine(record.format)
+    // The name can lie (a zipped FB2 saved as .epub): the bytes decide, and the record follows.
+    const format = (await detectFormat(file.value)) ?? record.format
+    if (mine !== session) return
+    if (format !== record.format) await library.setFormat(id, format)
+    const next = createEngine(format)
     const meta = await next.open(file.value)
     if (mine !== session) return next.destroy()
     if (isErr(meta)) {

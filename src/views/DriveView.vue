@@ -189,7 +189,7 @@ onBeforeUnmount(() => clearTimeout(debounce))
       <p v-else-if="empty" class="px-2 py-10 text-ink2">
         {{
           searching
-            ? `No EPUB or PDF files in your Drive match “${query.trim()}”.`
+            ? `No EPUB, FB2 or PDF files in your Drive match “${query.trim()}”.`
             : 'This folder has no books or folders.'
         }}
       </p>
