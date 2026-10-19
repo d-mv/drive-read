@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.1 — 2026-10-19
+
+- Desktop: plan for a macOS (Apple Silicon) app in `docs/DESKTOP.md`. Phase 0 spike (`spikes/desktop/`) shows the unchanged web build runs in Electron 44 over `app://`: EPUB, PDF and restart persistence pass with no CSP violations. Electron is a dev dependency; the web app is unchanged.
+
 ## 0.14.0 — 2026-10-16
 
 - Fix: a typeface switch applies in one step. The faces are registered once per book page with the FontFace API instead of re-parsing ~1 MB of inline `@font-face` CSS on every settings change, and the new face loads before the CSS names it, so the fallback font no longer flashes.

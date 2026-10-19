@@ -2,6 +2,13 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: Desktop app, phase 0 spike (v0.14.1)
+
+- **Plan:** `docs/DESKTOP.md`. Electron, macOS `arm64` only, no Apple Developer ID (self-signed certificate, version-file update notice instead of electron-updater), local files read in place, local-file progress synced, owner of `.epub` and alternate for `.pdf`.
+- **Spike result:** the web build runs unchanged from `app://drive-read/` (privileged standard, secure scheme, CSP from `csp.ts` sent as a header). IndexedDB and OPFS persist across restarts in the app profile. The service worker does not register on `app://`; that is wanted, since the desktop app updates differently.
+- **Main process is bundled with `bun build`** (ESM; external `electron`), no extra bundler dependency. The sandboxed preload (phase 1) must be CommonJS.
+- **Spike test quirk:** from the Library, importing a file only adds it (the web app's behaviour); the reader opens straight away only from the first-run screen.
+
 ## 2026-10-12: Sync hardening, PDF engine memory lifecycle, and UI performance (v0.13.1)
 
 - **Mount-time relocation isolation:** Foliate's engine normalizes CFIs upon rendering (e.g. adding or altering step identifiers). If emitted during mount, an initial relocation with a normalized CFI could differ from the stored raw locator string and falsely mark the record `dirty`. We introduced an `isMounting` guard across `engine.mount(el, restore)`: any relocation received while `isMounting` is active updates the reader state without triggering `library.saveProgress()`.
