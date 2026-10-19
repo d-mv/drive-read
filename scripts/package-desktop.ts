@@ -1,72 +1,39 @@
 /**
- * Builds the macOS desktop app (Apple Silicon) into desktop/release/: the web build, the bundled
- * main process, the .app (electron-builder), a signature with the local self-signed certificate,
- * and a drag-to-Applications .dmg (hdiutil). All local; no CI (docs/DESKTOP.md, phase 5).
+ * Builds the macOS desktop app (Apple Silicon) for use on this Mac: the web build, the bundled
+ * main process, and `desktop/release/mac-arm64/Drive Read.app`, ad-hoc signed. The app is never
+ * distributed, so there is no certificate, notarisation or installer (docs/DESKTOP.md).
  *
- *   bun scripts/package-desktop.ts             signed with the "Drive Read Local" certificate
- *   bun scripts/package-desktop.ts --adhoc     ad-hoc signature (no certificate yet; the
- *                                              keychain may ask again after every update)
- *   bun scripts/package-desktop.ts --release   also writes public/desktop-version.json, so the
- *                                              next web deploy offers this version
+ *   bun run desktop:package               build the .app
+ *   bun run desktop:package -- --install  also copy it to /Applications, replacing an older copy
  *
- * The web build uses .env like `bun run build`, so the logger key and client id ship.
+ * The web build reads .env like `bun run build`, so the Google client id and logger key ship.
  */
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rm } from 'node:fs/promises'
 
 import { $ } from 'bun'
 
-const IDENTITY = 'Drive Read Local'
-const RELEASE_DIR = 'desktop/release'
-const APP = `${RELEASE_DIR}/mac-arm64/Drive Read.app`
+const APP = 'desktop/release/mac-arm64/Drive Read.app'
+const INSTALLED = '/Applications/Drive Read.app'
+const install = process.argv.includes('--install')
 
-const args = new Set(process.argv.slice(2))
-const adhoc = args.has('--adhoc')
-const release = args.has('--release')
-
-const { version } = JSON.parse(await readFile('package.json', 'utf8')) as { version: string }
-const dmg = `${RELEASE_DIR}/Drive-Read-${version}-arm64.dmg`
-/** Where the .dmg is published; DR_DOWNLOAD_URL overrides it. */
-const downloadUrl =
-  process.env.DR_DOWNLOAD_URL ??
-  `https://github.com/d-mv/drive-read/releases/download/desktop-v${version}/Drive-Read-${version}-arm64.dmg`
-
-if (!adhoc) {
-  // Without -v: a self-signed certificate counts even if it is not marked trusted.
-  const identities = await $`security find-identity -p codesigning`.text()
-  if (!identities.includes(`"${IDENTITY}"`)) {
-    console.error(
-      `No "${IDENTITY}" code-signing certificate in the keychain. Create it (docs/DESKTOP.md, ` +
-        '"Signing certificate"), or pass --adhoc.',
-    )
-    process.exit(1)
-  }
-}
-
-console.log(`Drive Read ${version}: building`)
+console.log('building the web app and the desktop shell')
 await $`bun run build`.quiet()
 await $`bun desktop/build.ts`
+console.log('packing the .app')
 await $`bunx electron-builder --mac dir --arm64`.quiet()
 
-console.log(adhoc ? 'signing ad hoc' : `signing as "${IDENTITY}"`)
-await $`codesign --force --deep --sign ${adhoc ? '-' : IDENTITY} ${APP}`
+// Ad hoc: macOS runs it on this Mac; nothing to trust or renew.
+await $`codesign --force --deep --sign - ${APP}`
 await $`codesign --verify --deep --strict ${APP}`
+console.log(`built ${APP}`)
 
-console.log(`making ${dmg}`)
-const stage = await mkdtemp(join(tmpdir(), 'dr-dmg-'))
-try {
-  await $`ditto ${APP} ${join(stage, 'Drive Read.app')}`
-  await symlink('/Applications', join(stage, 'Applications'))
-  await mkdir(RELEASE_DIR, { recursive: true })
-  await $`hdiutil create -volname ${'Drive Read'} -srcfolder ${stage} -ov -format UDZO ${dmg}`.quiet()
-} finally {
-  await rm(stage, { recursive: true, force: true })
+if (install) {
+  const running = await $`pgrep -f ${`${INSTALLED}/Contents/MacOS/`}`.nothrow().quiet()
+  if (running.exitCode === 0) {
+    console.error('Drive Read is running from /Applications: quit it, then run this again.')
+    process.exit(1)
+  }
+  await rm(INSTALLED, { recursive: true, force: true })
+  await $`ditto ${APP} ${INSTALLED}`
+  console.log(`installed ${INSTALLED}`)
 }
-
-if (release) {
-  const doc = { v: 1, version, url: downloadUrl }
-  await writeFile('public/desktop-version.json', `${JSON.stringify(doc, null, 2)}\n`)
-  console.log(`public/desktop-version.json → ${version}; publish ${dmg} at ${downloadUrl}`)
-}
-console.log('done')

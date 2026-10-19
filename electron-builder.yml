@@ -1,4 +1,5 @@
-# Desktop packaging (docs/DESKTOP.md). macOS, Apple Silicon only. Built locally; no CI.
+# Desktop packaging (docs/DESKTOP.md). macOS, Apple Silicon only, for this Mac: built
+# locally by scripts/package-desktop.ts, never distributed.
 appId: net.mlnkv.driveread
 productName: Drive Read
 directories:
@@ -14,13 +15,13 @@ asar: true
 # Nothing native ships (main is bundled), so no rebuild of node_modules.
 npmRebuild: false
 mac:
-  # The .app only: scripts/package-desktop.ts signs it and makes the .dmg.
+  # The .app only; scripts/package-desktop.ts signs it ad hoc.
   target:
     - target: dir
       arch: [arm64]
   category: public.app-category.books
   icon: icon.png
-  # Signed afterwards by scripts/package-desktop.ts with the self-signed certificate.
+  # Signed ad hoc afterwards by scripts/package-desktop.ts.
   identity: null
   extendInfo:
     # System file types, so Finder matches every EPUB and PDF however it is named.

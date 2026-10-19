@@ -11,8 +11,9 @@ unchanged. Related: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 | --- | --- |
 | Shell | Electron (Chromium, so foliate-js, pdf.js, OPFS, IndexedDB and `navigator.locks` behave as on the web) |
 | Platforms | macOS, `arm64` only |
-| Signing | No Apple Developer ID. A free self-signed certificate gives every build the same identity, so the keychain does not re-prompt after an update |
-| Updates | No electron-updater (Squirrel.Mac needs a notarised app). The app reads `desktop-version.json` from drive-read.mlnkv.net and shows a download link |
+| Distribution | None: built and installed on the owner's Mac only |
+| Signing | Ad hoc (`codesign -s -`); no certificate, no notarisation |
+| Updates | Rebuild and reinstall (`bun run desktop:package -- --install`); no update check |
 | Local files | Read in place by path; no copy into OPFS |
 | Local progress | Synced: by Drive identity when the file's MD5 matches a Drive book, otherwise as `progress-local-<sha256>.json` |
 | File types | Owner of `.epub` (`org.idpf.epub-container`), alternate for `.pdf` (`com.adobe.pdf`) |
@@ -73,12 +74,10 @@ The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches
   covers books from other devices. In the desktop app `sync` treats local books as synced for
   progress only (`progress-local-<sha256[0..32]>.json`); `library.json` stays Drive-only. A Drive
   book whose file is gone falls back to OPFS, then to downloading.
-- **Packaging and updates (phase 5, v0.18.0):** `bun run desktop:package` runs
-  `scripts/package-desktop.ts`: web build (with `.env`), main bundle, `.app` (electron-builder,
-  target `dir`), `codesign` with the "Drive Read Local" certificate (`--adhoc` without one), and
-  a drag-to-Applications `.dmg` made with `hdiutil`. On start, main reads
-  `https://drive-read.mlnkv.net/desktop-version.json` (`desktop/updates.ts`); a newer version
-  shows "Drive Read X is available. [Download]" in the Library, opened in the browser.
+- **Packaging (phase 5, v0.19.0):** `bun run desktop:package` runs `scripts/package-desktop.ts`:
+  web build (with `.env`), main bundle, `.app` (electron-builder, target `dir`), ad-hoc
+  `codesign`; `--install` copies it to /Applications. No installer, no update check: the app is
+  never distributed.
 - **Run:** `bun run desktop`. **Test:** `bun run test:desktop` (Playwright `_electron`,
   `desktop/e2e/`); unit tests in `desktop/*.test.ts` run with the rest.
 
@@ -96,25 +95,21 @@ The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches
 Needs from the owner: a "Desktop app" OAuth client in Google Cloud Console (phase 3), and a
 self-signed code-signing certificate in Keychain Access (phase 5).
 
-## Signing certificate (once per Mac)
+## Build and install (this Mac)
 
-A self-signed certificate keeps the app's identity the same across builds, so the keychain
-does not ask again for the Google sign-in after each update.
+Needs Bun, the repo's dependencies (`bun install`) and a `.env` with `VITE_GOOGLE_CLIENT_ID`
+(and `VITE_LOGGER_INGEST_KEY` for logs), as for the web app.
 
-1. Keychain Access → menu Keychain Access → Certificate Assistant → Create a Certificate…
-2. Name: `Drive Read Local`. Identity Type: Self-Signed Root. Certificate Type: Code Signing.
-   Create.
-3. Optional: open the certificate (login keychain, My Certificates) → Trust → Code Signing:
-   Always Trust.
+```sh
+bun run desktop:package -- --install   # build, sign ad hoc, copy to /Applications
+```
 
-## Releasing a desktop version
+The first launch registers Drive Read for EPUB and PDF. To make it the EPUB default: select an
+EPUB in Finder → File › Get Info → Open with: Drive Read → Change All. To update, quit the app
+and run the same command again. `bun run desktop` runs it from the repo without packaging.
 
-1. Bump the version in `package.json`, update `CHANGELOG.md`, commit.
-2. `bun run desktop:package -- --release` → `desktop/release/Drive-Read-<version>-arm64.dmg` and
-   `public/desktop-version.json`.
-3. Publish the `.dmg` where `desktop-version.json` points (default: a GitHub release
-   `desktop-v<version>`; `DR_DOWNLOAD_URL` overrides it). Commit the version file.
-4. Deploy the web app: the next start of an older desktop app offers the download.
+An ad-hoc signature changes with every build, so once desktop sign-in (phase 3) stores its token
+in the keychain, macOS asks once after each rebuild whether Drive Read may use it.
 
 ## Dependencies
 

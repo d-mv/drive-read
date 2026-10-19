@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0 — 2026-10-19
+
+- Desktop: built for this Mac only. `bun run desktop:package -- --install` builds the app, signs it ad hoc and copies it to /Applications. The self-signed certificate path, the `.dmg` and the update notice are removed: the app is never distributed.
+
 ## 0.18.0 — 2026-10-19
 
 - Desktop (phase 5): `bun run desktop:package` builds a signed Apple Silicon `.dmg` (self-signed "Drive Read Local" certificate, or `--adhoc`). The desktop app checks `desktop-version.json` on the web host at start and offers a newer version for download in the Library. Desktop build output is kept out of the web Docker image.

@@ -35,7 +35,7 @@ async function launch(): Promise<Page> {
   await app?.close()
   app = await electron.launch({
     args: [MAIN],
-    env: { ...process.env, DR_USER_DATA: userData, DR_VERSION_URL: 'http://127.0.0.1:9/' },
+    env: { ...process.env, DR_USER_DATA: userData },
   })
   return app.firstWindow()
 }

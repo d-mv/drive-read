@@ -21,7 +21,6 @@ const bridge: DesktopBridge = {
     })
     ipcRenderer.send(IPC.ready)
   },
-  checkUpdate: () => ipcRenderer.invoke(IPC.update),
   onMenuOpen(cb) {
     ipcRenderer.on(IPC.menuOpen, () => cb())
   },

@@ -35,8 +35,6 @@ test.afterEach(async () => {
 const env = () => ({
   ...process.env,
   DR_USER_DATA: join(root, 'profile'),
-  // Never ask the real server for a newer version during tests.
-  DR_VERSION_URL: 'http://127.0.0.1:9/',
 })
 
 async function launch(...files: string[]): Promise<Page> {

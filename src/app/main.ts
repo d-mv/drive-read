@@ -32,7 +32,6 @@ import { startInstallWatch } from './install'
 import { reportStarted, startObservability, vueErrorEvent } from './observability'
 import { registerServiceWorker } from './update'
 import { startDesktopOpens } from './desktopOpen'
-import { checkDesktopUpdate } from './desktopUpdate'
 
 declare global {
   interface Window {
@@ -81,7 +80,6 @@ async function start() {
     startDesktopOpens(desktop, (id) =>
       router.push(id ? { name: 'reader', params: { id } } : { path: '/' }),
     )
-    void checkDesktopUpdate(desktop)
   }
 
   startSyncTriggers()

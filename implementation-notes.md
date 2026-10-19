@@ -2,6 +2,12 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: Desktop app, local build only (v0.19.0)
+
+- **Owner decision: no certificate, never distributed.** Removed the "Drive Read Local" certificate path, the `.dmg`, `--release`/`desktop-version.json` and the update notice (`desktop/updates.ts`, `app/desktopUpdate.ts`, IPC `app:update`). The v0.18.0 notes below describe what was removed.
+- **`bun run desktop:package -- --install`** copies the ad-hoc-signed `.app` to /Applications and refuses while that copy is running.
+- **Keychain prompt after each rebuild (phase 3):** an ad-hoc signature changes with every build, so macOS asks again before the new build can read the stored Google token. Accepted for a personal build.
+
 ## 2026-10-19: Desktop app, phase 5 (v0.18.0)
 
 - **The `.dmg` is made with `hdiutil`, not electron-builder's dmg target.** electron-builder only signs with Apple identities; the self-signed certificate is applied with `codesign` after packing, which has to happen before the image is made.
