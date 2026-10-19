@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.1 — 2026-10-19
+
+- Desktop: Finder opens checked on the packaged app (running and cold start); Drive Read appears under Open With for EPUB and PDF.
+
 ## 0.16.0 — 2026-10-19
 
 - Desktop (phase 2): books open from Finder, the Dock, Open Recent, a second launch, drag-and-drop onto the window, and File › Open… (⌘O); the first one opens in the reader, and a file that can't be read says so in the Library. The packaged app declares EPUB as its own type and PDF as "Open With" (`electron-builder.yml`, `bun run desktop:package`), and the Library explains once how to make it the default for EPUB. macOS app icon added to `bun run icons`.
