@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Position } from '@/services/engine/types'
 import { logger } from '@/services/logger'
+import { type MemoryLocalFiles, memoryLocalFiles } from '@/services/storage/localFiles'
 import { isSome } from '@/shared/result'
 
 import { useLibrary } from './library'
@@ -405,5 +406,73 @@ describe('verifyDownloads', () => {
       ['d1', false],
       ['d2', true],
     ])
+  })
+})
+
+describe('desktop: files read in place', () => {
+  const onDisk = (files: MemoryLocalFiles, file: File, path: string) => {
+    files.pathOf.set(file, path)
+    return file
+  }
+
+  it('records the path and copies nothing into app storage', async () => {
+    const files = memoryLocalFiles()
+    const { blobs } = await setupServices({ files })
+    const library = useLibrary()
+    const file = onDisk(files, epubFile('abc'), '/Users/me/Books/harbour_year.epub')
+
+    const result = await library.importFiles([file])
+
+    expect(result.added).toEqual([
+      expect.objectContaining({ id: 'local-abc', path: '/Users/me/Books/harbour_year.epub' }),
+    ])
+    expect(blobs.paths()).toEqual(['covers/local-abc'])
+  })
+
+  it('copies a file that is not on disk, as the web app does', async () => {
+    const files = memoryLocalFiles()
+    const { blobs } = await setupServices({ files })
+    const result = await useLibrary().importFiles([epubFile('abc')])
+    expect(result.added[0]?.path).toBeUndefined()
+    expect(blobs.paths()).toEqual(['books/local-abc', 'covers/local-abc'])
+  })
+
+  it('follows the file when the same bytes are opened from a new place', async () => {
+    const files = memoryLocalFiles()
+    const { services } = await setupServices({ files })
+    const library = useLibrary()
+    await library.importFiles([onDisk(files, epubFile('abc'), '/old/a.epub')])
+    await library.importFiles([onDisk(files, epubFile('abc'), '/new/a.epub')])
+
+    expect(library.books.map((b) => b.path)).toEqual(['/new/a.epub'])
+    const stored = await services.db.getBook('local-abc')
+    expect(isSome(stored) && stored.value.path).toBe('/new/a.epub')
+  })
+
+  describe('relink', () => {
+    it('points the book at the chosen file when the bytes match', async () => {
+      const files = memoryLocalFiles()
+      await setupServices({ files })
+      const library = useLibrary()
+      await library.importFiles([onDisk(files, epubFile('abc'), '/old/a.epub')])
+
+      const r = await library.relink('local-abc', onDisk(files, epubFile('abc'), '/moved/a.epub'))
+
+      expect(r).toBe('relinked')
+      expect(library.books[0]?.path).toBe('/moved/a.epub')
+    })
+
+    it('refuses a different file and leaves the book alone', async () => {
+      const files = memoryLocalFiles()
+      await setupServices({ files })
+      const library = useLibrary()
+      await library.importFiles([onDisk(files, epubFile('abc'), '/old/a.epub')])
+
+      const r = await library.relink('local-abc', onDisk(files, epubFile('xyz'), '/other.epub'))
+
+      expect(r).toBe('different-file')
+      expect(library.books.map((b) => b.path)).toEqual(['/old/a.epub'])
+      expect(library.books).toHaveLength(1)
+    })
   })
 })

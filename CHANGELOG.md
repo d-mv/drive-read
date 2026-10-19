@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.0 — 2026-10-19
+
+- Desktop (phase 1): an Electron shell (`desktop/`, `bun run desktop`) runs the web app from `app://drive-read/`. Books opened from disk are read where they sit instead of being copied into app storage; a moved file shows "Locate file…", which accepts only the same book. The main process reads only files the reader chose. The web app is unchanged.
+
 ## 0.14.1 — 2026-10-19
 
 - Desktop: plan for a macOS (Apple Silicon) app in `docs/DESKTOP.md`. Phase 0 spike (`spikes/desktop/`) shows the unchanged web build runs in Electron 44 over `app://`: EPUB, PDF and restart persistence pass with no CSP violations. Electron is a dev dependency; the web app is unchanged.

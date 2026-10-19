@@ -4,6 +4,7 @@ import type { DriveApi } from './drive/client'
 import type { BookEngine } from './engine/types'
 import type { BlobStore } from './storage/blobs'
 import type { Db } from './storage/db'
+import type { LocalFiles } from './storage/localFiles'
 
 /**
  * What the stores need from the outside world. main.ts provides the real ones; tests provide fakes.
@@ -19,6 +20,8 @@ export interface Services {
   gis: Gis
   drive: DriveApi
   appdata: AppData
+  /** Desktop only: book files read in place on disk. Null in the web app. */
+  files: LocalFiles | null
 }
 
 let current: Services | undefined

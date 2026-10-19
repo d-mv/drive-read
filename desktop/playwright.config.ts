@@ -1,9 +1,10 @@
 import { defineConfig } from '@playwright/test'
 
-/** The desktop spike only: launches Electron directly, no web server. */
+/** Desktop app E2E: launches Electron on the built app (`bun run test:desktop` builds first). */
 export default defineConfig({
-  testDir: '.',
-  testMatch: 'spike.spec.ts',
+  testDir: 'e2e',
+  fullyParallel: false,
+  retries: 0,
   reporter: 'list',
   timeout: 60_000,
   use: { trace: 'retain-on-failure' },

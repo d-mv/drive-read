@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logger } from '@/services/logger'
+import { memoryLocalFiles } from '@/services/storage/localFiles'
 import type { BookEngine } from '@/services/engine/types'
 
 import { useAuth } from './auth'
@@ -135,6 +136,50 @@ describe('open', () => {
     const reader = useReader()
     await reader.open('local-abc', document.createElement('div'))
     expect(reader.status).toEqual({ kind: 'error', error: 'missing-file' })
+  })
+})
+
+describe('open, desktop: a file read in place', () => {
+  async function withFileOnDisk() {
+    const files = memoryLocalFiles()
+    const ctx = await setupServices({ files })
+    const file = epubFile('abc')
+    files.pathOf.set(file, '/Users/me/Books/harbour_year.epub')
+    await useLibrary().importFiles([file])
+    return { ...ctx, files }
+  }
+
+  it('reads the book from its path', async () => {
+    const { engine } = await withFileOnDisk()
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+
+    const opened = engine.open.mock.calls.at(-1)?.[0]
+    expect(opened?.name).toBe('harbour_year.epub')
+    expect(opened?.type).toBe('application/epub+zip')
+    expect(await opened?.text()).toBe('abc')
+    expect(reader.status).toEqual({ kind: 'ready' })
+  })
+
+  it('says the file moved when it is no longer at its path', async () => {
+    const { files } = await withFileOnDisk()
+    files.disk.delete('/Users/me/Books/harbour_year.epub')
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'error', error: 'file-moved' })
+  })
+
+  it('opens again once the file is located', async () => {
+    const { files } = await withFileOnDisk()
+    files.disk.delete('/Users/me/Books/harbour_year.epub')
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+
+    const moved = epubFile('abc', 'harbour_year.epub')
+    files.pathOf.set(moved, '/Users/me/Archive/harbour_year.epub')
+    expect(await useLibrary().relink('local-abc', moved)).toBe('relinked')
+    await reader.open('local-abc', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'ready' })
   })
 })
 

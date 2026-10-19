@@ -17,7 +17,7 @@ import type {
 } from '@/services/engine/types'
 import { track } from '@/services/events'
 import { bookPath } from '@/services/storage/blobs'
-import { isErr, isNone, type Option, toNullable } from '@/shared/result'
+import { isErr, isNone, type Option, Some, toNullable } from '@/shared/result'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
@@ -25,6 +25,8 @@ import { useLibrary } from './library'
 export type ReaderError =
   | 'not-found'
   | 'missing-file'
+  /** Desktop: the book's file is no longer at its path (moved, renamed or deleted). */
+  | 'file-moved'
   | 'unreadable'
   /** Drive book, not on this device, and no valid token. */
   | 'reconnect'
@@ -38,6 +40,8 @@ export type ReaderStatus =
   | { kind: 'downloading'; fraction: number }
   | { kind: 'ready' }
   | { kind: 'error'; error: ReaderError }
+
+const MIME = { epub: 'application/epub+zip', pdf: 'application/pdf' } as const
 
 const DOWNLOAD_ERROR: Record<DriveError['kind'], ReaderError> = {
   'auth-expired': 'reconnect',
@@ -107,7 +111,7 @@ export const useReader = defineStore('reader', () => {
     const openStarted = performance.now()
     downloadedNow = false
     const library = useLibrary()
-    const { blobs, createEngine } = useServices()
+    const { blobs, createEngine, files } = useServices()
     bookId.value = id
     status.value = { kind: 'loading' }
 
@@ -116,8 +120,17 @@ export const useReader = defineStore('reader', () => {
     if (!record) return failWith('not-found', undefined)
     const fail = (error: ReaderError) => failWith(error, record)
 
-    let file = await blobs.get(bookPath(id))
-    if (mine !== session) return
+    let file: Option<File>
+    if (record.path) {
+      // Desktop: read in place. Without the desktop bridge the path can't be read at all.
+      const read = files ? await files.read(record.path, MIME[record.format]) : null
+      if (mine !== session) return
+      if (!read || isErr(read)) return fail('file-moved')
+      file = Some(read.value)
+    } else {
+      file = await blobs.get(bookPath(id))
+      if (mine !== session) return
+    }
     if (isNone(file) && record.source === 'drive') {
       // Never downloaded, or evicted by the browser: fetch it from Drive (book pipeline step 3).
       if (record.downloaded) await library.setDownloaded(id, false)

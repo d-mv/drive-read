@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
+import { chooseFiles } from '@/app/useImportFiles'
 import { browserWakeLock, createWakeLock } from '@/app/wakeLock'
 import AppIcon from '@/components/AppIcon.vue'
 import ContentsPanel from '@/components/ContentsPanel.vue'
@@ -67,6 +68,8 @@ const ERRORS: Record<ReaderError, string> = {
   'not-found': 'This book is not in your library.',
   'missing-file':
     'The file for this book is no longer on this device. The browser may have cleared it to free space.',
+  'file-moved':
+    "The file for this book isn't where it was. It may have been moved, renamed or deleted.",
   unreadable: "This file can't be opened. It may be protected or damaged.",
   reconnect: 'This book is still in your Drive. Reconnect Drive to download it to this device.',
   offline: "This book isn't on this device yet. It opens once you're back online.",
@@ -76,9 +79,10 @@ const ERRORS: Record<ReaderError, string> = {
 }
 
 /** The one action that fixes each error, besides going back. */
-type FixAction = 'reconnect' | 'retry' | 'remove' | 'free-space'
+type FixAction = 'reconnect' | 'retry' | 'remove' | 'free-space' | 'locate'
 const ACTION: Partial<Record<ReaderError, FixAction>> = {
   'missing-file': 'remove',
+  'file-moved': 'locate',
   'missing-in-drive': 'remove',
   reconnect: 'reconnect',
   offline: 'retry',
@@ -90,6 +94,26 @@ const ACTION_LABEL: Record<FixAction, string> = {
   retry: 'Try again',
   remove: 'Remove book',
   'free-space': 'Free space',
+  locate: 'Locate file…',
+}
+
+/** Why the last "Locate file…" choice was not used; cleared on the next try. */
+const locateError = ref<string | null>(null)
+const LOCATE_ERROR = {
+  'different-file': "That's a different file. Choose the file this book was opened from.",
+  'not-on-disk': "That file can't be read in place. Choose it from a folder on this Mac.",
+} as const
+
+async function locate() {
+  locateError.value = null
+  const [file] = await chooseFiles({
+    multiple: false,
+    accept: reader.book?.format === 'pdf' ? '.pdf' : '.epub',
+  })
+  if (!file) return
+  const r = await library.relink(id, file)
+  if (r === 'relinked') await open()
+  else locateError.value = LOCATE_ERROR[r]
 }
 
 function token(name: string) {
@@ -174,6 +198,7 @@ async function fix(action: FixAction) {
     void router.push({ name: 'library', query: { show: 'downloaded' } })
     return
   }
+  if (action === 'locate') return locate()
   if (action === 'remove') {
     await library.remove(id)
     return back()
@@ -396,6 +421,12 @@ onBeforeUnmount(() => {
             class="text-[13px] text-signal"
           >
             {{ authErrorCopy(auth.error) }}
+          </p>
+          <p
+            v-if="reader.status.error === 'file-moved' && locateError"
+            class="text-[13px] text-signal"
+          >
+            {{ locateError }}
           </p>
         </div>
       </main>

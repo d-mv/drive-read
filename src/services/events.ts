@@ -23,6 +23,7 @@ export interface Events {
   'auth.expired': { where: string }
   'library.imported': { source: Source; added: number; failed: number; reason: string | null }
   'library.removed': { source: Source }
+  'library.relinked': Record<string, never>
   'library.download_removed': { format: Format; bytes: number }
   'drive.checked': {
     ms: number

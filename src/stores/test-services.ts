@@ -7,6 +7,7 @@ import type { DriveApi, DriveError } from '@/services/drive/client'
 import type { BookEngine, BookMeta, OpenError, Relocation } from '@/services/engine/types'
 import { memoryBlobStore, type MemoryBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
+import type { MemoryLocalFiles } from '@/services/storage/localFiles'
 import { Err, Ok, type Result } from '@/shared/result'
 
 export type MockEngine = { [K in keyof BookEngine]: Mock<NonNullable<BookEngine[K]>> }
@@ -135,6 +136,8 @@ export async function setupServices(
     meta?: Result<BookMeta, OpenError>
     appdata?: MemoryAppData
     device?: { id: string; name: string }
+    /** Run as the desktop app, with this fake disk. */
+    files?: MemoryLocalFiles
   } = {},
 ): Promise<TestContext> {
   const fake = fakeEngine(opts.meta ?? Ok(META))
@@ -154,6 +157,7 @@ export async function setupServices(
     gis,
     drive,
     appdata: opts.appdata ?? memoryAppData(),
+    files: opts.files ?? null,
   }
   provideServices(services)
   const advance = (ms: number) => {

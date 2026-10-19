@@ -2,6 +2,17 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: Desktop app, phase 1 (v0.15.0)
+
+Deviations from `docs/DESKTOP.md` as planned:
+
+- **No `'file'` source.** A book read in place is `source: 'local'` with a `path`. Sync, events and views already branch on `'local' | 'drive'`; a third source would touch all of them for no gain, and phase 4 can put `path` on a Drive record.
+- **No desktop Vite build mode.** One build; the renderer checks `window.driveReadDesktop` at run time.
+- **The picker is still the hidden `<input type=file>`**, not an Electron dialog. The preload derives the path from the chosen File, so the page never names a path to grant, and the existing E2E file-chooser flow works unchanged.
+- **Moved files are detected on open**, not in the library list: the reader shows `file-moved` with "Locate file…". A library-row badge would need a stat per book at start.
+- **The spike is deleted**; `desktop/main.ts` replaced it.
+- `files.ts` compares the requested path with its normalised form, so `/kept/a.epub/../../x.epub` is denied even though grants are stored normalised.
+
 ## 2026-10-19: Desktop app, phase 0 spike (v0.14.1)
 
 - **Plan:** `docs/DESKTOP.md`. Electron, macOS `arm64` only, no Apple Developer ID (self-signed certificate, version-file update notice instead of electron-updater), local files read in place, local-file progress synced, owner of `.epub` and alternate for `.pdf`.

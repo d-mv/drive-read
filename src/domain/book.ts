@@ -17,6 +17,8 @@ export interface BookRecord {
   openedAt: string | null
   /** From Drive metadata; re-matches a book uploaded again under a new id. */
   md5?: string | null
+  /** Desktop: the file on disk, read in place. Nothing is copied into app storage. */
+  path?: string
   /** Title and author guessed from the file name until the book is first opened. */
   provisional?: boolean
   /** Drive no longer lists the file (deleted, trashed or access lost); the local copy still opens. */

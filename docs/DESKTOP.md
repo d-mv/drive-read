@@ -42,10 +42,25 @@ src/
 
 ## Book records
 
-`BookRecord.source` gains `'file'`: `{ path, size, mtimeMs }`. Opening reads the bytes from main
-as a `File`, so engines and the reader do not change. A missing file shows "File not found" with
-"Locate…", which re-links by content hash. The key stays `local-<sha256[0..32]>`, or the Drive
-file ID when the MD5 matches a Drive book.
+A book read in place keeps `source: 'local'` and gains `path` (absolute). Opening reads the bytes
+from main as a `File`, so engines and the reader do not change. A file no longer at its path
+fails with `file-moved`: "Locate file…" re-links it, accepting only the same bytes (content hash).
+The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches a Drive book
+(phase 4, which reuses `path` on a Drive record).
+
+## As built (phase 1, v0.15.0)
+
+- **One web build.** The app detects `window.driveReadDesktop` at run time: no desktop Vite mode.
+  On desktop it skips the service worker; Electron never fires the install prompt.
+- **`Services.files`** (`services/storage/localFiles.ts`): `keep(file)` and `read(path, type)`;
+  null on the web. The existing hidden file input still picks files; the preload gets each
+  File's path from Electron (`webUtils.getPathForFile`).
+- **Main** (`desktop/files.ts`) keeps the chosen paths in `kept-files.json` in the app profile
+  and reads only those, compared as given (no `..` tricks), EPUB and PDF only, and answers IPC
+  only from `app://drive-read/`. Navigation away from the origin is blocked; web links open in
+  the browser; the only permission granted is the screen wake lock.
+- **Run:** `bun run desktop`. **Test:** `bun run test:desktop` (Playwright `_electron`,
+  `desktop/e2e/`); unit tests in `desktop/*.test.ts` run with the rest.
 
 ## Phases
 
@@ -68,4 +83,5 @@ self-signed code-signing certificate in Keychain Access (phase 5).
 | electron 44.9.0 | Active, released 2026-10-17 | MIT |
 | electron-builder 26.15.3 | Active, last push 2026-10-18 | MIT |
 
-The main process and preload are bundled with `bun build`; no extra bundler.
+The main process (ESM) and the sandboxed preload (CommonJS) are bundled with `bun build`
+(`desktop/build.ts`); no extra bundler.

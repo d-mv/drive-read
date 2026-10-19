@@ -47,7 +47,8 @@ export async function registerServiceWorker() {
     updatedTo.value = change.to
     track('pwa.updated', { from: change.from, to: change.to })
   }
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
+  // The desktop app is updated as an app, not through a service worker (docs/DESKTOP.md).
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator) || window.driveReadDesktop) return
 
   const { registerSW } = await import('virtual:pwa-register')
   registerSW({

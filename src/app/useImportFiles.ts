@@ -18,21 +18,28 @@ export function importMessage(result: ImportResult): string | null {
   return `${first.name}: ${FAILURE_COPY[first.reason]}${suffix}`
 }
 
+const BOOK_TYPES = '.epub,.pdf,application/epub+zip,application/pdf'
+
+/** The system file dialog through a hidden file input; empty when the reader cancels. */
+export function chooseFiles(opts: { multiple: boolean; accept?: string }): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = opts.accept ?? BOOK_TYPES
+    input.multiple = opts.multiple
+    input.addEventListener('change', () => resolve([...(input.files ?? [])]))
+    input.addEventListener('cancel', () => resolve([]))
+    input.click()
+  })
+}
+
 /** "Open a file from this device": a hidden file input plus the import call. */
 export function useImportFiles() {
   const busy = ref(false)
   const message = ref<string | null>(null)
 
-  function pick(): Promise<ImportResult | null> {
-    return new Promise((resolve) => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = '.epub,.pdf,application/epub+zip,application/pdf'
-      input.multiple = true
-      input.addEventListener('change', async () => resolve(await run([...(input.files ?? [])])))
-      input.addEventListener('cancel', () => resolve(null))
-      input.click()
-    })
+  async function pick(): Promise<ImportResult | null> {
+    return run(await chooseFiles({ multiple: true }))
   }
 
   async function run(files: File[]): Promise<ImportResult | null> {

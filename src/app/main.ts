@@ -18,6 +18,7 @@ import { createPdfEngine } from '@/services/engine/pdf'
 import { opfsBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
 import { localBookId } from '@/services/storage/hash'
+import { desktopFiles } from '@/services/storage/localFiles'
 import { useAuth } from '@/stores/auth'
 import { useLibrary } from '@/stores/library'
 import { useSettings } from '@/stores/settings'
@@ -50,6 +51,7 @@ async function start() {
     gis: createGis(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''),
     drive: createDriveApi(),
     appdata: createAppData(),
+    files: window.driveReadDesktop ? desktopFiles(window.driveReadDesktop) : null,
   })
 
   startObservability(currentDeviceValue)

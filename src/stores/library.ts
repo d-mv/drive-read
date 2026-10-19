@@ -16,7 +16,7 @@ import { track } from '@/services/events'
 import type { DriveChange } from '@/services/sync/driveCheck'
 import { bookPath, coverPath } from '@/services/storage/blobs'
 import { requestPersistence } from '@/services/storage/persist'
-import { isErr, isNone } from '@/shared/result'
+import { isErr, isNone, toNullable } from '@/shared/result'
 
 import { useSync } from './sync'
 
@@ -72,21 +72,29 @@ export const useLibrary = defineStore('library', () => {
   }
 
   async function importOne(file: File): Promise<BookRecord | ImportFailure> {
-    const { db, blobs, createEngine, bookId, now } = useServices()
+    const { db, blobs, createEngine, bookId, now, files } = useServices()
     const format = formatOf(file)
     if (!format) return 'unsupported'
 
     const id = await bookId(file)
+    // Desktop: a file on disk is read where it sits; anything else is copied, as on the web.
+    const path = files ? toNullable(await files.keep(file)) : null
     const existing = books.value.find((b) => b.id === id)
-    if (existing) return existing
+    if (existing) {
+      // The same bytes from a new place: the book follows the file.
+      if (path && existing.source === 'local' && existing.path !== path) await update(id, { path })
+      return existing
+    }
 
     const engine = createEngine(format)
     const meta = await engine.open(file)
     engine.destroy()
     if (isErr(meta)) return 'unreadable'
 
-    const stored = await blobs.put(bookPath(id), file)
-    if (isErr(stored)) return stored.error.kind === 'quota' ? 'quota' : 'storage'
+    if (!path) {
+      const stored = await blobs.put(bookPath(id), file)
+      if (isErr(stored)) return stored.error.kind === 'quota' ? 'quota' : 'storage'
+    }
 
     const hasCover = meta.value.cover
       ? !isErr(await blobs.put(coverPath(id), meta.value.cover))
@@ -105,6 +113,7 @@ export const useLibrary = defineStore('library', () => {
       downloaded: true,
       addedAt: now().toISOString(),
       openedAt: null,
+      ...(path ? { path } : {}),
     }
     const saved = await db.putBook(record)
     if (isErr(saved)) {
@@ -131,6 +140,23 @@ export const useLibrary = defineStore('library', () => {
     // Ask once books are stored, so the browser keeps them under storage pressure.
     if (result.added.length > 0) void requestPersistence()
     return result
+  }
+
+  /**
+   * Desktop "Locate…": points a book whose file moved at the file the reader chose, but only
+   * when it holds the same bytes.
+   */
+  async function relink(
+    id: string,
+    file: File,
+  ): Promise<'relinked' | 'different-file' | 'not-on-disk'> {
+    const { bookId, files } = useServices()
+    if ((await bookId(file)) !== id) return 'different-file'
+    const path = files ? toNullable(await files.keep(file)) : null
+    if (!path) return 'not-on-disk'
+    await update(id, { path })
+    track('library.relinked', {})
+    return 'relinked'
   }
 
   async function markOpened(id: string) {
@@ -347,6 +373,7 @@ export const useLibrary = defineStore('library', () => {
     continueBook,
     load,
     importFiles,
+    relink,
     addFromDrive,
     setDownloaded,
     removeDownload,

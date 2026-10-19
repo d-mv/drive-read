@@ -166,7 +166,7 @@ devices. The Drive file ID is a book's key everywhere.
 | IndexedDB `meta` (v2) | `library.json` entries as last merged, last sync time | fixed key | No |
 | localStorage | Theme mirror, device ID and kind, hashed user ID, last version run | fixed keys | Device and user ID only, as log fields |
 | sessionStorage | Access token and expiry | fixed key | No |
-| OPFS `/books/<id>` | The book file as downloaded | path | No (Drive already has it) |
+| OPFS `/books/<id>` | The book file as downloaded (desktop: local books are not copied; the record holds their `path`) | path | No (Drive already has it) |
 | OPFS `/covers/<id>` | Cover image from the first open | path | No |
 | Drive appDataFolder | `library.json` and `progress-<fileId>.json` | file name | n/a |
 
@@ -277,6 +277,10 @@ flowchart LR
 
 Local books (opened from the device) go straight to OPFS, keyed by a content hash. They stay on
 that device: they are not in `library.json` and their progress does not sync.
+
+In the desktop app ([`DESKTOP.md`](DESKTOP.md)) a local book on disk is read where it sits: the
+record keeps its `path`, nothing is copied to OPFS, and the Electron main process reads only
+files the reader chose. A moved file shows "Locate file…", which accepts only the same bytes.
 
 ## Progress sync
 

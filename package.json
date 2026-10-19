@@ -1,8 +1,9 @@
 {
   "name": "drive-read",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "private": true,
   "type": "module",
+  "main": "desktop/out/main.mjs",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
@@ -11,10 +12,13 @@
     "test": "vitest run",
     "test:unit": "vitest",
     "test:e2e": "playwright test",
-    "lint": "oxlint src e2e",
-    "format": "oxfmt src e2e scripts *.ts",
-    "format:check": "oxfmt --check src e2e scripts *.ts",
-    "icons": "bun scripts/icons.ts"
+    "lint": "oxlint src e2e desktop",
+    "format": "oxfmt src e2e desktop scripts *.ts",
+    "format:check": "oxfmt --check src e2e desktop scripts *.ts",
+    "icons": "bun scripts/icons.ts",
+    "desktop:build": "bun run build && bun desktop/build.ts",
+    "desktop": "bun run desktop:build && electron .",
+    "test:desktop": "bun run desktop:build && playwright test -c desktop"
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",
