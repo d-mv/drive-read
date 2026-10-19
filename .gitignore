@@ -11,3 +11,4 @@ test-results/
 playwright-report/
 node_modules/.tmp/
 desktop/out/
+desktop/release/

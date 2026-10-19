@@ -1,0 +1,34 @@
+# Desktop packaging (docs/DESKTOP.md). macOS, Apple Silicon only. Built locally; no CI.
+appId: net.mlnkv.driveread
+productName: Drive Read
+directories:
+  output: desktop/release
+  buildResources: desktop/resources
+# The web build and the bundled main/preload are all the app needs at run time.
+files:
+  - package.json
+  - dist/**
+  - desktop/out/**
+  - '!**/node_modules/**'
+asar: true
+# Nothing native ships (main is bundled), so no rebuild of node_modules.
+npmRebuild: false
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.books
+  icon: icon.png
+  # Phase 5 signs with a self-signed certificate; until then the app is ad-hoc signed.
+  identity: null
+  extendInfo:
+    # System file types, so Finder matches every EPUB and PDF however it is named.
+    CFBundleDocumentTypes:
+      - CFBundleTypeName: EPUB book
+        CFBundleTypeRole: Viewer
+        LSHandlerRank: Owner
+        LSItemContentTypes: [org.idpf.epub-container]
+      - CFBundleTypeName: PDF document
+        CFBundleTypeRole: Viewer
+        LSHandlerRank: Alternate
+        LSItemContentTypes: [com.adobe.pdf]

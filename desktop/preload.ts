@@ -14,6 +14,15 @@ const bridge: DesktopBridge = {
     return path ? ipcRenderer.invoke(IPC.keep, path) : null
   },
   read: (path) => ipcRenderer.invoke(IPC.read, path),
+  onOpenPaths(cb) {
+    ipcRenderer.on(IPC.opened, (_e, paths: unknown) => {
+      if (Array.isArray(paths) && paths.every((p) => typeof p === 'string')) cb(paths)
+    })
+    ipcRenderer.send(IPC.ready)
+  },
+  onMenuOpen(cb) {
+    ipcRenderer.on(IPC.menuOpen, () => cb())
+  },
 }
 
 contextBridge.exposeInMainWorld(BRIDGE_KEY, bridge)

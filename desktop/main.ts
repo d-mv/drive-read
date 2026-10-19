@@ -12,6 +12,8 @@ import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, protocol, shell }
 import { CSP } from '../csp.ts'
 import { IPC } from '../src/shared/desktop'
 import { type Grants, keepFile, loadGrants, readKept } from './files'
+import { setAppMenu } from './menu'
+import { bookArgs, createOpenQueue } from './opens'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 /** The web build. Packaged next to the bundled main; DR_DIST overrides it for tests. */
@@ -20,6 +22,46 @@ const ORIGIN = 'app://drive-read'
 
 // A separate profile (tests) keeps runs apart.
 if (process.env.DR_USER_DATA) app.setPath('userData', process.env.DR_USER_DATA)
+
+// One app: a second launch (e.g. `open` with a file) hands its books to the first and quits.
+const firstInstance = app.requestSingleInstanceLock()
+if (!firstInstance) app.quit()
+
+let win: BrowserWindow | null = null
+let grants: Grants | null = null
+
+/** Kept paths go to the page once it listens (IPC.ready). */
+const opens = createOpenQueue((paths) => win?.webContents.send(IPC.opened, paths))
+
+/** Open Recent. Only the packaged app: a dev run's Recents would belong to Electron.app. */
+const addRecent = (path: string) => {
+  if (app.isPackaged) app.addRecentDocument(path)
+}
+
+/** Paths from the system are the user's choice: keep them, add them to Recents, open them. */
+const systemPaths: string[] = []
+async function openFromSystem(paths: readonly string[]) {
+  if (!grants) {
+    systemPaths.push(...paths)
+    return
+  }
+  const kept: string[] = []
+  for (const p of paths) {
+    const path = await keepFile(grants, p)
+    if (path) kept.push(path)
+  }
+  for (const path of kept) addRecent(path)
+  opens.push(kept)
+  if (win?.isMinimized()) win.restore()
+  win?.focus()
+}
+
+// Finder, Dock and Open Recent; can fire before `ready`, so it is registered at once.
+app.on('open-file', (e, path) => {
+  e.preventDefault()
+  void openFromSystem([path])
+})
+app.on('second-instance', (_e, argv, cwd) => void openFromSystem(bookArgs(argv.slice(1), cwd)))
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -76,15 +118,23 @@ async function serve(request: Request): Promise<Response> {
 /** IPC is answered only for the app's own page. */
 const fromApp = (e: IpcMainInvokeEvent) => e.senderFrame?.url.startsWith(`${ORIGIN}/`) === true
 
-function handleFiles(grants: Grants) {
-  ipcMain.handle(IPC.keep, (e, path: unknown) => (fromApp(e) ? keepFile(grants, path) : null))
+function handleFiles(g: Grants) {
+  ipcMain.handle(IPC.keep, async (e, path: unknown) => {
+    if (!fromApp(e)) return null
+    const kept = await keepFile(g, path)
+    if (kept) addRecent(kept)
+    return kept
+  })
   ipcMain.handle(IPC.read, (e, path: unknown) =>
-    fromApp(e) ? readKept(grants, path) : { ok: false, reason: 'denied' },
+    fromApp(e) ? readKept(g, path) : { ok: false, reason: 'denied' },
   )
+  ipcMain.on(IPC.ready, (e) => {
+    if (e.senderFrame?.url.startsWith(`${ORIGIN}/`)) opens.ready()
+  })
 }
 
 async function createWindow() {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1200,
     height: 820,
     minWidth: 480,
@@ -105,10 +155,14 @@ async function createWindow() {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
+  win.on('closed', () => {
+    win = null
+  })
   await win.loadURL(`${ORIGIN}/`)
 }
 
 void app.whenReady().then(async () => {
+  if (!firstInstance) return
   // Keeping the screen on while reading is the only permission the page gets.
   app.on('web-contents-created', (_, wc) =>
     wc.session.setPermissionRequestHandler((_wc, permission, done) =>
@@ -116,8 +170,15 @@ void app.whenReady().then(async () => {
     ),
   )
   protocol.handle('app', serve)
-  handleFiles(await loadGrants(join(app.getPath('userData'), 'kept-files.json')))
+  grants = await loadGrants(join(app.getPath('userData'), 'kept-files.json'))
+  handleFiles(grants)
+  setAppMenu(() => win?.webContents.send(IPC.menuOpen))
   await createWindow()
+  // Books from before `ready`, and from the command line (`electron . book.epub`).
+  await openFromSystem([
+    ...systemPaths.splice(0),
+    ...bookArgs(process.argv.slice(app.isPackaged ? 1 : 2), process.cwd()),
+  ])
 })
 
 app.on('activate', () => {

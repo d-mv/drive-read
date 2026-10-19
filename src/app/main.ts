@@ -31,6 +31,7 @@ import { startSyncTriggers } from './syncTriggers'
 import { startInstallWatch } from './install'
 import { reportStarted, startObservability, vueErrorEvent } from './observability'
 import { registerServiceWorker } from './update'
+import { startDesktopOpens } from './desktopOpen'
 
 declare global {
   interface Window {
@@ -73,6 +74,12 @@ async function start() {
     const { added } = await useLibrary().importFiles(opened)
     if (added[0]) await router.push({ name: 'reader', params: { id: added[0].id } })
   })
+
+  const desktop = window.driveReadDesktop
+  if (desktop)
+    startDesktopOpens(desktop, (id) =>
+      router.push(id ? { name: 'reader', params: { id } } : { path: '/' }),
+    )
 
   startSyncTriggers()
   startInstallWatch()

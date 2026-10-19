@@ -59,6 +59,14 @@ The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches
   and reads only those, compared as given (no `..` tricks), EPUB and PDF only, and answers IPC
   only from `app://drive-read/`. Navigation away from the origin is blocked; web links open in
   the browser; the only permission granted is the screen wake lock.
+- **Opening from outside (phase 2, v0.16.0):** main queues paths from `open-file` (Finder, Dock,
+  Open Recent; may fire before `ready`), launch arguments and `second-instance`, keeps them and
+  sends them once the page registers `onOpenPaths`. The page reads them in place
+  (`app/desktopOpen.ts`), adds them and opens the first. Drop and File › Open… go the same way.
+  Open Recent entries are written only by the packaged app.
+- **Packaging:** `electron-builder.yml`; `bun run desktop:package` → `desktop/release/`. The
+  document types are written as `CFBundleDocumentTypes` with system UTIs (EPUB `Owner`, PDF
+  `Alternate`) rather than electron-builder's extension-based `fileAssociations`.
 - **Run:** `bun run desktop`. **Test:** `bun run test:desktop` (Playwright `_electron`,
   `desktop/e2e/`); unit tests in `desktop/*.test.ts` run with the rest.
 

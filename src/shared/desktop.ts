@@ -17,6 +17,13 @@ export interface DesktopBridge {
   keep(file: File): Promise<string | null>
   /** The bytes of a kept file, or why not. */
   read(path: string): Promise<DesktopReadResult>
+  /**
+   * Books macOS hands over (Finder, Dock, Open Recent) or a second launch passes on, already
+   * kept. Registering says the page is ready: books that arrived earlier come now.
+   */
+  onOpenPaths(cb: (paths: string[]) => void): void
+  /** File › Open… (⌘O) in the app menu. */
+  onMenuOpen(cb: () => void): void
 }
 
 export const BRIDGE_KEY = 'driveReadDesktop'
@@ -25,6 +32,12 @@ export const BRIDGE_KEY = 'driveReadDesktop'
 export const IPC = {
   keep: 'files:keep',
   read: 'files:read',
+  /** main → page: kept paths to open. */
+  opened: 'files:opened',
+  /** page → main: listening for `opened`. */
+  ready: 'files:ready',
+  /** main → page: File › Open… */
+  menuOpen: 'menu:open',
 } as const
 
 declare global {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.0 — 2026-10-19
+
+- Desktop (phase 2): books open from Finder, the Dock, Open Recent, a second launch, drag-and-drop onto the window, and File › Open… (⌘O); the first one opens in the reader, and a file that can't be read says so in the Library. The packaged app declares EPUB as its own type and PDF as "Open With" (`electron-builder.yml`, `bun run desktop:package`), and the Library explains once how to make it the default for EPUB. macOS app icon added to `bun run icons`.
+
 ## 0.15.0 — 2026-10-19
 
 - Desktop (phase 1): an Electron shell (`desktop/`, `bun run desktop`) runs the web app from `app://drive-read/`. Books opened from disk are read where they sit instead of being copied into app storage; a moved file shows "Locate file…", which accepts only the same book. The main process reads only files the reader chose. The web app is unchanged.

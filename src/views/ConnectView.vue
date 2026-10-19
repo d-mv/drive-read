@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 
 import { authErrorCopy } from '@/app/copy'
+import { openNotice } from '@/app/desktopOpen'
 import { useImportFiles } from '@/app/useImportFiles'
 import { useAuth } from '@/stores/auth'
 
@@ -68,7 +69,9 @@ async function openFile() {
       >
         {{ busy ? 'Opening…' : 'Open a file from this device' }}
       </button>
-      <p v-if="message" role="alert" class="text-center text-[13px] text-signal">{{ message }}</p>
+      <p v-if="message || openNotice" role="alert" class="text-center text-[13px] text-signal">
+        {{ message ?? openNotice }}
+      </p>
       <p class="mt-2 text-center text-[13px] text-ink2">
         EPUB and PDF. Files with DRM will not open.
       </p>

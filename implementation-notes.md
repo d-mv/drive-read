@@ -2,6 +2,14 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: Desktop app, phase 2 (v0.16.0)
+
+- **Packaging config moved forward from phase 5.** File associations live only in a packaged app's `Info.plist`, so `electron-builder.yml` and the macOS icon came with phase 2. Signing, DMG polish and the update notice stay in phase 5.
+- **`CFBundleDocumentTypes` via `extendInfo`**, not `fileAssociations`: system UTIs (`org.idpf.epub-container`, `com.adobe.pdf`) match files by type, not only by extension, and `LSHandlerRank` is set explicitly.
+- **Becoming the EPUB default is a hint, not an action.** macOS has no Electron API for a file-type default and asks the user anyway; the Library shows the Get Info › Change All steps once. An EPUB arriving from Finder ends the hint.
+- **Recents only from the packaged app**, so dev and test runs never write to Electron.app's recent documents.
+- **A Finder double-click on the packaged app is not yet verified by hand:** launching it registers it with Launch Services on this Mac. The E2E suite covers `open-file`, launch arguments, a second instance, drop and the menu.
+
 ## 2026-10-19: Desktop app, phase 1 (v0.15.0)
 
 Deviations from `docs/DESKTOP.md` as planned:

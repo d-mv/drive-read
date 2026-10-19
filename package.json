@@ -1,6 +1,6 @@
 {
   "name": "drive-read",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "main": "desktop/out/main.mjs",
@@ -18,7 +18,8 @@
     "icons": "bun scripts/icons.ts",
     "desktop:build": "bun run build && bun desktop/build.ts",
     "desktop": "bun run desktop:build && electron .",
-    "test:desktop": "bun run desktop:build && playwright test -c desktop"
+    "test:desktop": "VITE_LOGGER_INGEST_KEY= VITE_GOOGLE_CLIENT_ID=e2e-client bun run desktop:build && playwright test -c desktop",
+    "desktop:package": "bun run desktop:build && electron-builder --mac --arm64"
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",
@@ -36,6 +37,7 @@
     "@vitejs/plugin-vue": "^6.0.9",
     "@vue/test-utils": "^2.5.1",
     "electron": "44.9.0",
+    "electron-builder": "26.15.3",
     "fake-indexeddb": "^6.2.5",
     "fast-check": "^4.10.2",
     "happy-dom": "^20.14.5",

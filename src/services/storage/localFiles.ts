@@ -15,14 +15,19 @@ export interface LocalFiles {
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 
 export function desktopFiles(bridge: DesktopBridge): LocalFiles {
+  // A File made by `read` has no path Electron knows; it is already kept, at this path.
+  const readFrom = new WeakMap<File, string>()
   return {
     async keep(file) {
-      const path = await bridge.keep(file)
+      const path = readFrom.get(file) ?? (await bridge.keep(file))
       return path ? Some(path) : None
     },
     async read(path, type) {
       const r = await bridge.read(path)
-      return r.ok ? Ok(new File([r.bytes], baseName(path), { type })) : Err(r.reason)
+      if (!r.ok) return Err(r.reason)
+      const file = new File([r.bytes], baseName(path), { type })
+      readFrom.set(file, path)
+      return Ok(file)
     },
   }
 }
@@ -32,6 +37,8 @@ export type MemoryLocalFiles = LocalFiles & {
   disk: Map<string, File>
   /** Where `keep` finds each file the user chooses. */
   pathOf: Map<File, string>
+  /** Paths main may read: kept, or handed over by the system. */
+  kept: Set<string>
 }
 
 /** A fake disk for tests: a File is "on disk" when `pathOf` names it. */
@@ -42,6 +49,7 @@ export function memoryLocalFiles(): MemoryLocalFiles {
   return {
     disk,
     pathOf,
+    kept,
     async keep(file) {
       const path = pathOf.get(file)
       if (!path) return None
@@ -52,7 +60,10 @@ export function memoryLocalFiles(): MemoryLocalFiles {
     async read(path, type) {
       if (!kept.has(path)) return Err('denied')
       const f = disk.get(path)
-      return f ? Ok(new File([f], baseName(path), { type })) : Err('missing')
+      if (!f) return Err('missing')
+      const file = new File([f], baseName(path), { type })
+      pathOf.set(file, path)
+      return Ok(file)
     },
   }
 }
