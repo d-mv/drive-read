@@ -10,3 +10,6 @@ playwright-report
 !.env.example
 *.log
 spikes
+# Desktop build output (hundreds of MB); the web image never needs it.
+desktop/out
+desktop/release

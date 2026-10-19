@@ -2,6 +2,15 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: Desktop app, phase 5 (v0.18.0)
+
+- **The `.dmg` is made with `hdiutil`, not electron-builder's dmg target.** electron-builder only signs with Apple identities; the self-signed certificate is applied with `codesign` after packing, which has to happen before the image is made.
+- **`codesign --deep`** signs the helper apps and frameworks in one pass. Without notarisation there is no hardened runtime, so Electron needs no entitlements.
+- **The version check runs in main** (`net.fetch`), so the page's CSP gains no new origin. Only an `https` download link is accepted; it opens in the browser through the window-open handler.
+- **Desktop tests point `DR_VERSION_URL` at an unreachable port**, so they never ask the live server.
+- **`.dockerignore` now excludes `desktop/out` and `desktop/release`**: the web image's `COPY . .` would otherwise carry a 300 MB app.
+- **Open:** the release host for the `.dmg` (the version file defaults to a public GitHub release) and the owner's certificate.
+
 ## 2026-10-19: Desktop app, phase 4 (v0.17.0)
 
 - **Matched against library books only**, not `library.json` entries directly: sync adds every entry to the library, so a Drive book from another device is matched once this Mac has synced.

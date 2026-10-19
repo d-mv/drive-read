@@ -7,13 +7,22 @@ import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, protocol, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  type IpcMainInvokeEvent,
+  net,
+  protocol,
+  shell,
+} from 'electron'
 
 import { CSP } from '../csp.ts'
 import { IPC } from '../src/shared/desktop'
 import { type Grants, keepFile, loadGrants, md5Kept, readKept } from './files'
 import { setAppMenu } from './menu'
 import { bookArgs, createOpenQueue } from './opens'
+import { type DesktopUpdate, newerVersion, VERSION_URL } from './updates'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 /** The web build. Packaged next to the bundled main; DR_DIST overrides it for tests. */
@@ -118,6 +127,19 @@ async function serve(request: Request): Promise<Response> {
 /** IPC is answered only for the app's own page. */
 const fromApp = (e: IpcMainInvokeEvent) => e.senderFrame?.url.startsWith(`${ORIGIN}/`) === true
 
+/** The published version file, when it names a newer version. Any failure: no offer. */
+async function checkUpdate(): Promise<DesktopUpdate | null> {
+  try {
+    const res = await net.fetch(process.env.DR_VERSION_URL ?? VERSION_URL, {
+      signal: AbortSignal.timeout(10_000),
+      cache: 'no-store',
+    })
+    return res.ok ? newerVersion(await res.json(), app.getVersion()) : null
+  } catch {
+    return null
+  }
+}
+
 function handleFiles(g: Grants) {
   ipcMain.handle(IPC.keep, async (e, path: unknown) => {
     if (!fromApp(e)) return null
@@ -129,6 +151,7 @@ function handleFiles(g: Grants) {
     fromApp(e) ? readKept(g, path) : { ok: false, reason: 'denied' },
   )
   ipcMain.handle(IPC.md5, (e, path: unknown) => (fromApp(e) ? md5Kept(g, path) : null))
+  ipcMain.handle(IPC.update, (e) => (fromApp(e) ? checkUpdate() : null))
   ipcMain.on(IPC.ready, (e) => {
     if (e.senderFrame?.url.startsWith(`${ORIGIN}/`)) opens.ready()
   })

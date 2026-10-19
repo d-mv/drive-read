@@ -14,12 +14,13 @@ asar: true
 # Nothing native ships (main is bundled), so no rebuild of node_modules.
 npmRebuild: false
 mac:
+  # The .app only: scripts/package-desktop.ts signs it and makes the .dmg.
   target:
-    - target: dmg
+    - target: dir
       arch: [arm64]
   category: public.app-category.books
   icon: icon.png
-  # Phase 5 signs with a self-signed certificate; until then the app is ad-hoc signed.
+  # Signed afterwards by scripts/package-desktop.ts with the self-signed certificate.
   identity: null
   extendInfo:
     # System file types, so Finder matches every EPUB and PDF however it is named.

@@ -1,6 +1,6 @@
 {
   "name": "drive-read",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "type": "module",
   "main": "desktop/out/main.mjs",
@@ -19,7 +19,7 @@
     "desktop:build": "bun run build && bun desktop/build.ts",
     "desktop": "bun run desktop:build && electron .",
     "test:desktop": "VITE_LOGGER_INGEST_KEY= VITE_GOOGLE_CLIENT_ID=e2e-client bun run desktop:build && playwright test -c desktop",
-    "desktop:package": "bun run desktop:build && electron-builder --mac --arm64"
+    "desktop:package": "bun scripts/package-desktop.ts"
   },
   "dependencies": {
     "@fontsource-variable/literata": "^5.3.0",

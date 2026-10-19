@@ -32,7 +32,12 @@ test.afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const env = () => ({ ...process.env, DR_USER_DATA: join(root, 'profile') })
+const env = () => ({
+  ...process.env,
+  DR_USER_DATA: join(root, 'profile'),
+  // Never ask the real server for a newer version during tests.
+  DR_VERSION_URL: 'http://127.0.0.1:9/',
+})
 
 async function launch(...files: string[]): Promise<Page> {
   app = await electron.launch({ args: [MAIN, ...files], env: env() })

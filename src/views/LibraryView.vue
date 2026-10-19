@@ -8,6 +8,7 @@ import { appVersion } from '@/app/update'
 import { canInstall, install, iosHint } from '@/app/install'
 import { useOnline } from '@/app/useOnline'
 import { epubHintDone, finishEpubHint, openNotice } from '@/app/desktopOpen'
+import { desktopUpdate } from '@/app/desktopUpdate'
 import { useImportFiles } from '@/app/useImportFiles'
 import AppIcon from '@/components/AppIcon.vue'
 import AppNotice from '@/components/AppNotice.vue'
@@ -65,6 +66,11 @@ const syncMessage = computed(() =>
   syncDismissed.value ? null : syncNotice(sync.status, sync.pending, needsReconnect.value),
 )
 const { busy, message, pick } = useImportFiles()
+
+/** Opens in the browser: the desktop window hands https links to the system. */
+function openDownload() {
+  if (desktopUpdate.value) window.open(desktopUpdate.value.url, '_blank', 'noopener')
+}
 
 /** Desktop, once: macOS keeps EPUBs with Books until the reader picks this app in Finder. */
 const EPUB_HINT =
@@ -237,6 +243,13 @@ onBeforeUnmount(() => {
     <AppNotice v-if="message" :message="message" @dismiss="message = null" />
     <AppNotice v-if="openNotice" :message="openNotice" @dismiss="openNotice = null" />
     <AppNotice v-if="epubHint" :message="EPUB_HINT" @dismiss="finishEpubHint" />
+    <AppNotice
+      v-if="desktopUpdate"
+      :message="`Drive Read ${desktopUpdate.version} is available.`"
+      action-label="Download"
+      @action="openDownload"
+      @dismiss="desktopUpdate = null"
+    />
 
     <ContinueRow
       v-if="continueEntry && !query"

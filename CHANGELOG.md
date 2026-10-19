@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.0 — 2026-10-19
+
+- Desktop (phase 5): `bun run desktop:package` builds a signed Apple Silicon `.dmg` (self-signed "Drive Read Local" certificate, or `--adhoc`). The desktop app checks `desktop-version.json` on the web host at start and offers a newer version for download in the Library. Desktop build output is kept out of the web Docker image.
+
 ## 0.17.0 — 2026-10-19
 
 - Desktop (phase 4): reading positions of books opened from local files sync through Drive. A file identical to a Drive book in the library (same MD5) becomes that book, read from disk, and shares its position with every device; if the file goes missing, the book downloads from Drive instead. Other local books sync as `progress-local-<hash>.json`, so the same file on another Mac picks up the place; they never join `library.json`. The web app's local books still stay on the device.

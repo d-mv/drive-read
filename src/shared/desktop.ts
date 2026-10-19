@@ -26,6 +26,8 @@ export interface DesktopBridge {
   onOpenPaths(cb: (paths: string[]) => void): void
   /** File › Open… (⌘O) in the app menu. */
   onMenuOpen(cb: () => void): void
+  /** A newer desktop version published for download, or null (also when offline). */
+  checkUpdate(): Promise<{ version: string; url: string } | null>
 }
 
 export const BRIDGE_KEY = 'driveReadDesktop'
@@ -41,6 +43,8 @@ export const IPC = {
   ready: 'files:ready',
   /** main → page: File › Open… */
   menuOpen: 'menu:open',
+  /** page → main: is a newer version published? */
+  update: 'app:update',
 } as const
 
 declare global {

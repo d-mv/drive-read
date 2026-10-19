@@ -73,6 +73,12 @@ The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches
   covers books from other devices. In the desktop app `sync` treats local books as synced for
   progress only (`progress-local-<sha256[0..32]>.json`); `library.json` stays Drive-only. A Drive
   book whose file is gone falls back to OPFS, then to downloading.
+- **Packaging and updates (phase 5, v0.18.0):** `bun run desktop:package` runs
+  `scripts/package-desktop.ts`: web build (with `.env`), main bundle, `.app` (electron-builder,
+  target `dir`), `codesign` with the "Drive Read Local" certificate (`--adhoc` without one), and
+  a drag-to-Applications `.dmg` made with `hdiutil`. On start, main reads
+  `https://drive-read.mlnkv.net/desktop-version.json` (`desktop/updates.ts`); a newer version
+  shows "Drive Read X is available. [Download]" in the Library, opened in the browser.
 - **Run:** `bun run desktop`. **Test:** `bun run test:desktop` (Playwright `_electron`,
   `desktop/e2e/`); unit tests in `desktop/*.test.ts` run with the rest.
 
@@ -89,6 +95,26 @@ The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches
 
 Needs from the owner: a "Desktop app" OAuth client in Google Cloud Console (phase 3), and a
 self-signed code-signing certificate in Keychain Access (phase 5).
+
+## Signing certificate (once per Mac)
+
+A self-signed certificate keeps the app's identity the same across builds, so the keychain
+does not ask again for the Google sign-in after each update.
+
+1. Keychain Access → menu Keychain Access → Certificate Assistant → Create a Certificate…
+2. Name: `Drive Read Local`. Identity Type: Self-Signed Root. Certificate Type: Code Signing.
+   Create.
+3. Optional: open the certificate (login keychain, My Certificates) → Trust → Code Signing:
+   Always Trust.
+
+## Releasing a desktop version
+
+1. Bump the version in `package.json`, update `CHANGELOG.md`, commit.
+2. `bun run desktop:package -- --release` → `desktop/release/Drive-Read-<version>-arm64.dmg` and
+   `public/desktop-version.json`.
+3. Publish the `.dmg` where `desktop-version.json` points (default: a GitHub release
+   `desktop-v<version>`; `DR_DOWNLOAD_URL` overrides it). Commit the version file.
+4. Deploy the web app: the next start of an older desktop app offers the download.
 
 ## Dependencies
 
