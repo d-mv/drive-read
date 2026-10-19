@@ -16,7 +16,6 @@ import { chooseFiles, importMessage } from './useImportFiles'
 /** Why the last open from outside did not work; shown in the Library. */
 export const openNotice = ref<string | null>(null)
 
-const MIME = { epub: 'application/epub+zip', pdf: 'application/pdf' } as const
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 
 /** Adds the files; the id of the first book to open, or null (`openNotice` says why). */
@@ -55,7 +54,8 @@ export async function openPaths(paths: readonly string[]): Promise<string | null
   const read: File[] = []
   const unreadable: string[] = []
   for (const path of paths) {
-    const r = await files.read(path, /\.pdf$/i.test(path) ? MIME.pdf : MIME.epub)
+    // The type is only a hint: the import checks the contents.
+    const r = await files.read(path, /\.pdf$/i.test(path) ? 'application/pdf' : '')
     if (isErr(r)) unreadable.push(baseName(path))
     else read.push(r.value)
   }

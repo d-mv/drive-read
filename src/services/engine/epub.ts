@@ -4,6 +4,7 @@ import { Err, Ok, type Result } from '@/shared/result'
 
 import { formatAuthors, formatLanguageMap, tocEntries } from './epub-meta'
 import { chapterAt, normalizeStarts, sectionStarts } from './progress'
+import { foliateFile } from './sniff'
 import type {
   BookEngine,
   BookMeta,
@@ -26,7 +27,7 @@ const SIZE_PER_MINUTE = 1600
 
 const loadFoliate = () => import('@foliate/view.js')
 
-export function createEpubEngine(): BookEngine {
+export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
   let book: FoliateBook | null = null
   let view: View | null = null
   let starts: number[] = []
@@ -64,22 +65,25 @@ export function createEpubEngine(): BookEngine {
   }
 
   async function open(file: File): Promise<Result<BookMeta, OpenError>> {
+    // Anything foliate-js throws, while loading or while reading metadata, means unreadable.
     try {
       const { makeBook } = await loadFoliate()
-      book = await makeBook(file)
+      const opened = await makeBook(await foliateFile(file, format))
+      book = opened
+      const lang = [opened.metadata?.language].flat()[0]
+      starts = sectionStarts(opened.sections)
+      const toc = tocEntries(opened.toc ?? [], starts, (href) => opened.resolveHref(href)?.index)
+      // EPUB answers with a promise; FB2 without a cover answers null at once.
+      const cover = (await Promise.resolve(opened.getCover?.()).catch(() => null)) ?? undefined
+      return Ok({
+        title: formatLanguageMap(opened.metadata?.title, lang),
+        author: formatAuthors(opened.metadata?.author as Parameters<typeof formatAuthors>[0], lang),
+        cover,
+        toc,
+      })
     } catch (e) {
       return Err({ kind: 'unreadable', message: e instanceof Error ? e.message : String(e) })
     }
-    const lang = [book.metadata?.language].flat()[0]
-    starts = sectionStarts(book.sections)
-    const toc = tocEntries(book.toc ?? [], starts, (href) => book!.resolveHref(href)?.index)
-    const cover = (await book.getCover?.().catch(() => null)) ?? undefined
-    return Ok({
-      title: formatLanguageMap(book.metadata?.title, lang),
-      author: formatAuthors(book.metadata?.author as Parameters<typeof formatAuthors>[0], lang),
-      cover,
-      toc,
-    })
   }
 
   function toRelocation(d: FoliateRelocate): Relocation {

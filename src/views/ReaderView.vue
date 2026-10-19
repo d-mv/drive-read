@@ -108,7 +108,7 @@ async function locate() {
   locateError.value = null
   const [file] = await chooseFiles({
     multiple: false,
-    accept: reader.book?.format === 'pdf' ? '.pdf' : '.epub',
+    accept: { pdf: '.pdf', epub: '.epub', fb2: '.fb2,.fbz,.zip' }[reader.book?.format ?? 'epub'],
   })
   if (!file) return
   const r = await library.relink(id, file)

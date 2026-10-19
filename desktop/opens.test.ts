@@ -43,4 +43,12 @@ describe('bookArgs', () => {
       ),
     ).toEqual(['/home/x.epub', '/b/Paper.PDF'])
   })
+
+  it('keeps FB2 arguments too', () => {
+    expect(bookArgs(['/a.fb2', '/b.fbz', '/c.fb2.zip', '/d.zip'], '/')).toEqual([
+      '/a.fb2',
+      '/b.fbz',
+      '/c.fb2.zip',
+    ])
+  })
 })

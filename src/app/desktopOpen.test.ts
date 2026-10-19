@@ -24,7 +24,7 @@ describe('openBooks', () => {
   it('says why nothing opened', async () => {
     await setupServices()
     expect(await openBooks([new File(['x'], 'notes.txt')])).toBeNull()
-    expect(openNotice.value).toBe('notes.txt: Only EPUB and PDF files open.')
+    expect(openNotice.value).toBe('notes.txt: Only EPUB, FB2 and PDF files open.')
   })
 })
 

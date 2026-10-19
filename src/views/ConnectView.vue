@@ -73,7 +73,7 @@ async function openFile() {
         {{ message ?? openNotice }}
       </p>
       <p class="mt-2 text-center text-[13px] text-ink2">
-        EPUB and PDF. Files with DRM will not open.
+        EPUB, FB2 and PDF. Files with DRM will not open.
       </p>
     </div>
   </main>

@@ -1,4 +1,6 @@
-import { extname, resolve } from 'node:path'
+import { resolve } from 'node:path'
+
+import { isBookName } from './files'
 
 /**
  * Books handed over by macOS (Finder, Dock, Open Recent) or a second launch can arrive before
@@ -25,9 +27,7 @@ export function createOpenQueue(deliver: (paths: string[]) => void) {
   }
 }
 
-/** EPUB and PDF paths among launch arguments, absolute. */
+/** Book paths among launch arguments, absolute. */
 export function bookArgs(argv: readonly string[], cwd: string): string[] {
-  return argv
-    .filter((a) => !a.startsWith('-') && ['.epub', '.pdf'].includes(extname(a).toLowerCase()))
-    .map((a) => resolve(cwd, a))
+  return argv.filter((a) => !a.startsWith('-') && isBookName(a)).map((a) => resolve(cwd, a))
 }

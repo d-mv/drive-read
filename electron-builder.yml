@@ -34,3 +34,21 @@ mac:
         CFBundleTypeRole: Viewer
         LSHandlerRank: Alternate
         LSItemContentTypes: [com.adobe.pdf]
+      - CFBundleTypeName: FB2 book
+        CFBundleTypeRole: Viewer
+        LSHandlerRank: Alternate
+        LSItemContentTypes: [ru.gribuser.fictionbook.fb2, ru.gribuser.fictionbook.fbz]
+    # macOS has no FB2 types of its own. `.fb2.zip` is left out: claiming it would claim `.zip`.
+    UTImportedTypeDeclarations:
+      - UTTypeIdentifier: ru.gribuser.fictionbook.fb2
+        UTTypeDescription: FB2 book
+        UTTypeConformsTo: [public.xml, public.data]
+        UTTypeTagSpecification:
+          public.filename-extension: [fb2]
+          public.mime-type: [application/x-fictionbook+xml]
+      - UTTypeIdentifier: ru.gribuser.fictionbook.fbz
+        UTTypeDescription: Zipped FB2 book
+        UTTypeConformsTo: [public.zip-archive, public.data]
+        UTTypeTagSpecification:
+          public.filename-extension: [fbz]
+          public.mime-type: [application/x-zip-compressed-fb2]

@@ -518,3 +518,17 @@ describe('desktop: a local file that is a Drive book', () => {
     expect(library.books.map((b) => b.id).sort()).toEqual(['drive-1', 'local-abc'])
   })
 })
+
+describe('FB2', () => {
+  it('imports an FB2 by its contents, even when it is named .epub', async () => {
+    const { services } = await setupServices()
+    const createEngine = vi.spyOn(services, 'createEngine')
+    const fb2 = new File(['<?xml version="1.0"?><FictionBook></FictionBook>'], 'Пламя (epub).epub')
+
+    const result = await useLibrary().importFiles([fb2])
+
+    expect(result.failed).toEqual([])
+    expect(result.added[0]?.format).toBe('fb2')
+    expect(createEngine).toHaveBeenCalledWith('fb2')
+  })
+})

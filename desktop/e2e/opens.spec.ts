@@ -137,3 +137,11 @@ test('no hint once an EPUB came from Finder', async () => {
   await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'Change All' })).toBeHidden()
 })
+
+test('a zipped FB2 named .epub opens in place', async () => {
+  const fb2 = join(root, 'Пламя (epub).epub')
+  await copyFile(resolve('e2e/fixtures/test-flame-fb2.epub'), fb2)
+  const page = await launch(fb2)
+  await expect(page).toHaveURL(READER)
+  await expect(page.locator('header').getByText('Тестовое пламя')).toBeVisible()
+})

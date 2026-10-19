@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20.0 — 2026-10-19
+
+- FB2 books open from the device (web and desktop): plain `.fb2`, zipped `.fbz` / `.fb2.zip`, in UTF-8 or windows-1251. The format is read from the file's contents, so a zipped FB2 saved as `.epub` opens too. FB2 renders in foliate-js like EPUB (themes, typefaces, contents, positions, local progress sync). The desktop app lists FB2 under Open With. FB2 in Google Drive is not supported yet.
+- Fix: a book that failed while its title, contents or cover were read could leave the import silently unfinished; it now says the file can't be opened.
+
 ## 0.19.0 — 2026-10-19
 
 - Desktop: built for this Mac only. `bun run desktop:package -- --install` builds the app, signs it ad hoc and copies it to /Applications. The self-signed certificate path, the `.dmg` and the update notice are removed: the app is never distributed.

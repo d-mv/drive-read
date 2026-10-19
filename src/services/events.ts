@@ -1,3 +1,4 @@
+import type { BookFormat } from '@/domain/book'
 import { logger } from './logger'
 
 /**
@@ -6,7 +7,7 @@ import { logger } from './logger'
  * Fields are counts, durations, kinds and reasons: never titles, file names, tokens or emails.
  */
 
-type Format = 'epub' | 'pdf'
+type Format = BookFormat
 type Source = 'local' | 'drive'
 
 export interface Events {

@@ -18,7 +18,8 @@ declare module '@foliate/view.js' {
     }
     rendition?: { layout?: string }
     resolveHref(href: string): { index: number } | undefined
-    getCover?(): Promise<Blob | null>
+    /** A promise for EPUB; FB2 without a cover answers null directly. */
+    getCover?(): Promise<Blob | null> | null
   }
 
   export interface FoliateRelocate {

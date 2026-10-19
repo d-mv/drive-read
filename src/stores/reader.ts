@@ -1,3 +1,4 @@
+import type { BookFormat } from '@/domain/book'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -41,7 +42,11 @@ export type ReaderStatus =
   | { kind: 'ready' }
   | { kind: 'error'; error: ReaderError }
 
-const MIME = { epub: 'application/epub+zip', pdf: 'application/pdf' } as const
+const MIME = {
+  epub: 'application/epub+zip',
+  pdf: 'application/pdf',
+  fb2: 'application/x-fictionbook+xml',
+} as const
 
 const DOWNLOAD_ERROR: Record<DriveError['kind'], ReaderError> = {
   'auth-expired': 'reconnect',
@@ -76,7 +81,7 @@ export const useReader = defineStore('reader', () => {
 
   /** The reading session being measured (reading.session): from open or the last flush. */
   let measure: {
-    format: 'epub' | 'pdf'
+    format: BookFormat
     source: 'local' | 'drive'
     started: number
     from: number | null
@@ -302,7 +307,7 @@ export const useReader = defineStore('reader', () => {
 
   function failWith(
     error: ReaderError,
-    record: { format: 'epub' | 'pdf'; source: 'local' | 'drive' } | undefined,
+    record: { format: BookFormat; source: 'local' | 'drive' } | undefined,
   ) {
     status.value = { kind: 'error', error }
     track('book.open_failed', {

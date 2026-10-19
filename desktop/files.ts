@@ -5,17 +5,18 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { readFile, rename, stat, writeFile } from 'node:fs/promises'
-import { extname, isAbsolute, normalize } from 'node:path'
+import { isAbsolute, normalize } from 'node:path'
 
 import type { DesktopReadResult } from '../src/shared/desktop'
 
-const BOOK_EXT = new Set(['.epub', '.pdf'])
+/** EPUB, PDF and FB2 (plain, `.fbz` or `.fb2.zip`) by name; the page checks the contents. */
+export const isBookName = (name: string) => /\.(epub|pdf|fb2|fbz|fb2\.zip)$/i.test(name)
 
-/** An absolute, normalised EPUB or PDF path, or null. */
+/** An absolute, normalised book path, or null. */
 function bookPath(path: unknown): string | null {
   if (typeof path !== 'string' || !isAbsolute(path)) return null
   const clean = normalize(path)
-  return BOOK_EXT.has(extname(clean).toLowerCase()) ? clean : null
+  return isBookName(clean) ? clean : null
 }
 
 export interface Grants {

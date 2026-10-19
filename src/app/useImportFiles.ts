@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { type ImportFailure, type ImportResult, useLibrary } from '@/stores/library'
 
 const FAILURE_COPY: Record<ImportFailure, string> = {
-  unsupported: 'Only EPUB and PDF files open.',
+  unsupported: 'Only EPUB, FB2 and PDF files open.',
   unreadable: "This file can't be opened. It may be protected or damaged.",
   quota: 'Not enough space on this device.',
   storage: "The file couldn't be saved on this device.",
@@ -18,7 +18,8 @@ export function importMessage(result: ImportResult): string | null {
   return `${first.name}: ${FAILURE_COPY[first.reason]}${suffix}`
 }
 
-const BOOK_TYPES = '.epub,.pdf,application/epub+zip,application/pdf'
+// .zip: zipped FB2 is often `.fb2.zip`; the import checks the contents.
+const BOOK_TYPES = '.epub,.pdf,.fb2,.fbz,.zip,application/epub+zip,application/pdf'
 
 /** The system file dialog through a hidden file input; empty when the reader cancels. */
 export function chooseFiles(opts: { multiple: boolean; accept?: string }): Promise<File[]> {

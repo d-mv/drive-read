@@ -41,6 +41,18 @@ describe('keepFile', () => {
     expect(await keepFile(grants, path)).toBeNull()
   })
 
+  it.each(['b.fb2', 'b.fbz', 'b.fb2.zip', 'B.FB2'])('keeps an FB2 named %s', async (name) => {
+    const path = await book(name)
+    const grants = await loadGrants(grantsFile)
+    expect(await keepFile(grants, path)).toBe(path)
+  })
+
+  it('refuses a plain zip', async () => {
+    const path = await book('photos.zip')
+    const grants = await loadGrants(grantsFile)
+    expect(await keepFile(grants, path)).toBeNull()
+  })
+
   it('refuses a book path that does not exist', async () => {
     const grants = await loadGrants(grantsFile)
     expect(await keepFile(grants, join(dir, 'nope.epub'))).toBeNull()

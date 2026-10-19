@@ -67,7 +67,12 @@ export default defineConfig({
           file_handlers: [
             {
               action: '/',
-              accept: { 'application/epub+zip': ['.epub'], 'application/pdf': ['.pdf'] },
+              accept: {
+                'application/epub+zip': ['.epub'],
+                'application/pdf': ['.pdf'],
+                'application/x-fictionbook+xml': ['.fb2'],
+                'application/x-zip-compressed-fb2': ['.fbz'],
+              },
             },
           ],
         } as object),

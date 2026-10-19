@@ -45,7 +45,8 @@ async function start() {
     db: await openDb(),
     blobs: opfsBlobStore(),
     // Each engine is a lazy chunk: pdf.js loads only when a PDF opens.
-    createEngine: (format) => (format === 'pdf' ? createPdfEngine() : createEpubEngine()),
+    // EPUB and FB2 both open in foliate-js.
+    createEngine: (format) => (format === 'pdf' ? createPdfEngine() : createEpubEngine(format)),
     bookId: localBookId,
     now: () => new Date(),
     device: currentDeviceValue,

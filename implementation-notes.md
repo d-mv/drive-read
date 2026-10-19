@@ -2,6 +2,15 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: FB2 (v0.20.0)
+
+- **Asked for by the owner** after a zipped FB2 saved as `.epub` failed to open. foliate-js already reads FB2; the app now accepts it from the device.
+- **Format by content, then name** (`services/engine/sniff.ts`): `%PDF`, the first zip entry (`mimetype` → EPUB, `*.fb2` → FB2), or a `<FictionBook` tag; otherwise by extension/type, so a damaged book still reaches its engine and reads as damaged, not unsupported.
+- **foliate-js picks its reader by file name**, so `foliateFile` hands it `book.fb2` or `book.fbz`.
+- **Not in Drive yet:** Drive reports FB2 under several MIME types and its name search can't match an extension, so browsing and search stay EPUB/PDF.
+- **Desktop Open With only** for `.fb2`/`.fbz` (imported UTIs `ru.gribuser.fictionbook.fb2|fbz`); `.fb2.zip` can't be claimed without claiming `.zip`.
+- **Bug found on the way:** foliate's FB2 `getCover()` returns `null`, not a promise, and `.catch` on it threw outside the engine's try, so the import never finished and showed nothing. The whole `open` is now inside the try. Fixtures: `bun e2e/fixtures/build-fb2.ts`.
+
 ## 2026-10-19: Desktop app, local build only (v0.19.0)
 
 - **Owner decision: no certificate, never distributed.** Removed the "Drive Read Local" certificate path, the `.dmg`, `--release`/`desktop-version.json` and the update notice (`desktop/updates.ts`, `app/desktopUpdate.ts`, IPC `app:update`). The v0.18.0 notes below describe what was removed.

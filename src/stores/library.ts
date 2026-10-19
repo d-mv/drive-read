@@ -11,6 +11,7 @@ import {
 import { useServices } from '@/services'
 import type { DriveFile } from '@/services/drive/client'
 import { bookFromFileName } from '@/services/drive/names'
+import { detectFormat } from '@/services/engine/sniff'
 import type { BookMeta, Position } from '@/services/engine/types'
 import { track } from '@/services/events'
 import type { DriveChange } from '@/services/sync/driveCheck'
@@ -30,7 +31,7 @@ export interface ImportResult {
 
 export type LibraryEntry = LibraryItem & { book: BookRecord }
 
-/** EPUB or PDF, by type or extension (some browsers give no type); null for anything else. */
+/** A Drive file's format: EPUB or PDF, by type or extension; null for anything else. */
 function formatOf(f: { type: string; name: string }): BookRecord['format'] | null {
   if (f.type === 'application/epub+zip' || /\.epub$/i.test(f.name)) return 'epub'
   if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) return 'pdf'
@@ -73,7 +74,8 @@ export const useLibrary = defineStore('library', () => {
 
   async function importOne(file: File): Promise<BookRecord | ImportFailure> {
     const { db, blobs, createEngine, bookId, now, files } = useServices()
-    const format = formatOf(file)
+    // By content: books are often misnamed (a zipped FB2 saved as .epub).
+    const format = await detectFormat(file)
     if (!format) return 'unsupported'
 
     const id = await bookId(file)

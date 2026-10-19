@@ -1,3 +1,5 @@
+import type { BookFormat } from '@/domain/book'
+
 import type { Gis } from './auth/gis'
 import type { AppData } from './drive/appdata'
 import type { DriveApi } from './drive/client'
@@ -13,7 +15,7 @@ export interface Services {
   db: Db
   blobs: BlobStore
   /** A fresh engine for one book. */
-  createEngine: (format: 'epub' | 'pdf') => BookEngine
+  createEngine: (format: BookFormat) => BookEngine
   bookId: (file: Blob) => Promise<string>
   now: () => Date
   device: { id: string; name: string }

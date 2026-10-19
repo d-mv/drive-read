@@ -1,11 +1,14 @@
 import type { Locator, TocEntry } from '@/services/engine/types'
 
+/** Book file formats: EPUB and FB2 open in foliate-js, PDF in pdf.js. */
+export type BookFormat = 'epub' | 'pdf' | 'fb2'
+
 /** A book in the library. Key: the Drive file ID, or `local-<sha256>` for a file from this device. */
 export interface BookRecord {
   v: 1
   id: string
   source: 'local' | 'drive'
-  format: 'epub' | 'pdf'
+  format: BookFormat
   fileName: string
   title: string
   author: string
