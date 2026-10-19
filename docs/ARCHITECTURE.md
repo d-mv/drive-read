@@ -281,6 +281,8 @@ that device: they are not in `library.json` and their progress does not sync.
 In the desktop app ([`DESKTOP.md`](DESKTOP.md)) a local book on disk is read where it sits: the
 record keeps its `path`, nothing is copied to OPFS, and the Electron main process reads only
 files the reader chose. A moved file shows "Locate file…", which accepts only the same bytes.
+There, local books' positions sync too (`progress-local-<hash>.json`, never in `library.json`),
+and a file with a Drive book's MD5 becomes that Drive book, read from disk.
 
 ## Progress sync
 

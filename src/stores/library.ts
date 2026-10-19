@@ -85,6 +85,17 @@ export const useLibrary = defineStore('library', () => {
       if (path && existing.source === 'local' && existing.path !== path) await update(id, { path })
       return existing
     }
+    // Desktop: the same file as a Drive book becomes that book, read from disk, so its
+    // position syncs with every device (docs/DESKTOP.md, phase 4).
+    if (path && files) {
+      const md5 = toNullable(await files.md5(path))
+      const drive = md5 && books.value.find((b) => b.source === 'drive' && b.md5 === md5)
+      if (drive) {
+        await update(drive.id, { path })
+        track('library.matched_drive', { format })
+        return drive
+      }
+    }
 
     const engine = createEngine(format)
     const meta = await engine.open(file)
@@ -186,7 +197,7 @@ export const useLibrary = defineStore('library', () => {
     progress.value[id] = record
     const saved = await db.putProgress(record)
     if (isErr(saved)) track('storage.write_failed', { what: 'progress', reason: saved.error.kind })
-    if (books.value.find((b) => b.id === id)?.source === 'drive') useSync().nudge()
+    if (useSync().syncs(id)) useSync().nudge()
   }
 
   /** A position from another device, adopted as is (not dirty). */

@@ -2,6 +2,8 @@
  * Which files the app may read, and reading them. Main reads only books the user chose
  * (picker, drag-and-drop, Finder) and that are therefore kept here; never a path the page names.
  */
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { extname, isAbsolute, normalize } from 'node:path'
 
@@ -65,11 +67,30 @@ export async function keepFile(grants: Grants, path: unknown): Promise<string | 
   return clean
 }
 
-/** A kept book's bytes. `denied` for anything not kept; `missing` when it is no longer there. */
-export async function readKept(grants: Grants, path: unknown): Promise<DesktopReadResult> {
+/** Whether a path may be read: kept, and named exactly as kept. */
+function keptPath(grants: Grants, path: unknown): string | null {
   const clean = bookPath(path)
   // Compare the path as given too: a path that only normalises to a kept one is refused.
-  if (!clean || clean !== path || !grants.has(clean)) return { ok: false, reason: 'denied' }
+  return clean && clean === path && grants.has(clean) ? clean : null
+}
+
+/** A kept book's MD5 in hex, as Drive's md5Checksum; null if not kept or unreadable. */
+export async function md5Kept(grants: Grants, path: unknown): Promise<string | null> {
+  const clean = keptPath(grants, path)
+  if (!clean) return null
+  const hash = createHash('md5')
+  try {
+    for await (const chunk of createReadStream(clean)) hash.update(chunk as Buffer)
+    return hash.digest('hex')
+  } catch {
+    return null
+  }
+}
+
+/** A kept book's bytes. `denied` for anything not kept; `missing` when it is no longer there. */
+export async function readKept(grants: Grants, path: unknown): Promise<DesktopReadResult> {
+  const clean = keptPath(grants, path)
+  if (!clean) return { ok: false, reason: 'denied' }
   try {
     const buf = await readFile(clean)
     const bytes = new Uint8Array(new ArrayBuffer(buf.byteLength))

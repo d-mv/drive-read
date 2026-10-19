@@ -11,7 +11,7 @@ import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, protocol, shell }
 
 import { CSP } from '../csp.ts'
 import { IPC } from '../src/shared/desktop'
-import { type Grants, keepFile, loadGrants, readKept } from './files'
+import { type Grants, keepFile, loadGrants, md5Kept, readKept } from './files'
 import { setAppMenu } from './menu'
 import { bookArgs, createOpenQueue } from './opens'
 
@@ -128,6 +128,7 @@ function handleFiles(g: Grants) {
   ipcMain.handle(IPC.read, (e, path: unknown) =>
     fromApp(e) ? readKept(g, path) : { ok: false, reason: 'denied' },
   )
+  ipcMain.handle(IPC.md5, (e, path: unknown) => (fromApp(e) ? md5Kept(g, path) : null))
   ipcMain.on(IPC.ready, (e) => {
     if (e.senderFrame?.url.startsWith(`${ORIGIN}/`)) opens.ready()
   })

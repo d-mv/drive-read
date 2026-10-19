@@ -5,6 +5,7 @@ import { provideServices } from '@/services'
 import { logger } from '@/services/logger'
 import type { DriveFile } from '@/services/drive/client'
 import type { Position } from '@/services/engine/types'
+import { type MemoryLocalFiles, memoryLocalFiles } from '@/services/storage/localFiles'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
@@ -24,10 +25,18 @@ interface Device {
   pinia: Pinia
 }
 
-async function device(appdata: MemoryAppData, name: string): Promise<Device> {
+async function device(
+  appdata: MemoryAppData,
+  name: string,
+  opts: { files?: MemoryLocalFiles } = {},
+): Promise<Device> {
   const pinia = createPinia()
   setActivePinia(pinia)
-  const ctx = await setupServices({ appdata, device: { id: name.toLowerCase(), name } })
+  const ctx = await setupServices({
+    appdata,
+    device: { id: name.toLowerCase(), name },
+    files: opts.files,
+  })
   ctx.gis.requestToken.mockResolvedValue(
     Ok({ accessToken: 'tok', expiresAt: Date.now() + 3_600_000 }),
   )
@@ -84,7 +93,7 @@ describe('push', () => {
     expect(useSync().pending).toBe(0)
   })
 
-  it('never syncs books opened from a local file', async () => {
+  it('the web app never syncs books opened from a local file', async () => {
     const appdata = memoryAppData()
     await device(appdata, 'Laptop')
     await useLibrary().importFiles([
@@ -399,5 +408,55 @@ describe('Drive file changes', () => {
     )
     await useSync().syncNow()
     expect(useLibrary().books[0]!.missingInDrive).toBeUndefined()
+  })
+})
+
+describe('desktop: local files', () => {
+  /** A Mac with `bytes` on disk at `path`, opened into its library. */
+  async function mac(appdata: MemoryAppData, name: string, bytes = 'x', path = '/Books/a.epub') {
+    const files = memoryLocalFiles()
+    const d = await device(appdata, name, { files })
+    const file = new File([bytes], 'a.epub', { type: 'application/epub+zip' })
+    files.pathOf.set(file, path)
+    await useLibrary().importFiles([file])
+    return { ...d, files }
+  }
+
+  it("syncs a local book's position by content hash, with no library.json entry", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const appdata = memoryAppData()
+    await mac(appdata, 'Laptop')
+    await useLibrary().saveProgress('local-x', at(0.5))
+    expect(useSync().pending).toBe(1)
+    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.waitFor(() => expect(progressFiles(appdata)).toEqual(['progress-local-x.json']))
+    const lib = [...appdata.files.values()].find((f) => f.name === 'library.json')
+    expect(lib).toBeUndefined()
+  })
+
+  it('another Mac with the same file picks up the position', async () => {
+    const appdata = memoryAppData()
+    const a = await mac(appdata, 'Laptop')
+    await useLibrary().saveProgress('local-x', at(0.5))
+    await useSync().syncNow()
+
+    const b = await mac(appdata, 'Studio', 'x', '/Users/other/a.epub')
+    await useSync().syncNow()
+    expect(useLibrary().progress['local-x']?.fraction).toBe(0.5)
+    on(a)
+    expect(useLibrary().books).toHaveLength(1)
+    void b
+  })
+
+  it('a different file on the other Mac stays apart', async () => {
+    const appdata = memoryAppData()
+    await mac(appdata, 'Laptop')
+    await useLibrary().saveProgress('local-x', at(0.5))
+    await useSync().syncNow()
+
+    await mac(appdata, 'Studio', 'y')
+    await useSync().syncNow()
+    expect(useLibrary().progress['local-y']).toBeUndefined()
+    expect(useLibrary().books.map((b) => b.id)).toEqual(['local-y'])
   })
 })

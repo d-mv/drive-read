@@ -476,3 +476,45 @@ describe('desktop: files read in place', () => {
     })
   })
 })
+
+describe('desktop: a local file that is a Drive book', () => {
+  const drive = {
+    id: 'drive-1',
+    name: 'Harbour Year.epub',
+    mimeType: 'application/epub+zip',
+    size: 3,
+    md5: 'md5-abc',
+    modifiedTime: '',
+  }
+
+  it('becomes that Drive book, read from disk, when the MD5 matches', async () => {
+    const files = memoryLocalFiles()
+    await setupServices({ files })
+    const library = useLibrary()
+    await library.addFromDrive([drive])
+    const file = epubFile('abc')
+    files.pathOf.set(file, '/Books/harbour_year.epub')
+    files.md5Of.set('/Books/harbour_year.epub', 'md5-abc')
+
+    const result = await library.importFiles([file])
+
+    expect(result.added.map((b) => b.id)).toEqual(['drive-1'])
+    expect(library.books).toEqual([
+      expect.objectContaining({ id: 'drive-1', source: 'drive', path: '/Books/harbour_year.epub' }),
+    ])
+  })
+
+  it('stays a local book when no Drive book has its MD5', async () => {
+    const files = memoryLocalFiles()
+    await setupServices({ files })
+    const library = useLibrary()
+    await library.addFromDrive([drive])
+    const file = epubFile('abc')
+    files.pathOf.set(file, '/Books/other.epub')
+    files.md5Of.set('/Books/other.epub', 'md5-zzz')
+
+    await library.importFiles([file])
+
+    expect(library.books.map((b) => b.id).sort()).toEqual(['drive-1', 'local-abc'])
+  })
+})

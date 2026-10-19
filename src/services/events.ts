@@ -24,6 +24,7 @@ export interface Events {
   'library.imported': { source: Source; added: number; failed: number; reason: string | null }
   'library.removed': { source: Source }
   'library.relinked': Record<string, never>
+  'library.matched_drive': { format: Format }
   'library.download_removed': { format: Format; bytes: number }
   'drive.checked': {
     ms: number

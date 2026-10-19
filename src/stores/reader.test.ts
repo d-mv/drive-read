@@ -480,3 +480,45 @@ describe('search', () => {
     expect(engine.clearSearch).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('open, desktop: a Drive book read from disk', () => {
+  async function driveBookOnDisk() {
+    const files = memoryLocalFiles()
+    const ctx = await setupServices({ files })
+    ctx.gis.requestToken.mockResolvedValue(
+      Ok({ accessToken: 'tok', expiresAt: Date.now() + 3_600_000 }),
+    )
+    await useAuth().connect()
+    await useLibrary().addFromDrive([
+      {
+        id: 'drive-1',
+        name: 'Harbour Year.epub',
+        mimeType: 'application/epub+zip',
+        size: 3,
+        md5: 'md5-abc',
+        modifiedTime: '',
+      },
+    ])
+    const file = epubFile('abc')
+    files.pathOf.set(file, '/Books/harbour_year.epub')
+    files.md5Of.set('/Books/harbour_year.epub', 'md5-abc')
+    await useLibrary().importFiles([file])
+    return { ...ctx, files }
+  }
+
+  it('opens from disk without downloading', async () => {
+    const { drive } = await driveBookOnDisk()
+    const reader = useReader()
+    await reader.open('drive-1', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'ready' })
+    expect(drive.download).not.toHaveBeenCalled()
+  })
+
+  it('downloads from Drive when the file on disk is gone', async () => {
+    const { drive, files } = await driveBookOnDisk()
+    files.disk.delete('/Books/harbour_year.epub')
+    const reader = useReader()
+    await reader.open('drive-1', document.createElement('div'))
+    expect(drive.download).toHaveBeenCalled()
+  })
+})

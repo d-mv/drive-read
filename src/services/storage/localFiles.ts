@@ -10,6 +10,8 @@ export interface LocalFiles {
   keep(file: File): Promise<Option<string>>
   /** The file at a kept path, named and typed for the engine. */
   read(path: string, type: string): Promise<Result<File, DesktopReadError>>
+  /** MD5 of a kept file, to match it with a Drive book. */
+  md5(path: string): Promise<Option<string>>
 }
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
@@ -29,6 +31,10 @@ export function desktopFiles(bridge: DesktopBridge): LocalFiles {
       readFrom.set(file, path)
       return Ok(file)
     },
+    async md5(path) {
+      const hex = await bridge.md5(path)
+      return hex ? Some(hex) : None
+    },
   }
 }
 
@@ -39,6 +45,8 @@ export type MemoryLocalFiles = LocalFiles & {
   pathOf: Map<File, string>
   /** Paths main may read: kept, or handed over by the system. */
   kept: Set<string>
+  /** MD5 per path; a kept path without one has none. */
+  md5Of: Map<string, string>
 }
 
 /** A fake disk for tests: a File is "on disk" when `pathOf` names it. */
@@ -46,10 +54,16 @@ export function memoryLocalFiles(): MemoryLocalFiles {
   const disk = new Map<string, File>()
   const pathOf = new Map<File, string>()
   const kept = new Set<string>()
+  const md5Of = new Map<string, string>()
   return {
     disk,
     pathOf,
     kept,
+    md5Of,
+    async md5(path) {
+      const hex = kept.has(path) ? md5Of.get(path) : undefined
+      return hex ? Some(hex) : None
+    },
     async keep(file) {
       const path = pathOf.get(file)
       if (!path) return None

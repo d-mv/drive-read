@@ -2,6 +2,13 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-19: Desktop app, phase 4 (v0.17.0)
+
+- **Matched against library books only**, not `library.json` entries directly: sync adds every entry to the library, so a Drive book from another device is matched once this Mac has synced.
+- **Matching happens at import.** A local book already in the library is not re-matched when the same file is later added from Drive; the two stay separate entries. Rare, and fixable by removing the local one.
+- **Local progress sync is desktop-only**, keyed by `useServices().files` being present. The web app's local books have the same ids, so turning it on there later is a one-line change.
+- **Not covered end to end yet:** Drive sign-in doesn't work in the desktop app until phase 3, so the desktop E2E can't reach Drive. Unit tests cover matching, the progress push and pull between two Macs, and the download fallback.
+
 ## 2026-10-19: Desktop app, phase 2 (v0.16.0)
 
 - **Packaging config moved forward from phase 5.** File associations live only in a packaged app's `Info.plist`, so `electron-builder.yml` and the macOS icon came with phase 2. Signing, DMG polish and the update notice stay in phase 5.

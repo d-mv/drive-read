@@ -14,6 +14,7 @@ const bridge: DesktopBridge = {
     return path ? ipcRenderer.invoke(IPC.keep, path) : null
   },
   read: (path) => ipcRenderer.invoke(IPC.read, path),
+  md5: (path) => ipcRenderer.invoke(IPC.md5, path),
   onOpenPaths(cb) {
     ipcRenderer.on(IPC.opened, (_e, paths: unknown) => {
       if (Array.isArray(paths) && paths.every((p) => typeof p === 'string')) cb(paths)

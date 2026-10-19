@@ -125,8 +125,10 @@ export const useReader = defineStore('reader', () => {
       // Desktop: read in place. Without the desktop bridge the path can't be read at all.
       const read = files ? await files.read(record.path, MIME[record.format]) : null
       if (mine !== session) return
-      if (!read || isErr(read)) return fail('file-moved')
-      file = Some(read.value)
+      if (read && !isErr(read)) file = Some(read.value)
+      // A Drive book still has its Drive copy; only a local book is lost with its file.
+      else if (record.source !== 'drive') return fail('file-moved')
+      else file = await blobs.get(bookPath(id))
     } else {
       file = await blobs.get(bookPath(id))
       if (mine !== session) return

@@ -17,6 +17,8 @@ export interface DesktopBridge {
   keep(file: File): Promise<string | null>
   /** The bytes of a kept file, or why not. */
   read(path: string): Promise<DesktopReadResult>
+  /** MD5 of a kept file (as Drive reports it), or null. Matches a local file to a Drive book. */
+  md5(path: string): Promise<string | null>
   /**
    * Books macOS hands over (Finder, Dock, Open Recent) or a second launch passes on, already
    * kept. Registering says the page is ready: books that arrived earlier come now.
@@ -32,6 +34,7 @@ export const BRIDGE_KEY = 'driveReadDesktop'
 export const IPC = {
   keep: 'files:keep',
   read: 'files:read',
+  md5: 'files:md5',
   /** main → page: kept paths to open. */
   opened: 'files:opened',
   /** page → main: listening for `opened`. */

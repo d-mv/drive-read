@@ -67,6 +67,12 @@ The key stays `local-<sha256[0..32]>`, or the Drive file ID when the MD5 matches
 - **Packaging:** `electron-builder.yml`; `bun run desktop:package` → `desktop/release/`. The
   document types are written as `CFBundleDocumentTypes` with system UTIs (EPUB `Owner`, PDF
   `Alternate`) rather than electron-builder's extension-based `fileAssociations`.
+- **Local progress sync (phase 4, v0.17.0):** on import, main hashes a kept file with MD5
+  (`files:md5`); a Drive book in the library with that `md5` gains the file's `path` and the
+  import returns it. Sync already adds every `library.json` entry to the library, so that list
+  covers books from other devices. In the desktop app `sync` treats local books as synced for
+  progress only (`progress-local-<sha256[0..32]>.json`); `library.json` stays Drive-only. A Drive
+  book whose file is gone falls back to OPFS, then to downloading.
 - **Run:** `bun run desktop`. **Test:** `bun run test:desktop` (Playwright `_electron`,
   `desktop/e2e/`); unit tests in `desktop/*.test.ts` run with the rest.
 

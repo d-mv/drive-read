@@ -29,7 +29,9 @@ import { useReader } from './reader'
  * Progress and library sync through the Drive app folder (architecture doc, "Progress sync").
  * Writes are local first; Drive gets them 20 s after the last page turn, when the tab is hidden,
  * and on "Sync now". Pulls run on app start, book open, back online and reconnect. Nothing polls.
- * Only Drive books sync; books opened from a local file stay on this device.
+ * Drive books sync their position and library entry. In the desktop app, books opened from a
+ * local file sync their position too (`progress-local-<hash>.json`), but never join library.json:
+ * other devices could not open them. The web app keeps local books on the device.
  */
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'reconnect' | 'error'
@@ -77,10 +79,18 @@ export const useSync = defineStore('sync', () => {
 
   const library = useLibrary()
   const driveBooks = () => library.books.filter((b) => b.source === 'drive')
+  /** Books whose position syncs: Drive books, and on desktop local books too. */
+  const synced = (b: BookRecord) => b.source === 'drive' || useServices().files !== null
+  const syncedBooks = () => library.books.filter(synced)
+  /** Whether this book's position syncs. */
+  function syncs(id: string): boolean {
+    const b = library.books.find((x) => x.id === id)
+    return !!b && synced(b)
+  }
 
   const pending = computed(
     () =>
-      driveBooks().filter((b) => library.progress[b.id]?.dirty).length +
+      syncedBooks().filter((b) => library.progress[b.id]?.dirty).length +
       (meta.value.library.dirty ? 1 : 0),
   )
   const lastSyncAt = computed(() => meta.value.lastSyncAt)
@@ -204,7 +214,7 @@ export const useSync = defineStore('sync', () => {
   async function syncProgress(tok: string, files: AppDataFile[]): Promise<DriveError | null> {
     const { appdata } = useServices()
     const openId = useReader().bookId
-    for (const book of driveBooks()) {
+    for (const book of syncedBooks()) {
       const file = files.find((f) => f.name === progressFile(book.id))
       const local = library.progress[book.id]
       if (!file || file.modifiedTime === local?.remoteModifiedTime) continue
@@ -261,7 +271,7 @@ export const useSync = defineStore('sync', () => {
     const { appdata } = useServices()
     const idOf = (name: string) => files.find((f) => f.name === name)?.id
 
-    for (const book of driveBooks()) {
+    for (const book of syncedBooks()) {
       const rec = library.progress[book.id]
       if (!rec?.dirty) continue
       const name = progressFile(book.id)
@@ -385,6 +395,7 @@ export const useSync = defineStore('sync', () => {
     noteAdded,
     noteRemoved,
     nudge,
+    syncs,
     syncNow,
     push,
     takeOffer,

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { keepFile, loadGrants, readKept } from './files'
+import { keepFile, loadGrants, md5Kept, readKept } from './files'
 
 let dir: string
 let grantsFile: string
@@ -94,5 +94,17 @@ describe('loadGrants', () => {
     const path = await book('a.epub')
     await keepFile(grants, path)
     expect(JSON.parse(await readFile(grantsFile, 'utf8'))).toEqual({ v: 1, paths: [path] })
+  })
+})
+
+describe('md5Kept', () => {
+  it("gives a kept file's MD5 as Drive writes it, and nothing for others", async () => {
+    const path = await book('a.epub', 'hello')
+    const grants = await loadGrants(grantsFile)
+    expect(await md5Kept(grants, path)).toBeNull()
+    await keepFile(grants, path)
+    expect(await md5Kept(grants, path)).toBe('5d41402abc4b2a76b9719d911017c592')
+    await rm(path)
+    expect(await md5Kept(grants, path)).toBeNull()
   })
 })
