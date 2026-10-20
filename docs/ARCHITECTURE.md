@@ -87,6 +87,8 @@ src/
                 epub.ts          foliate-js adapter for EPUB and FB2 (epub-meta.ts: title, author, cover)
                 pdf.ts           pdf.js adapter (pdf-layout.ts: layout maths)
                 progress.ts      chapter and progress maths
+    speech/     ssml.ts          foliate's SSML blocks to plain text with word offsets; voice choice
+                player.ts        read-aloud player over a Speaker (speechSynthesis in the app)
     storage/    db.ts            IndexedDB (raw, via idb.ts): books, progress, settings, meta
                 blobs.ts         OPFS reads; writes through blobs.worker.ts
                 hash.ts          content hash for local files
@@ -128,6 +130,7 @@ interface BookEngine {
   onZoom?(cb: (zoom: number) => void): void        // PDF only
   search?(query: string): AsyncIterable<SearchYield> // in-book full text search
   clearSearch?(): void
+  readAloud?(): ReadAloudSource                    // EPUB and FB2: SSML blocks for reading aloud
   destroy(): void
 }
 
@@ -404,6 +407,11 @@ chrome and the book content; dark mode swaps token values.
 - After an in-book link (a footnote), the reader shows "Back to text", which steps back through
   foliate's history (`engine.back()`); any other jump (contents, search) clears it.
 - PDF pages keep their own colours; dark mode changes only the surround.
+- Read aloud (EPUB, FB2): foliate's `tts.js` gives the section's text as SSML blocks with a mark
+  before every word. `speech/ssml.ts` flattens a block to text plus mark offsets, the browser's
+  `speechSynthesis` speaks it, and word boundary events highlight the word (a selection in the
+  frame), which turns the page. Pause cancels and resume restarts the block at the last word.
+  Page turns, swipes and jumps restart reading from the page on screen.
 - Space Grotesk, IBM Plex Mono, Literata, Cartisse, Libron, NV Jost, NV Zilla Slab, and Readerly are self-hosted fonts, precached.
 
 ## Failure states

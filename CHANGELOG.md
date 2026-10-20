@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.0 — 2026-10-20
+
+- Read aloud for EPUB and FB2 (web and desktop): the speaker button in the reader header (or `r`) reads from the page on screen with the device's own voices, in the book's language. The spoken word is highlighted and pages turn on their own, on into the next chapter. While reading, the footer has pause/resume, speed (0.75×–2×) and stop. Turning the page, swiping or jumping from the contents carries on from the new page. PDFs don't offer it.
+
 ## 0.21.1 — 2026-10-19
 
 - Docs: `ARCHITECTURE.md` brought up to v0.21 (desktop app, files read in place, FB2 and format detection, Drive listing changes, desktop tests); `DESKTOP.md` rewritten from a plan into how the desktop app is built, works and is installed, with phase status.

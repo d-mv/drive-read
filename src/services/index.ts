@@ -6,6 +6,7 @@ import type { DriveApi } from './drive/client'
 import type { BookEngine } from './engine/types'
 import type { BlobStore } from './storage/blobs'
 import type { Db } from './storage/db'
+import type { Speaker } from './speech/player'
 import type { LocalFiles } from './storage/localFiles'
 
 /**
@@ -24,6 +25,8 @@ export interface Services {
   appdata: AppData
   /** Desktop only: book files read in place on disk. Null in the web app. */
   files: LocalFiles | null
+  /** Speech for reading aloud; null where the browser has none. */
+  speaker: Speaker | null
 }
 
 let current: Services | undefined

@@ -2,6 +2,17 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-10-20: Read aloud (v0.22.0)
+
+- **Asked for by the owner** for non-PDF books. EPUB and FB2 only: PDF text has no block structure to read by.
+- **Browser voices only** (`speechSynthesis`): no new dependency, no cost, works offline and in Electron. Voice is picked by the block's `xml:lang` (`pickVoice`), else the browser's default. No voice picker yet.
+- **SSML is flattened to text**: browsers don't speak SSML. `<break>` becomes a space; emphasis and phonemes are dropped.
+- **Pause is cancel + resume from the last word**: `speechSynthesis.pause()` is unreliable (Android ignores it). The same path applies a new speed.
+- **Speed is kept for the session only**, not saved in settings.
+- **Swipes** are seen through the paginator's `relocate` reason `snap` (`ReadAloudSource.onSwipe`), since they don't go through the store.
+- **Limits:** voices without word boundaries (some network voices) highlight only each block's first word, so a block spanning two pages turns at the next block. Phones may stop speaking when the screen locks; there is no Media Session / lock-screen control.
+- **E2E** (`e2e/read-aloud.spec.ts`) replaces `speechSynthesis` with a fake that sends word boundaries; real macOS Chromium was probed by hand (180 voices, per-word boundaries).
+
 ## 2026-10-19: FB2 in Google Drive (v0.21.0)
 
 - **Drive's MIME type for FB2 can't be trusted** (it keeps what the uploader sent: often `application/octet-stream` or `application/zip`), and `q` can't filter by extension. So:

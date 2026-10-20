@@ -18,6 +18,13 @@ import type {
 } from '@/services/engine/types'
 import { track } from '@/services/events'
 import { detectFormat } from '@/services/engine/sniff'
+import {
+  createReadAloud,
+  type ReadAloud,
+  type ReadAloudError,
+  type ReadAloudState,
+} from '@/services/speech/player'
+import { stepRate } from '@/services/speech/ssml'
 import { bookPath } from '@/services/storage/blobs'
 import { isErr, isNone, type Option, Some, toNullable } from '@/shared/result'
 
@@ -74,6 +81,13 @@ export const useReader = defineStore('reader', () => {
   const zoomable = ref(false)
   /** In-book links followed since the last other jump; while > 0 the reader offers Back. */
   const linkDepth = ref(0)
+  /** Read aloud: offered for reflowable books where the browser can speak. */
+  const canReadAloud = ref(false)
+  const readAloudState = ref<ReadAloudState>('idle')
+  const readAloudError = ref<ReadAloudError | null>(null)
+  /** Speech rate; kept across books for the session. */
+  const readAloudRate = ref(1)
+  let player: ReadAloud | null = null
 
   // Not reactive: the engine owns DOM and a custom element.
   let engine: BookEngine | null = null
@@ -222,6 +236,17 @@ export const useReader = defineStore('reader', () => {
       isMounting = false
     }
     if (mine !== session) return
+    const { speaker } = useServices()
+    const source = speaker ? next.readAloud?.() : undefined
+    if (speaker && source) {
+      player = createReadAloud(source, speaker, {
+        state: (s) => (readAloudState.value = s),
+        error: (e) => (readAloudError.value = e),
+      })
+      player.setRate(readAloudRate.value)
+      source.onSwipe(() => void player?.moved())
+      canReadAloud.value = true
+    }
     await library.markOpened(id)
     status.value = { kind: 'ready' }
     track('book.opened', {
@@ -326,6 +351,11 @@ export const useReader = defineStore('reader', () => {
     flushSession()
     measure = null
     session++
+    player?.stop()
+    player = null
+    canReadAloud.value = false
+    readAloudState.value = 'idle'
+    readAloudError.value = null
     engine?.clearSearch?.()
     engine?.destroy()
     engine = null
@@ -340,15 +370,38 @@ export const useReader = defineStore('reader', () => {
     status.value = { kind: 'idle' }
   }
 
-  const next = async () => {
-    await engine?.next()
+  /** A page turn or jump while reading aloud: reading carries on from the new page. */
+  async function moving(go: () => Promise<void>) {
+    const playing = readAloudState.value === 'playing'
+    if (playing) player?.pause()
+    await go()
+    if (readAloudState.value === 'paused') await player?.moved()
+    if (playing) await player?.play()
   }
-  const prev = async () => {
-    await engine?.prev()
+
+  const next = () => moving(async () => void (await engine?.next()))
+  const prev = () => moving(async () => void (await engine?.prev()))
+  const goTo = (loc: Locator) =>
+    moving(async () => {
+      linkDepth.value = 0
+      await engine?.goTo(loc)
+    })
+
+  /** Starts reading at the page on screen, or pauses. */
+  async function toggleReadAloud() {
+    if (!player) return
+    readAloudError.value = null
+    if (readAloudState.value === 'playing') player.pause()
+    else await player.play()
   }
-  const goTo = async (loc: Locator) => {
-    linkDepth.value = 0
-    await engine?.goTo(loc)
+
+  function stopReadAloud() {
+    player?.stop()
+  }
+
+  function stepReadAloudRate(dir: 1 | -1) {
+    readAloudRate.value = stepRate(readAloudRate.value, dir)
+    player?.setRate(readAloudRate.value)
   }
   /** Returns from a followed link (a footnote) to where the reader was. */
   const back = () => {
@@ -402,5 +455,12 @@ export const useReader = defineStore('reader', () => {
     zoomBy,
     search,
     clearSearch,
+    canReadAloud,
+    readAloudState,
+    readAloudError,
+    readAloudRate,
+    toggleReadAloud,
+    stopReadAloud,
+    stepReadAloudRate,
   }
 })

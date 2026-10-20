@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logger } from '@/services/logger'
 import { memoryLocalFiles } from '@/services/storage/localFiles'
-import type { BookEngine } from '@/services/engine/types'
+import type { BookEngine, ReadAloudSource } from '@/services/engine/types'
+import type { Speaker } from '@/services/speech/player'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
@@ -550,5 +551,76 @@ describe('open: the format is checked against the downloaded bytes', () => {
     expect(createEngine).toHaveBeenLastCalledWith('fb2')
     expect(useLibrary().books[0]?.format).toBe('fb2')
     expect(reader.status).toEqual({ kind: 'ready' })
+  })
+})
+
+describe('read aloud', () => {
+  const SSML = `<speak xmlns="http://www.w3.org/2001/10/synthesis"><mark name="0"/>Hello</speak>`
+
+  async function withSpeech(opts: { speaker?: boolean; readable?: boolean } = {}) {
+    const said: string[] = []
+    const speaker = {
+      speak: vi.fn<Speaker['speak']>((r) => void said.push(r.text)),
+      cancel: vi.fn<Speaker['cancel']>(),
+    }
+    const ctx = await setupServices(opts.speaker === false ? {} : { speaker })
+    await useLibrary().importFiles([epubFile('abc')])
+    const source = {
+      start: vi.fn<ReadAloudSource['start']>(async () => SSML),
+      next: vi.fn<ReadAloudSource['next']>(async () => null),
+      resume: vi.fn<ReadAloudSource['resume']>(async () => SSML),
+      mark: vi.fn<ReadAloudSource['mark']>(),
+      stop: vi.fn<ReadAloudSource['stop']>(),
+      onSwipe: vi.fn<ReadAloudSource['onSwipe']>(),
+    }
+    if (opts.readable !== false)
+      ctx.engine.readAloud = vi.fn<NonNullable<BookEngine['readAloud']>>(() => source)
+    const reader = useReader()
+    await reader.open('local-abc', document.createElement('div'))
+    return { ...ctx, reader, said, source, speaker }
+  }
+
+  it('is offered only when the book and the browser can both do it', async () => {
+    expect((await withSpeech()).reader.canReadAloud).toBe(true)
+    setActivePinia(createPinia())
+    expect((await withSpeech({ readable: false })).reader.canReadAloud).toBe(false)
+    setActivePinia(createPinia())
+    expect((await withSpeech({ speaker: false })).reader.canReadAloud).toBe(false)
+  })
+
+  it('plays, pauses, and stops when the book closes', async () => {
+    const { reader, said, source } = await withSpeech()
+    await reader.toggleReadAloud()
+    expect(reader.readAloudState).toBe('playing')
+    expect(said).toEqual(['Hello'])
+    await reader.toggleReadAloud()
+    expect(reader.readAloudState).toBe('paused')
+    reader.close()
+    expect(source.stop).toHaveBeenCalled()
+    expect(reader.canReadAloud).toBe(false)
+  })
+
+  it('reads on from the new page after a page turn', async () => {
+    const { reader, engine, source } = await withSpeech()
+    await reader.toggleReadAloud()
+    await reader.next()
+    expect(engine.next).toHaveBeenCalled()
+    expect(source.start).toHaveBeenCalledTimes(2)
+    expect(reader.readAloudState).toBe('playing')
+
+    // A swipe turns the page without the store: the engine reports it.
+    source.onSwipe.mock.calls[0]![0]()
+    await expect.poll(() => source.start.mock.calls.length).toBe(3)
+  })
+
+  it('steps the speed', async () => {
+    const { reader, speaker } = await withSpeech()
+    reader.stepReadAloudRate(1)
+    await reader.toggleReadAloud()
+    expect(reader.readAloudRate).toBe(1.25)
+    expect(speaker.speak).toHaveBeenLastCalledWith(
+      expect.objectContaining({ rate: 1.25 }),
+      expect.anything(),
+    )
   })
 })

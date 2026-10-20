@@ -26,7 +26,25 @@ export interface BookEngine {
   /** In-book full text search. */
   search?(query: string): AsyncIterable<SearchYield>
   clearSearch?(): void
+  /** Reflowable formats: the book's text, block by block, for reading aloud. Call after mount. */
+  readAloud?(): ReadAloudSource
   destroy(): void
+}
+
+/** Blocks of text as SSML, each with a `<mark name>` before every word. */
+export interface ReadAloudSource {
+  /** The first block on the page on screen, or null if there is no text. */
+  start(): Promise<string | null>
+  /** The block after the current one, crossing chapters; null at the end of the book. */
+  next(): Promise<string | null>
+  /** The current block again, from the last highlighted word. */
+  resume(): Promise<string | null>
+  /** Highlights a word, turning to its page. */
+  mark(name: string): void
+  /** Removes the highlight. */
+  stop(): void
+  /** The reader turned the page by touch, which the app's page turns don't see. */
+  onSwipe(cb: () => void): void
 }
 
 export interface SearchSubitem {

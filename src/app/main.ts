@@ -15,6 +15,7 @@ import { createAppData } from '@/services/drive/appdata'
 import { createDriveApi } from '@/services/drive/client'
 import { createEpubEngine } from '@/services/engine/epub'
 import { createPdfEngine } from '@/services/engine/pdf'
+import { browserSpeaker } from '@/services/speech/player'
 import { opfsBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
 import { localBookId } from '@/services/storage/hash'
@@ -54,6 +55,7 @@ async function start() {
     drive: createDriveApi(),
     appdata: createAppData(),
     files: window.driveReadDesktop ? desktopFiles(window.driveReadDesktop) : null,
+    speaker: browserSpeaker(),
   })
 
   startObservability(currentDeviceValue)

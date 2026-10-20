@@ -7,6 +7,7 @@ import type { DriveApi, DriveError } from '@/services/drive/client'
 import type { BookEngine, BookMeta, OpenError, Relocation } from '@/services/engine/types'
 import { memoryBlobStore, type MemoryBlobStore } from '@/services/storage/blobs'
 import { openDb } from '@/services/storage/db'
+import type { Speaker } from '@/services/speech/player'
 import type { MemoryLocalFiles } from '@/services/storage/localFiles'
 import { Err, Ok, type Result } from '@/shared/result'
 
@@ -139,6 +140,7 @@ export async function setupServices(
     device?: { id: string; name: string }
     /** Run as the desktop app, with this fake disk. */
     files?: MemoryLocalFiles
+    speaker?: Speaker
   } = {},
 ): Promise<TestContext> {
   const fake = fakeEngine(opts.meta ?? Ok(META))
@@ -159,6 +161,7 @@ export async function setupServices(
     drive,
     appdata: opts.appdata ?? memoryAppData(),
     files: opts.files ?? null,
+    speaker: opts.speaker ?? null,
   }
   provideServices(services)
   const advance = (ms: number) => {

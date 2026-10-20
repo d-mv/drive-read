@@ -27,6 +27,18 @@ declare module '@foliate/view.js' {
     cfi: string
     time?: { section: number; total: number }
     section?: { current: number; total: number }
+    /** The visible text of the page. */
+    range?: Range
+  }
+
+  /** tts.js: one section's text as SSML blocks. Every method answers undefined past the end. */
+  export interface FoliateTTS {
+    doc: Document
+    start(): string | undefined
+    resume(): string | undefined
+    next(paused?: boolean): string | undefined
+    from(range: Range): string | undefined
+    setMark(mark: string): void
   }
 
   export interface FoliateRenderer extends HTMLElement {
@@ -35,6 +47,8 @@ declare module '@foliate/view.js' {
     getContents(): { doc: Document; index: number }[]
     next(): Promise<void>
     prev(): Promise<void>
+    nextSection(): Promise<void>
+    scrollToAnchor(anchor: Range, select?: boolean): Promise<void>
   }
 
   export function makeBook(file: File | Blob): Promise<FoliateBook>
@@ -53,6 +67,9 @@ declare module '@foliate/view.js' {
     resolveNavigation(target: string | number | { fraction: number }): { index: number } | undefined
     goTo(target: string | number): Promise<unknown>
     goToFraction(fraction: number): Promise<void>
+    tts: FoliateTTS | null
+    /** Text of the section on screen; the default highlight selects the word and turns to it. */
+    initTTS(granularity?: 'word' | 'sentence', highlight?: (range: Range) => void): Promise<void>
     getSectionFractions(): number[]
     next(): Promise<void>
     prev(): Promise<void>

@@ -97,6 +97,11 @@ const ACTION_LABEL: Record<FixAction, string> = {
   locate: 'Locate file…',
 }
 
+const READ_ALOUD_ERROR = {
+  'no-voice': "This device has no voice for the book's language.",
+  failed: 'Reading aloud stopped.',
+} as const
+
 /** Why the last "Locate file…" choice was not used; cleared on the next try. */
 const locateError = ref<string | null>(null)
 const LOCATE_ERROR = {
@@ -179,6 +184,7 @@ function onKeydown(e: KeyboardEvent) {
     contents: () => togglePanel('contents'),
     settings: () => togglePanel('settings'),
     search: () => togglePanel('search'),
+    ...(reader.canReadAloud && { 'read-aloud': () => void reader.toggleReadAloud() }),
     theme: () => void settings.toggleTheme(),
     back: () => (panel.value !== 'none' ? void closePanel() : back()),
     ...(reader.zoomable && {
@@ -270,6 +276,17 @@ onBeforeUnmount(() => {
         @click="togglePanel('search')"
       >
         <AppIcon name="search" />
+      </button>
+      <button
+        v-if="reader.canReadAloud"
+        type="button"
+        :aria-label="reader.readAloudState === 'playing' ? 'Pause reading aloud' : 'Read aloud'"
+        :aria-pressed="reader.readAloudState !== 'idle'"
+        class="flex size-11 flex-none items-center justify-center rounded-ctl"
+        :class="reader.readAloudState !== 'idle' && 'bg-ink text-paper'"
+        @click="reader.toggleReadAloud()"
+      >
+        <AppIcon name="listen" />
       </button>
       <button
         ref="contentsButton"
@@ -503,6 +520,53 @@ onBeforeUnmount(() => {
             <AppIcon name="plus" :size="16" />
           </button>
         </div>
+        <div
+          v-if="reader.readAloudState !== 'idle'"
+          role="group"
+          aria-label="Read aloud"
+          class="flex items-center"
+        >
+          <button
+            type="button"
+            :aria-label="reader.readAloudState === 'playing' ? 'Pause' : 'Resume'"
+            class="flex size-11 items-center justify-center text-ink"
+            @click="reader.toggleReadAloud()"
+          >
+            <AppIcon :name="reader.readAloudState === 'playing' ? 'pause' : 'play'" :size="16" />
+          </button>
+          <button
+            type="button"
+            aria-label="Slower"
+            class="flex size-11 items-center justify-center text-ink disabled:opacity-35"
+            :disabled="reader.readAloudRate <= 0.75"
+            @click="reader.stepReadAloudRate(-1)"
+          >
+            <AppIcon name="minus" :size="16" />
+          </button>
+          <span class="min-w-11 text-center text-ink" aria-live="polite"
+            >{{ reader.readAloudRate }}×</span
+          >
+          <button
+            type="button"
+            aria-label="Faster"
+            class="flex size-11 items-center justify-center text-ink disabled:opacity-35"
+            :disabled="reader.readAloudRate >= 2"
+            @click="reader.stepReadAloudRate(1)"
+          >
+            <AppIcon name="plus" :size="16" />
+          </button>
+          <button
+            type="button"
+            aria-label="Stop reading aloud"
+            class="flex size-11 items-center justify-center text-ink"
+            @click="reader.stopReadAloud()"
+          >
+            <AppIcon name="close" :size="16" />
+          </button>
+        </div>
+        <span v-if="reader.readAloudError" role="alert" class="font-ui text-[13px] text-signal">{{
+          READ_ALOUD_ERROR[reader.readAloudError]
+        }}</span>
         <span v-if="reader.page" class="ml-auto"
           >Page {{ reader.page.current }} of {{ reader.page.total }}</span
         >

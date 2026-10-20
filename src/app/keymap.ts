@@ -12,6 +12,8 @@ export type KeyAction =
   | 'back'
   | 'search'
   | 'resume'
+  /** EPUB and FB2: start or pause reading aloud. */
+  | 'read-aloud'
   | 'blur'
   /** PDF only. */
   | 'zoom-in'
@@ -39,6 +41,7 @@ const READER: Record<string, KeyAction> = {
   t: 'theme',
   '/': 'search',
   s: 'search',
+  r: 'read-aloud',
   Escape: 'back',
   '+': 'zoom-in',
   '=': 'zoom-in',

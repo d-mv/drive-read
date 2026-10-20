@@ -222,6 +222,56 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
     clearSearch() {
       ;(view as unknown as { clearSearch?(): void })?.clearSearch?.()
     },
+    readAloud() {
+      /** tts.js works on one section; past its end, read on in the next one that has text. */
+      async function nextSection(): Promise<string | null> {
+        for (;;) {
+          if (!view) return null
+          const before = view.renderer.getContents()[0]?.index
+          await view.renderer.nextSection()
+          if (!view || view.renderer.getContents()[0]?.index === before) return null
+          await view.initTTS('word')
+          const first = view.tts?.start()
+          if (first !== undefined) return first
+        }
+      }
+      let swipeCb: (() => void) | undefined
+      // A swipe turns the page inside foliate's paginator, reported as a 'snap'.
+      view?.renderer.addEventListener('relocate', (e) => {
+        if ((e as CustomEvent<{ reason?: string }>).detail.reason === 'snap') swipeCb?.()
+      })
+      return {
+        onSwipe(cb) {
+          swipeCb = cb
+        },
+        async start() {
+          if (!view) return null
+          await view.initTTS('word')
+          const range = view.lastLocation?.range
+          let first: string | undefined
+          try {
+            first = range ? view.tts?.from(range) : view.tts?.start()
+          } catch {
+            // The page's range belongs to a section no longer shown: read the section from its start.
+            first = view.tts?.start()
+          }
+          return first ?? nextSection()
+        },
+        async next() {
+          return view?.tts?.next() ?? nextSection()
+        },
+        async resume() {
+          return view?.tts?.resume() ?? null
+        },
+        mark(name) {
+          view?.tts?.setMark(name)
+        },
+        stop() {
+          for (const { doc } of view?.renderer.getContents() ?? [])
+            doc.getSelection()?.removeAllRanges()
+        },
+      }
+    },
     destroy() {
       view?.close()
       view?.remove()
