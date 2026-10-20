@@ -239,9 +239,15 @@ export const useReader = defineStore('reader', () => {
     const { speaker } = useServices()
     const source = speaker ? next.readAloud?.() : undefined
     if (speaker && source) {
+      const format = record.format
       player = createReadAloud(source, speaker, {
         state: (s) => (readAloudState.value = s),
         error: (e) => (readAloudError.value = e),
+        report: ({ voiceMatched, ...r }) => {
+          const fields = { format, ...r, voice_matched: voiceMatched }
+          if (r.reason === 'error') track('read_aloud.failed', fields)
+          else track('read_aloud.stopped', fields)
+        },
       })
       player.setRate(readAloudRate.value)
       source.onSwipe(() => void player?.moved())
@@ -351,7 +357,7 @@ export const useReader = defineStore('reader', () => {
     flushSession()
     measure = null
     session++
-    player?.stop()
+    player?.stop('closed')
     player = null
     canReadAloud.value = false
     readAloudState.value = 'idle'
@@ -391,8 +397,10 @@ export const useReader = defineStore('reader', () => {
   async function toggleReadAloud() {
     if (!player) return
     readAloudError.value = null
-    if (readAloudState.value === 'playing') player.pause()
-    else await player.play()
+    if (readAloudState.value === 'playing') return player.pause()
+    if (readAloudState.value === 'idle' && book.value)
+      track('read_aloud.started', { format: book.value.format })
+    await player.play()
   }
 
   function stopReadAloud() {

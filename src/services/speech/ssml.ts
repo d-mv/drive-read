@@ -58,17 +58,25 @@ export function markAt(marks: readonly SpeechMark[], charIndex: number): string 
 const norm = (lang: string) => lang.toLowerCase().replace('_', '-')
 
 /**
- * A voice for the book's language: an exact match first, then the same language in any region;
- * the default voice wins a tie. Null leaves the choice to the browser.
+ * A voice for the book's language: an exact match first, then the same language in any region.
+ * Among several, the region the reader prefers (`preferred`, e.g. navigator.languages) wins, then
+ * the default voice, then an on-device one. Null leaves the choice to the browser.
  */
 export function pickVoice(
   voices: readonly SpeechSynthesisVoice[],
   lang: string | null,
+  preferred: readonly string[] = [],
 ): SpeechSynthesisVoice | null {
   if (!lang) return null
   const want = norm(lang)
   const base = want.split('-')[0]
-  const best = (list: SpeechSynthesisVoice[]) => list.find((v) => v.default) ?? list[0] ?? null
+  const regions = preferred.map(norm)
+  const best = (list: SpeechSynthesisVoice[]) =>
+    regions.map((r) => list.find((v) => norm(v.lang) === r)).find((v) => v) ??
+    list.find((v) => v.default) ??
+    list.find((v) => v.localService) ??
+    list[0] ??
+    null
   return (
     best(voices.filter((v) => norm(v.lang) === want)) ??
     best(voices.filter((v) => norm(v.lang).split('-')[0] === base))

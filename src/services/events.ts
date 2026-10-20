@@ -10,6 +10,19 @@ import { logger } from './logger'
 type Format = BookFormat
 type Source = 'local' | 'drive'
 
+/** One read-aloud run (services/speech/player.ts ReadAloudReport). */
+interface ReadAloudFields {
+  format: Format
+  reason: 'user' | 'end' | 'error' | 'closed'
+  code: string | null
+  blocks: number
+  boundaries: boolean
+  seconds: number
+  lang: string | null
+  voices: number
+  voice_matched: boolean
+}
+
 export interface Events {
   'app.started': {
     browser: string
@@ -46,6 +59,9 @@ export interface Events {
     from: number
     to: number
   }
+  'read_aloud.started': { format: Format }
+  'read_aloud.stopped': ReadAloudFields
+  'read_aloud.failed': ReadAloudFields
   'drive.listed': { kind: string; ms: number; files: number | null; stale: boolean }
   'sync.completed': {
     ms: number

@@ -34,6 +34,8 @@ URLs with paths, tokens or emails.
 | `book.open_failed` | warn | `reason`, `format`, `source` | Broken, missing, offline, needs reconnect |
 | `book.downloaded` | info | `format`, `bytes`, `ms` | Download size and speed |
 | `reading.session` | info | `format`, `source`, `minutes`, `pages`, `from`, `to` | Real reading time and progress; sent on close and when the tab is hidden. `minutes` counts gaps between page turns, each capped at 5 min (idle); `pages` counts only real position changes |
+| `read_aloud.started` | info | `format` | Read aloud used, per format |
+| `read_aloud.stopped`, `read_aloud.failed` | info, warn | `format`, `reason` (`user`, `end`, `closed`, `error`), `code` (speech error, e.g. `synthesis-failed`, `no-start`), `blocks`, `boundaries`, `seconds`, `lang`, `voices`, `voice_matched` | Why reading aloud stopped; whether the voice sends word boundaries (Android's don't) and the device has a voice for the book's language |
 | `drive.checked` | info | `ms`, `books`, `missing`, `new_versions`, `complete` | Daily check of the library's Drive files: books gone from Drive, newer versions offered; `complete` = false when the listing may be cut short (nothing marked missing then) |
 | `drive.check_failed` | warn | `reason` | Why the daily check was skipped (it runs again on the next full sync) |
 | `drive.listed` | info | `kind` (`search`, `folder`), `ms`, `files`, `stale` | Drive browsing speed; `stale` = answer dropped as outdated |

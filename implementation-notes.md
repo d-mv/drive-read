@@ -10,7 +10,11 @@ Conservative choices and deviations from the architecture doc, newest first.
 - **Pause is cancel + resume from the last word**: `speechSynthesis.pause()` is unreliable (Android ignores it). The same path applies a new speed.
 - **Speed is kept for the session only**, not saved in settings.
 - **Swipes** are seen through the paginator's `relocate` reason `snap` (`ReadAloudSource.onSwipe`), since they don't go through the store.
-- **Limits:** voices without word boundaries (some network voices) highlight only each block's first word, so a block spanning two pages turns at the next block. Phones may stop speaking when the screen locks; there is no Media Session / lock-screen control.
+- **Voices without word boundaries** (Android Chrome's, checked on an Android 16 emulator with Chrome 134): the highlight follows elapsed time at a speed in characters per second, starting at 14 and re-measured from every finished block longer than a second (v0.22.1). The first real boundary turns the estimate off for the run. It drifts within a block, but turns pages at about the right time.
+- **No `cancel()` before each `speak()`** (v0.22.1): on Android a cancel right before speak can drop the new utterance. Pause, stop and jumps still cancel. An utterance that ends without having started is reported as error `no-start` instead of moving on.
+- **Voice choice** prefers the reader's region from `navigator.languages`, then the default, then an on-device voice: Android lists `en_AU` first and flags no default. Android also returns no voices until shortly after load, so the first block may use the browser's choice.
+- **Logged** as `read_aloud.*` with the stop reason and error code. A report from a phone of reading "stopped immediately" did not reproduce on the emulator with the test EPUB and FB2; the events are there to explain the next one.
+- **Limits:** phones may stop speaking when the screen locks; there is no Media Session / lock-screen control.
 - **E2E** (`e2e/read-aloud.spec.ts`) replaces `speechSynthesis` with a fake that sends word boundaries; real macOS Chromium was probed by hand (180 voices, per-word boundaries).
 
 ## 2026-10-19: FB2 in Google Drive (v0.21.0)

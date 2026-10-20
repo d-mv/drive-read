@@ -411,7 +411,8 @@ chrome and the book content; dark mode swaps token values.
 - Read aloud (EPUB, FB2): foliate's `tts.js` gives the section's text as SSML blocks with a mark
   before every word. `speech/ssml.ts` flattens a block to text plus mark offsets, the browser's
   `speechSynthesis` speaks it, and word boundary events highlight the word (a selection in the
-  frame), which turns the page. Pause cancels and resume restarts the block at the last word.
+  frame), which turns the page. Voices with no boundaries (Android) move the highlight by elapsed
+  time at a measured speed. Pause cancels and resume restarts the block at the last word.
   Page turns, swipes and jumps restart reading from the page on screen.
 - Space Grotesk, IBM Plex Mono, Literata, Cartisse, Libron, NV Jost, NV Zilla Slab, and Readerly are self-hosted fonts, precached.
 

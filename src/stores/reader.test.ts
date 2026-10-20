@@ -562,6 +562,7 @@ describe('read aloud', () => {
     const speaker = {
       speak: vi.fn<Speaker['speak']>((r) => void said.push(r.text)),
       cancel: vi.fn<Speaker['cancel']>(),
+      voices: vi.fn<Speaker['voices']>(() => ({ count: 1, matched: true })),
     }
     const ctx = await setupServices(opts.speaker === false ? {} : { speaker })
     await useLibrary().importFiles([epubFile('abc')])

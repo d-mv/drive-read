@@ -63,6 +63,12 @@ describe('pickVoice', () => {
     ]
     expect(pickVoice(voices, 'ru')?.name).toBe('Yuri')
   })
+  it("prefers the reader's own region, then an on-device voice", () => {
+    // Android lists voices with underscores and flags none as default.
+    const voices = [v('en_AU', { localService: false }), v('en_GB'), v('en_US')]
+    expect(pickVoice(voices, 'en', ['en-US', 'ru'])?.lang).toBe('en_US')
+    expect(pickVoice(voices, 'en', ['de-DE'])?.lang).toBe('en_GB')
+  })
   it('prefers an exact region match', () => {
     expect(pickVoice([v('en-US'), v('en-GB')], 'en-GB')?.lang).toBe('en-GB')
   })

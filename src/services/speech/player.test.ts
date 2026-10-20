@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { ReadAloudSource } from '@/services/engine/types'
 
-import { createReadAloud, type ReadAloudError, type ReadAloudState, type Speaker } from './player'
+import {
+  createReadAloud,
+  type ReadAloudError,
+  type ReadAloudReport,
+  type ReadAloudState,
+  type Speaker,
+} from './player'
 
 const NS = 'http://www.w3.org/2001/10/synthesis'
 const block = (...words: string[]) =>
@@ -26,8 +32,12 @@ type On = Parameters<Speaker['speak']>[1]
 function fakeSpeaker() {
   const said: { text: string; lang: string | null; rate: number; on: On }[] = []
   const speaker: Speaker = {
-    speak: (req, on) => void said.push({ ...req, on }),
+    speak: (req, on) => {
+      said.push({ ...req, on })
+      on.start()
+    },
     cancel: vi.fn<Speaker['cancel']>(),
+    voices: () => ({ count: 3, matched: true }),
   }
   return { speaker, said, last: () => said[said.length - 1]! }
 }
@@ -39,11 +49,13 @@ function setup(blocks: string[]) {
   const s = fakeSpeaker()
   const states: ReadAloudState[] = []
   const errors: ReadAloudError[] = []
+  const reports: ReadAloudReport[] = []
   const player = createReadAloud(source, s.speaker, {
     state: (x) => states.push(x),
     error: (e) => errors.push(e),
+    report: (r) => reports.push(r),
   })
-  return { source, ...s, states, errors, player }
+  return { source, ...s, states, errors, reports, player }
 }
 
 describe('read aloud', () => {
@@ -115,5 +127,65 @@ describe('read aloud', () => {
     t.last().on.error('language-unavailable')
     expect(t.errors).toEqual(['no-voice'])
     expect(t.states.at(-1)).toBe('idle')
+  })
+
+  it('reports why each run stopped', async () => {
+    const t = setup([block('a')])
+    await t.player.play()
+    t.last().on.boundary(0)
+    t.last().on.end()
+    await flush()
+    await t.player.play()
+    t.last().on.error('synthesis-failed')
+    expect(t.reports).toEqual([
+      expect.objectContaining({
+        reason: 'end',
+        blocks: 1,
+        boundaries: true,
+        lang: 'en',
+        voices: 3,
+      }),
+      expect.objectContaining({ reason: 'error', code: 'synthesis-failed', blocks: 1 }),
+    ])
+  })
+
+  describe('a voice with no word boundaries', () => {
+    it('moves the highlight along by time, at the speed of the blocks already read', async () => {
+      vi.useFakeTimers()
+      try {
+        // 10 words: "wrdN " is 5 characters, so word n starts at character 5n.
+        const words = Array.from({ length: 10 }, (_, i) => `wrd${i}`)
+        const t = setup([block(...words), block(...words)])
+        await t.player.play()
+        expect(t.source.mark).toHaveBeenLastCalledWith('0')
+        // Default 14 characters a second: after 1 s, character 14 is in word 2.
+        await vi.advanceTimersByTimeAsync(1000)
+        expect(t.source.mark).toHaveBeenLastCalledWith('2')
+
+        // The block took 2 s for 50 characters: 25 a second from now on, so 1 s reaches word 5.
+        await vi.advanceTimersByTimeAsync(1000)
+        t.last().on.end()
+        await vi.advanceTimersByTimeAsync(0)
+        expect(t.said).toHaveLength(2)
+        await vi.advanceTimersByTimeAsync(1000)
+        expect(t.source.mark).toHaveBeenLastCalledWith('5')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stops estimating once the voice sends a boundary', async () => {
+      vi.useFakeTimers()
+      try {
+        const t = setup([block('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')])
+        await t.player.play()
+        t.last().on.boundary(2)
+        expect(t.source.mark).toHaveBeenLastCalledWith('1')
+        await vi.advanceTimersByTimeAsync(3000)
+        expect(t.source.mark).toHaveBeenLastCalledWith('1')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

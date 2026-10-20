@@ -22,6 +22,7 @@ test.beforeEach(async ({ page }) => {
       lang = ''
       rate = 1
       voice = null
+      onstart: (() => void) | null = null
       onboundary: ((e: { charIndex: number; name: string }) => void) | null = null
       onend: (() => void) | null = null
       onerror: ((e: { error: string }) => void) | null = null
@@ -36,6 +37,7 @@ test.beforeEach(async ({ page }) => {
       },
       speak(u: Utterance) {
         window.__said.push({ text: u.text, lang: u.lang, rate: u.rate })
+        timers.push(window.setTimeout(() => u.onstart?.(), 0))
         let at = 0
         if (window.__boundaries)
           for (const m of u.text.matchAll(/\S+/g)) {

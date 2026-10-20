@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.1 — 2026-10-20
+
+- Read aloud on Android: the highlight now follows the speech through each paragraph. Android voices report no individual words, so the highlight moves by the time spoken, at a speed measured from the paragraphs already read.
+- Read aloud picks a voice in the reader's own region (e.g. US rather than Australian English) and no longer cancels speech before each paragraph, which on Android could drop it.
+- Read-aloud runs are logged (`read_aloud.started`, `read_aloud.stopped`, `read_aloud.failed`) with the stop reason and speech error code, so a stop can be explained from the logs.
+
 ## 0.22.0 — 2026-10-20
 
 - Read aloud for EPUB and FB2 (web and desktop): the speaker button in the reader header (or `r`) reads from the page on screen with the device's own voices, in the book's language. The spoken word is highlighted and pages turn on their own, on into the next chapter. While reading, the footer has pause/resume, speed (0.75×–2×) and stop. Turning the page, swiping or jumping from the contents carries on from the new page. PDFs don't offer it.
