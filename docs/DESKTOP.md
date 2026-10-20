@@ -94,6 +94,8 @@ electron-builder.yml                .app layout, icon, document types
   downloading.
 - **Formats:** every import and open checks the bytes (`engine/sniff.ts`), so a zipped FB2 saved
   as `.epub` opens as FB2.
+- **Read aloud:** the same as the web app; Electron's Chromium speaks with the macOS system voices
+  (Russian included), with per-word highlighting.
 
 ## Phases
 

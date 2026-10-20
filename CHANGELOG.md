@@ -3,6 +3,7 @@
 ## 0.22.0 — 2026-10-20
 
 - Read aloud for EPUB and FB2 (web and desktop): the speaker button in the reader header (or `r`) reads from the page on screen with the device's own voices, in the book's language. The spoken word is highlighted and pages turn on their own, on into the next chapter. While reading, the footer has pause/resume, speed (0.75×–2×) and stop. Turning the page, swiping or jumping from the contents carries on from the new page. PDFs don't offer it.
+- Docs: `ARCHITECTURE.md` (v0.22: speech module, engine contract, decisions, tests, build history) and `DESKTOP.md` cover read aloud.
 
 ## 0.21.1 — 2026-10-19
 

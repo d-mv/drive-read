@@ -1,6 +1,6 @@
 # Drive Read: Architecture
 
-As built at v0.21.0 (October 2026). A static, client-only PWA that reads EPUB, FB2 and PDF files
+As built at v0.22.0 (October 2026). A static, client-only PWA that reads EPUB, FB2 and PDF files
 from the reader's Google Drive or the device, keeps them on the device for offline reading, and
 syncs the reading position through Drive. The same app also runs as a macOS desktop app (Electron)
 that reads local files where they sit: see [`DESKTOP.md`](DESKTOP.md). There is no backend: Google
@@ -17,6 +17,7 @@ no "All books" tab).
 - An opened book stays readable with no network and no valid token.
 - The reading position follows the reader across devices.
 - Keyboard-first on desktop, touch on phone, light and dark themes.
+- Reflowable books (EPUB, FB2) can be read aloud with the device's own voices.
 - Few dependencies; native browser APIs where they exist.
 
 Not in scope: files with DRM, highlights and notes (the sync record leaves room for them),
@@ -517,7 +518,7 @@ in testing mode with scopes `drive.readonly` and `drive.appdata`.
 | Layer | Tool | Covers |
 | --- | --- | --- |
 | Unit | Vitest 5, happy-dom, fake-indexeddb | Domain rules, services, stores (with fake services), events |
-| End-to-end | Playwright, fake Google (`e2e/fake-google.ts`) | Reader, Drive browsing (FB2 included), sync across two devices, PDF, FB2, offline, failure states, PWA update flow |
+| End-to-end | Playwright, fake Google (`e2e/fake-google.ts`) | Reader, Drive browsing (FB2 included), sync across two devices, PDF, FB2, read aloud (with a fake `speechSynthesis`), offline, failure states, PWA update flow |
 | Desktop end-to-end | Playwright `_electron` (`desktop/e2e/`) | Files read in place, Locate file…, the page denied unchosen files, Finder / launch / second-instance / drop / File › Open… opens, the EPUB default hint |
 
 Gates before a release: unit tests, e2e (`bun run test:e2e`, and `bun run test:desktop` when
@@ -535,6 +536,7 @@ desktop code changed), `vue-tsc` typecheck, oxlint, oxfmt, `bun audit`.
 | Formats | EPUB, FB2, PDF; detected by content | FB2 is common for Russian books and often misnamed; foliate-js reads it |
 | Desktop | Electron, macOS arm64, built locally, never distributed | Same Chromium engine as the web app; owner decision |
 | Drive screen | Folders first, alphabetical, no "All books" list | Owner decision |
+| Read aloud | Browser `speechSynthesis`, EPUB and FB2 only | No dependency or cost, works offline and in Electron; PDF text has no blocks to read by |
 | Updates | Prompted, never mid-book | Never lose the reader's place |
 | Log identity | Random device id + hashed Drive permission id | Measurable per user without personal data |
 
@@ -552,5 +554,6 @@ desktop code changed), `vue-tsc` typecheck, oxlint, oxfmt, `bun audit`.
 10. Desktop app: Electron shell, local files read in place, Finder and file types, local
     progress sync, local packaging (v0.14–0.19).
 11. FB2 from the device and from Drive, with format detection by content (v0.20–0.21).
+12. Read aloud for EPUB and FB2 (v0.22).
 
 Open work is tracked in Kairos (project in `kairos.id`).
