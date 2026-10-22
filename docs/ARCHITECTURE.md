@@ -491,7 +491,8 @@ flowchart LR
 - Every deploy is checked by loading the live bundle and seeing `app.started` with the new
   version in the logs.
 - The container Caddyfile is generated from `csp.ts` (`scripts/caddyfile.ts`), so vite preview,
-  the e2e tests and production send the same CSP. `/assets/*` is `immutable` for a year;
+  the e2e tests and production send the same CSP. Production also sends HSTS and
+  `Cross-Origin-Opener-Policy: same-origin-allow-popups` (Google's sign-in popup still works). `/assets/*` is `immutable` for a year;
   everything else (`index.html`, `sw.js`, manifest) is `no-cache`.
 
 ```text

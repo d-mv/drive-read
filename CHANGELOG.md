@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.5 — 2026-10-22
+
+- Security: the app container's Caddy sends `Strict-Transport-Security: max-age=31536000` and `Cross-Origin-Opener-Policy: same-origin-allow-popups`. The front proxy already redirects HTTP to HTTPS, but sent neither header.
+
 ## 0.22.4 — 2026-10-22
 
 - Security (desktop): Electron fuses are set in `electron-builder.yml`. The packaged app ignores `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect`, loads only an integrity-checked `app.asar`, and drops the `file://` extra privileges. Another process can no longer run its own code as Drive Read and use its macOS folder permissions. `DR_DIST` and `DR_USER_DATA` now work only in dev and test runs (`desktop/overrides.ts`, unit-tested), and DevTools are off in the packaged app. Checked on a built `.app`: fuse wire read back, the app launches with asar integrity on, and `ELECTRON_RUN_AS_NODE=1` no longer runs code.

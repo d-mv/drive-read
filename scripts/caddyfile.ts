@@ -19,6 +19,10 @@ console.log(`{
 \t\tX-Content-Type-Options nosniff
 \t\tReferrer-Policy strict-origin-when-cross-origin
 \t\tPermissions-Policy "camera=(), microphone=(), geolocation=()"
+\t\t# Served over HTTPS by the front Caddy (this one listens on :80 behind it).
+\t\tStrict-Transport-Security "max-age=31536000"
+\t\t# Pages this tab opens get no handle on it; Google's sign-in popup still reports back.
+\t\tCross-Origin-Opener-Policy same-origin-allow-popups
 \t}
 
 \t# Hashed build output never changes under the same name. The two rules must not overlap:
