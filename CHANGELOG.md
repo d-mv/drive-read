@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.7 — 2026-10-22
+
+- Security (tooling): vite 8.3.2 → 8.3.5, which fixes six `bun audit` advisories in the dev server (files outside `server.fs.allow`, the `?vite-wasm-instance` byte leak, cross-origin script through custom middleware, and launch-editor). None of them reached the built site. The remaining advisory (sprintf-js via Electron's download tooling, denial of service only) waits for an upstream release.
+
 ## 0.22.6 — 2026-10-22
 
 - Security: books reach only the foliate-js readers the app offers (EPUB, FB2). An EPUB goes in as `book.epub` and must be a zip, and an FB2 with Kindle bytes is refused, so a Kindle (MOBI) file or a comic archive (CBZ) named as a book no longer opens through foliate's MOBI or CBZ readers. These readers were never reviewed for this app. Such files now report as unreadable.
