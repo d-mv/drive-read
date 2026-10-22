@@ -1,7 +1,7 @@
 /**
  * Builds e2e/fixtures/test-voyage.epub: four chapters with a TOC, long enough to paginate.
  * Chapter 3 carries a script that must NOT run (the CSP blocks it). Chapter 1 opens with a
- * footnote reference whose note lives in chapter 4.
+ * footnote reference whose note lives in chapter 4, a web link and a javascript: link.
  * Run: bun e2e/fixtures/build-epub.ts (needs the `zip` CLI)
  */
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -19,12 +19,14 @@ const chapters = ['Departure', 'The Long Calm', 'Signals', 'Landfall']
 const sentence = (c: number, i: number) =>
   `Chapter ${c + 1}, line ${i + 1}: the ship kept its heading while the crew counted the hours and wrote them down in the log.`
 const NOTEREF = ` <a epub:type="noteref" href="c4.xhtml#note-1">1</a>`
+// External links: the web one must open without a handle on the reader tab, the script one not at all.
+const LINKS = ` <a id="ext-web" href="https://example.test/away">web</a> <a id="ext-js" href="javascript:void(parent.document.documentElement.dataset.pwned='link')">js</a>`
 const NOTE = `<aside epub:type="footnote" id="note-1"><p>1. The log was kept in pencil.</p></aside>`
 const body = (c: number) =>
   Array.from(
     { length: 40 },
     (_, p) =>
-      `<p>${Array.from({ length: 6 }, (_, i) => sentence(c, p * 6 + i)).join(' ')}${c === 0 && p === 0 ? NOTEREF : ''}</p>`,
+      `<p>${Array.from({ length: 6 }, (_, i) => sentence(c, p * 6 + i)).join(' ')}${c === 0 && p === 0 ? NOTEREF + LINKS : ''}</p>`,
   ).join('\n')
 
 write('mimetype', 'application/epub+zip')

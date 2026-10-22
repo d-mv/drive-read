@@ -69,6 +69,41 @@ test('follows a footnote and comes back to the text', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Back to text' })).toBeHidden()
 })
 
+test('a web link in the book opens without a handle on the reader tab', async ({ page }) => {
+  await page
+    .context()
+    .route('https://example.test/**', (r) =>
+      r.fulfill({ contentType: 'text/html', body: '<title>away</title>' }),
+    )
+  await addBook(page)
+  const links = page.frames().map((f) => f.locator('#ext-web'))
+  await expect
+    .poll(async () => (await Promise.all(links.map((l) => l.count()))).indexOf(1))
+    .not.toBe(-1)
+  const counts = await Promise.all(links.map((l) => l.count()))
+  const popup = page.waitForEvent('popup')
+  await links[counts.indexOf(1)].dispatchEvent('click')
+  const away = await popup
+  await expect(away).toHaveURL('https://example.test/away')
+  expect(await away.evaluate(() => window.opener)).toBeNull()
+})
+
+test('a javascript: link in the book opens nothing', async ({ page }) => {
+  await addBook(page)
+  const links = page.frames().map((f) => f.locator('#ext-js'))
+  await expect
+    .poll(async () => (await Promise.all(links.map((l) => l.count()))).indexOf(1))
+    .not.toBe(-1)
+  const counts = await Promise.all(links.map((l) => l.count()))
+  let popups = 0
+  page.on('popup', () => popups++)
+  await links[counts.indexOf(1)].dispatchEvent('click')
+  // Give a popup, if any, time to open.
+  await page.waitForTimeout(500)
+  expect(popups).toBe(0)
+  expect(await page.evaluate(() => document.documentElement.dataset.pwned)).toBeUndefined()
+})
+
 test('a script inside the book does not run', async ({ page }) => {
   const violations: string[] = []
   page.on('console', (m) => {

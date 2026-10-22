@@ -3,6 +3,7 @@ import type { FoliateBook, FoliateRelocate, View } from '@foliate/view.js'
 import { Err, Ok, type Result } from '@/shared/result'
 
 import { formatAuthors, formatLanguageMap, tocEntries } from './epub-meta'
+import { externalUrl } from './links'
 import { chapterAt, normalizeStarts, sectionStarts } from './progress'
 import { foliateFile } from './sniff'
 import type {
@@ -149,6 +150,12 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
       registerFonts(doc, theme?.fonts ?? [])
     })
     view.addEventListener('link', () => linkCb?.())
+    // foliate would window.open() any scheme and leave the new page a handle on this tab.
+    view.addEventListener('external-link', (e) => {
+      e.preventDefault()
+      const url = externalUrl((e as CustomEvent<{ href_: string }>).detail.href_)
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    })
     await view.open(book)
     view.renderer.setAttribute('flow', 'paginated')
     await applyTheme()

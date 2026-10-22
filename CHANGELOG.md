@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.2 — 2026-10-22
+
+- Security: links in a book open only if they are http(s), in a new tab with no handle on the reader tab (`noopener,noreferrer`). Before, foliate opened any scheme with `window.open`, and the linked page could redirect the reader tab (e.g. to a fake sign-in page). Other schemes (javascript:, data:, file:, mailto:, app protocols) are dropped. E2E covers both cases.
+
 ## 0.22.1 — 2026-10-20
 
 - Read aloud on Android: the highlight now follows the speech through each paragraph. Android voices report no individual words, so the highlight moves by the time spoken, at a speed measured from the paragraphs already read.
