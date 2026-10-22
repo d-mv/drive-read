@@ -14,14 +14,16 @@ import { IPC } from '../src/shared/desktop'
 import { type Grants, keepFile, loadGrants, md5Kept, readKept } from './files'
 import { setAppMenu } from './menu'
 import { bookArgs, createOpenQueue } from './opens'
+import { devOverrides } from './overrides'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+const overrides = devOverrides(process.env, app.isPackaged)
 /** The web build. Packaged next to the bundled main; DR_DIST overrides it for tests. */
-const DIST = resolve(process.env.DR_DIST ?? join(HERE, '..', '..', 'dist'))
+const DIST = resolve(overrides.dist ?? join(HERE, '..', '..', 'dist'))
 const ORIGIN = 'app://drive-read'
 
 // A separate profile (tests) keeps runs apart.
-if (process.env.DR_USER_DATA) app.setPath('userData', process.env.DR_USER_DATA)
+if (overrides.userData) app.setPath('userData', overrides.userData)
 
 // One app: a second launch (e.g. `open` with a file) hands its books to the first and quits.
 const firstInstance = app.requestSingleInstanceLock()
@@ -146,6 +148,8 @@ async function createWindow() {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // Developer tools in dev runs only.
+      devTools: !app.isPackaged,
     },
   })
   // The app never leaves its origin; web links open in the browser.

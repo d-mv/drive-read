@@ -14,6 +14,17 @@ files:
 asar: true
 # Nothing native ships (main is bundled), so no rebuild of node_modules.
 npmRebuild: false
+# Another process launching the app must not run its own code under the app's identity (and its
+# macOS folder permissions): no Node mode, NODE_OPTIONS or inspector, and only the checked app.asar.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+  # Flipping fuses breaks the arm64 signature; scripts/package-desktop.ts signs again after.
+  resetAdHocDarwinSignature: true
 mac:
   # The .app only; scripts/package-desktop.ts signs it ad hoc.
   target:

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.4 — 2026-10-22
+
+- Security (desktop): Electron fuses are set in `electron-builder.yml`. The packaged app ignores `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect`, loads only an integrity-checked `app.asar`, and drops the `file://` extra privileges. Another process can no longer run its own code as Drive Read and use its macOS folder permissions. `DR_DIST` and `DR_USER_DATA` now work only in dev and test runs (`desktop/overrides.ts`, unit-tested), and DevTools are off in the packaged app. Checked on a built `.app`: fuse wire read back, the app launches with asar integrity on, and `ELECTRON_RUN_AS_NODE=1` no longer runs code.
+
 ## 0.22.3 — 2026-10-22
 
 - Security: the CSP allows Google for the sign-in script only (`https://accounts.google.com/gsi/client`), not the whole host. Book pages are same-origin frames, so a book's `<script src>` pointing at any script-returning URL on that host (a JSONP endpoint) would have run with access to the Drive token. The e2e test now stands in such an endpoint and checks the book's script stays blocked. Also added `object-src 'none'`, `base-uri 'none'`, `form-action 'none'` and `frame-ancestors 'none'`.

@@ -72,6 +72,11 @@ electron-builder.yml                .app layout, icon, document types
 - **Isolation:** `contextIsolation` and `sandbox` on, no Node in the page. Navigation away from
   the origin is blocked; web links open in the browser. The only permission granted is the
   screen wake lock. IPC is answered only for `app://drive-read/` and every argument is checked.
+- **Launch hardening:** the packaged app's Electron fuses (`electron-builder.yml`) turn off
+  `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect`, and load only the integrity-checked
+  `app.asar`, so another process cannot run its own code as Drive Read (and use its macOS folder
+  permissions). `DR_DIST` and `DR_USER_DATA` (`desktop/overrides.ts`) and DevTools work in dev
+  and test runs only.
 - **File access:** the page never names a path to grant. It hands over a `File` the user chose;
   the preload gets its path from Electron (`webUtils.getPathForFile`), and main keeps it in
   `kept-files.json` in the app profile. Main reads only kept paths, exactly as kept (a path that
