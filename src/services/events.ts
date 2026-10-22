@@ -35,6 +35,7 @@ export interface Events {
   'auth.connected': { first: boolean }
   'auth.connect_failed': { reason: string }
   'auth.expired': { where: string }
+  'auth.account_switch': { confirmed: boolean; books: number }
   'library.imported': { source: Source; added: number; failed: number; reason: string | null }
   'library.removed': { source: Source }
   'library.relinked': Record<string, never>

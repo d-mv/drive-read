@@ -244,6 +244,10 @@ sequenceDiagram
   A->>D: about.get (permissionId)
   D-->>A: permissionId
   A->>A: user_id = u_ + sha256(permissionId)[0..16]
+  opt user_id differs from this device's last account
+    A->>R: confirm: continue with this account?
+    Note over A: confirmed: books and sync state cleared from this device; cancelled: token dropped
+  end
   Note over A: token in memory + sessionStorage
   D-->>A: 401 or expiry within 60 s
   A->>R: "Reconnect Drive" where Drive is needed
@@ -251,6 +255,11 @@ sequenceDiagram
 
 - The GIS script loads on the first tap that needs Drive, never at boot, so the app starts with
   no network.
+- One Google account per device library. When a different account connects (its user id
+  differs from the last one), the reader is asked first. If they continue, every book and the
+  sync state are removed from this device without tombstones, so nothing of the old account is
+  pushed into the new account's app folder (it stays in the old account's Drive). If they cancel,
+  the token is dropped and nothing changes. Logged as `auth.account_switch`.
 - A token within a minute of expiry counts as gone. Each lapse is logged as `auth.expired` with
   where it was found.
 - Every call goes through `drive/client.ts` (plain `fetch`, no `gapi`), which turns HTTP results

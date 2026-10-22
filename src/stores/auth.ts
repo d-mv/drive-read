@@ -8,6 +8,9 @@ import { track } from '@/services/events'
 import { logger } from '@/services/logger'
 import { None, type Option, Some } from '@/shared/result'
 
+import { useLibrary } from './library'
+import { useSync } from './sync'
+
 /**
  * The Drive access token (architecture doc, "Token lifecycle"): in memory and in sessionStorage,
  * so a reload within its lifetime needs no prompt. A new token always needs a tap (connect()).
@@ -73,6 +76,9 @@ export const useAuth = defineStore('auth', () => {
         track('auth.connect_failed', { reason: r.error.kind })
         return false
       }
+      // Which account this is, before the token is kept: one small call.
+      const userId = await accountOf(r.value.accessToken)
+      if (!(await sameAccountOrReset(userId))) return false
       const first = !everConnected.value
       token.value = r.value
       everConnected.value = true
@@ -81,23 +87,52 @@ export const useAuth = defineStore('auth', () => {
         localStorage.setItem(CONNECTED_KEY, '1')
       })
       track('auth.connected', { first })
-      // Awaited (one small call) so identity is settled when connect() returns.
-      await identify(r.value.accessToken)
+      if (userId) setUser(userId)
       return true
     } finally {
       busy.value = false
     }
   }
 
+  /**
+   * The library on this device syncs with one Google account. If another one connects, ask; once
+   * confirmed, clear the device first, or the old account's books and positions would be pushed
+   * into the new account's Drive. False: the user kept the old account.
+   */
+  async function sameAccountOrReset(userId: string | null): Promise<boolean> {
+    const before = loadUserId()
+    if (!userId || !before || userId === before) return true
+    const library = useLibrary()
+    const books = library.books.length
+    const confirmed = confirm(
+      'This is a different Google account from the one used on this device before.\n\n' +
+        'Continue with it? The books and reading positions of the other account are removed ' +
+        'from this device (they stay in that account’s Drive).',
+    )
+    track('auth.account_switch', { confirmed, books })
+    if (!confirmed) return false
+    await library.removeAll()
+    await useSync().forget()
+    return true
+  }
+
   /** Pseudonymous account id for the logs: a hash of the Drive permission id, never the email. */
-  async function identify(accessToken: string) {
+  async function accountOf(accessToken: string): Promise<string | null> {
     const about = await useServices()
       .drive.aboutUser(accessToken)
       .catch(() => null)
-    if (!about || about._tag === 'Err') return
-    const userId = await userIdFromPermission(about.value.permissionId)
+    if (!about || about._tag === 'Err') return null
+    return userIdFromPermission(about.value.permissionId)
+  }
+
+  function setUser(userId: string) {
     saveUserId(userId)
     logger.setIdentity({ userId })
+  }
+
+  async function identify(accessToken: string) {
+    const userId = await accountOf(accessToken)
+    if (userId) setUser(userId)
   }
 
   /** The token if it is still good; a stale one is dropped. */

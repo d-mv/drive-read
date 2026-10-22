@@ -25,6 +25,7 @@ URLs with paths, tokens or emails.
 | `auth.connected` | info | `first` | Drive connections, first-time vs returning |
 | `auth.connect_failed` | warn | `reason` (`popup-blocked`, `popup-closed`, `denied`, `scopes-missing`, `unavailable`) | Why sign-in fails |
 | `auth.expired` | warn | `where` (`expiry`, `sync`, `download`, `drive-browser`) | How often access lapses mid-use |
+| `auth.account_switch` | info | `confirmed`, `books` (removed from this device if confirmed) | Another Google account connected on a device that had one |
 | `library.imported` | info | `source` (`local`, `drive`), `added`, `failed`, `reason` | Books added per source, import failures |
 | `library.removed` | info | `source` | Removals |
 | `library.matched_drive` | info | `format` | Desktop: a local file had a Drive book's MD5 and became that book |

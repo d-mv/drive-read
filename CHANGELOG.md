@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0 — 2026-10-22
+
+- Connecting a different Google account on a device that used another one now asks first. If you continue, the books and reading positions of the other account are removed from this device before the new token is used, so nothing of one account is synced into the other's Drive app folder (it stays in the old account's Drive). If you cancel, nothing changes and the new token is dropped. Before, both libraries were silently merged and pushed into both accounts. Logged as `auth.account_switch`. A reader that reconnects as another account while a book is open returns to the library.
+
 ## 0.22.7 — 2026-10-22
 
 - Security (tooling): vite 8.3.2 → 8.3.5, which fixes six `bun audit` advisories in the dev server (files outside `server.fs.allow`, the `?vite-wasm-instance` byte leak, cross-origin script through custom middleware, and launch-editor). None of them reached the built site. The remaining advisory (sprintf-js via Electron's download tooling, denial of service only) waits for an upstream release.

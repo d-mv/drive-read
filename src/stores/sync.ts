@@ -122,6 +122,15 @@ export const useSync = defineStore('sync', () => {
     removed,
   })
 
+  /** Starts over with no sync state: another Google account is connecting on this device. */
+  async function forget() {
+    clearTimeout(timer)
+    meta.value = emptyMeta()
+    offers.value = {}
+    status.value = 'idle'
+    await saveMeta()
+  }
+
   async function noteAdded(books: readonly BookRecord[]) {
     const now = useServices().now().toISOString()
     for (const b of books) if (b.source === 'drive') upsert(entryOf(b, now))
@@ -397,6 +406,7 @@ export const useSync = defineStore('sync', () => {
     lastSyncAt,
     offers,
     load,
+    forget,
     noteAdded,
     noteRemoved,
     nudge,

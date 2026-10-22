@@ -375,6 +375,11 @@ export const useLibrary = defineStore('library', () => {
     if (wasDrive && !opts.fromSync) await useSync().noteRemoved(id)
   }
 
+  /** Removes every book from this device without telling sync (no removals reach Drive). */
+  async function removeAll() {
+    for (const { id } of books.value) await remove(id, { fromSync: true })
+  }
+
   return {
     books,
     progress,
@@ -397,5 +402,6 @@ export const useLibrary = defineStore('library', () => {
     applyRemoteProgress,
     markSynced,
     remove,
+    removeAll,
   }
 })

@@ -209,7 +209,11 @@ async function fix(action: FixAction) {
     await library.remove(id)
     return back()
   }
-  if (action === 'reconnect' && !(await auth.connect())) return
+  if (action === 'reconnect') {
+    if (!(await auth.connect())) return
+    // Another account was connected and this device cleared: the book is gone.
+    if (!library.books.some((b) => b.id === id)) return back()
+  }
   await open()
 }
 
