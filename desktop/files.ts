@@ -3,8 +3,8 @@
  * (picker, drag-and-drop, Finder) and that are therefore kept here; never a path the page names.
  */
 import { createHash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { type FileHandle, lstat, open, readFile, rename, writeFile } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
 
 import type { DesktopReadResult } from '../src/shared/desktop'
@@ -62,7 +62,8 @@ export async function loadGrants(file: string): Promise<Grants> {
 export async function keepFile(grants: Grants, path: unknown): Promise<string | null> {
   const clean = bookPath(path)
   if (!clean) return null
-  const info = await stat(clean).catch(() => null)
+  // lstat: a symlink named as a book is refused, whatever it points at.
+  const info = await lstat(clean).catch(() => null)
   if (!info?.isFile()) return null
   await grants.add(clean)
   return clean
@@ -75,16 +76,36 @@ function keptPath(grants: Grants, path: unknown): string | null {
   return clean && clean === path && grants.has(clean) ? clean : null
 }
 
+/**
+ * Opens a kept book without following a symlink: a kept path later replaced by one (pointing at
+ * any other file) is refused, not read. Only a regular file is returned.
+ */
+async function openKept(path: string): Promise<FileHandle | 'denied' | 'missing'> {
+  let handle: FileHandle
+  try {
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'denied'
+  }
+  if ((await handle.stat()).isFile()) return handle
+  await handle.close()
+  return 'denied'
+}
+
 /** A kept book's MD5 in hex, as Drive's md5Checksum; null if not kept or unreadable. */
 export async function md5Kept(grants: Grants, path: unknown): Promise<string | null> {
   const clean = keptPath(grants, path)
   if (!clean) return null
+  const handle = await openKept(clean)
+  if (typeof handle === 'string') return null
   const hash = createHash('md5')
   try {
-    for await (const chunk of createReadStream(clean)) hash.update(chunk as Buffer)
+    for await (const chunk of handle.createReadStream()) hash.update(chunk as Buffer)
     return hash.digest('hex')
   } catch {
     return null
+  } finally {
+    await handle.close().catch(() => undefined)
   }
 }
 
@@ -92,12 +113,16 @@ export async function md5Kept(grants: Grants, path: unknown): Promise<string | n
 export async function readKept(grants: Grants, path: unknown): Promise<DesktopReadResult> {
   const clean = keptPath(grants, path)
   if (!clean) return { ok: false, reason: 'denied' }
+  const handle = await openKept(clean)
+  if (typeof handle === 'string') return { ok: false, reason: handle }
   try {
-    const buf = await readFile(clean)
+    const buf = await handle.readFile()
     const bytes = new Uint8Array(new ArrayBuffer(buf.byteLength))
     bytes.set(buf)
     return { ok: true, bytes }
   } catch {
     return { ok: false, reason: 'missing' }
+  } finally {
+    await handle.close().catch(() => undefined)
   }
 }

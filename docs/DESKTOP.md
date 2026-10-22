@@ -82,7 +82,8 @@ electron-builder.yml                .app layout, icon, document types
   `kept-files.json` in the app profile. Main reads only kept paths, exactly as kept (a path that
   only normalises to a kept one is refused), and only book names (`.epub`, `.pdf`, `.fb2`,
   `.fbz`, `.fb2.zip`). Files from Finder, the Dock, Open Recent and launch arguments are the
-  user's choice too, and main keeps them itself.
+  user's choice too, and main keeps them itself. A symlink is never kept, and a kept path is
+  opened without following symlinks, so swapping it for one later reads nothing.
 - **Books read in place:** such a book keeps `source: 'local'` and gains `path`. Opening reads
   the bytes from main as a `File`, so the engines and the reader do not change. A file no longer
   at its path fails with `file-moved`: "Locate file…" re-links it, accepting only the same bytes

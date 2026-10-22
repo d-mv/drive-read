@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -117,6 +117,31 @@ describe('md5Kept', () => {
     await keepFile(grants, path)
     expect(await md5Kept(grants, path)).toBe('5d41402abc4b2a76b9719d911017c592')
     await rm(path)
+    expect(await md5Kept(grants, path)).toBeNull()
+  })
+})
+
+describe('symlinks', () => {
+  it('refuses a symlink named as a book, whatever it points at', async () => {
+    const secret = await book('notes.txt', 'private')
+    const real = await book('real.epub')
+    const toSecret = join(dir, 'secret.epub')
+    const toBook = join(dir, 'alias.epub')
+    await symlink(secret, toSecret)
+    await symlink(real, toBook)
+    const grants = await loadGrants(grantsFile)
+    expect(await keepFile(grants, toSecret)).toBeNull()
+    expect(await keepFile(grants, toBook)).toBeNull()
+  })
+
+  it('does not follow a kept path that was swapped for a symlink later', async () => {
+    const secret = await book('notes.txt', 'private')
+    const path = await book('kept.epub')
+    const grants = await loadGrants(grantsFile)
+    expect(await keepFile(grants, path)).toBe(path)
+    await unlink(path)
+    await symlink(secret, path)
+    expect(await readKept(grants, path)).toEqual({ ok: false, reason: 'denied' })
     expect(await md5Kept(grants, path)).toBeNull()
   })
 })

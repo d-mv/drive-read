@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.1 — 2026-10-22
+
+- Security (desktop): a symlink named as a book is never kept, and kept books are opened without following symlinks (`O_NOFOLLOW`, regular files only). A kept path swapped for a symlink later reads nothing instead of whatever it points at.
+
 ## 0.24.0 — 2026-10-22
 
 - Disconnect Drive: a button on the Drive page withdraws Drive Read's access (Google revokes the token) and forgets the connection on this device. Books and reading positions stay; connecting again takes one tap. Before, the only way out was to wait for the token to expire or close the tab. Logged as `auth.disconnected`.
