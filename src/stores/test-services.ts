@@ -148,6 +148,7 @@ export async function setupServices(
   const blobs = memoryBlobStore()
   const gis: MockGis = {
     requestToken: vi.fn<Gis['requestToken']>(async () => Err({ kind: 'popup-closed' as const })),
+    revoke: vi.fn<Gis['revoke']>(async () => {}),
   }
   const drive = fakeDrive()
   const services: Services = {

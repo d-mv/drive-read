@@ -43,6 +43,18 @@ async function reconnect() {
   if (await auth.connect()) await load()
 }
 
+const disconnecting = ref(false)
+async function disconnect() {
+  disconnecting.value = true
+  try {
+    await auth.disconnect()
+    query.value = ''
+    await load()
+  } finally {
+    disconnecting.value = false
+  }
+}
+
 async function addSelected() {
   message.value = await browser.addSelected()
 }
@@ -92,6 +104,16 @@ onBeforeUnmount(() => clearTimeout(debounce))
           class="min-w-0 flex-1 bg-transparent outline-0 placeholder:text-ink2 disabled:opacity-50"
         />
       </label>
+      <button
+        v-if="auth.status !== 'disconnected'"
+        type="button"
+        title="Withdraw Drive Read's access to your Drive on this device"
+        class="h-11 px-1 font-mono text-xs text-ink2 underline-offset-[3px] hover:underline disabled:opacity-50"
+        :disabled="disconnecting"
+        @click="disconnect"
+      >
+        {{ disconnecting ? 'Disconnecting…' : 'Disconnect Drive' }}
+      </button>
     </header>
 
     <div

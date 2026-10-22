@@ -9,7 +9,7 @@ import { Err, None, Ok, Some } from '@/shared/result'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
-import { setupServices } from './test-services'
+import { epubFile, setupServices } from './test-services'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -187,5 +187,32 @@ describe('connecting a different Google account on this device', () => {
     expect([...blobs.paths()]).toEqual([])
     expect(localStorage.getItem(USER_KEY)).not.toBe('u_ba7816bf8f01cfea')
     vi.unstubAllGlobals()
+  })
+})
+
+describe('disconnect', () => {
+  it('revokes the token and forgets the connection, keeping the library and the account', async () => {
+    const { gis } = await setupServices()
+    gis.requestToken.mockResolvedValue(
+      Ok({ accessToken: 'tok', expiresAt: Date.now() + 3_600_000 }),
+    )
+    const auth = useAuth()
+    await auth.connect()
+    const account = localStorage.getItem(USER_KEY)
+    await useLibrary().importFiles([epubFile('abc')])
+
+    await auth.disconnect()
+    expect(gis.revoke).toHaveBeenCalledWith('tok')
+    expect(auth.status).toBe('disconnected')
+    expect(auth.validToken()).toEqual(None)
+    expect(sessionStorage.getItem('drive-read:token')).toBeNull()
+    expect(localStorage.getItem('drive-read:drive-connected')).toBeNull()
+    expect(localStorage.getItem(USER_KEY)).toBe(account)
+    expect(useLibrary().books).toHaveLength(1)
+
+    setActivePinia(createPinia())
+    const reloaded = useAuth()
+    reloaded.restore()
+    expect(reloaded.status).toBe('disconnected')
   })
 })

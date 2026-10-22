@@ -150,6 +150,24 @@ export const useAuth = defineStore('auth', () => {
     if (account) setUser(account.userId)
   }
 
+  /**
+   * Disconnect Drive: Google withdraws the token, and this device forgets it was connected.
+   * Books, positions and the account id stay, so the same account connects back without a prompt.
+   */
+  async function disconnect() {
+    const t = token.value
+    token.value = null
+    everConnected.value = false
+    error.value = null
+    tick.value++
+    safely(() => {
+      sessionStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(CONNECTED_KEY)
+    })
+    track('auth.disconnected', {})
+    if (t) await useServices().gis.revoke(t.accessToken)
+  }
+
   /** The token if it is still good; a stale one is dropped. */
   function validToken(): Option<string> {
     if (fresh(token.value)) return Some(token.value!.accessToken)
@@ -166,5 +184,5 @@ export const useAuth = defineStore('auth', () => {
     safely(() => sessionStorage.removeItem(TOKEN_KEY))
   }
 
-  return { status, error, busy, restore, connect, validToken, markExpired }
+  return { status, error, busy, restore, connect, disconnect, validToken, markExpired }
 })

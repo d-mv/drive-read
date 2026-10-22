@@ -26,6 +26,8 @@ export type AuthError =
 
 export interface Gis {
   requestToken(): Promise<Result<TokenGrant, AuthError>>
+  /** Withdraws the app's access granted with this token. Best effort: always settles. */
+  revoke(accessToken: string): Promise<void>
 }
 
 interface GisTokenResponse {
@@ -44,6 +46,7 @@ interface GisGlobal {
         error_callback?: (e: { type: string }) => void
       }): { requestAccessToken(opts?: { prompt?: string }): void }
       hasGrantedAllScopes(r: GisTokenResponse, ...scopes: string[]): boolean
+      revoke(accessToken: string, done?: () => void): void
     }
   }
 }
@@ -51,6 +54,8 @@ interface GisGlobal {
 const SCRIPT = 'https://accounts.google.com/gsi/client'
 /** Google's access tokens last an hour; assumed if a response leaves the lifetime out. */
 const DEFAULT_LIFETIME_S = 3600
+/** How long Disconnect waits for Google to confirm a revoke. */
+const REVOKE_WAIT_MS = 5000
 
 function loadScript(): Promise<GisGlobal> {
   const existing = (window as { google?: GisGlobal }).google
@@ -105,6 +110,18 @@ export function createGis(clientId: string, now: () => number = Date.now): Gis {
         })
         client.requestAccessToken({ prompt: '' })
       })
+    },
+    async revoke(accessToken) {
+      if (!clientId) return
+      try {
+        const google = await loadScript()
+        await Promise.race([
+          new Promise<void>((resolve) => google.accounts.oauth2.revoke(accessToken, resolve)),
+          new Promise<void>((resolve) => setTimeout(resolve, REVOKE_WAIT_MS)),
+        ])
+      } catch {
+        // Offline or blocked: the token still lapses within the hour.
+      }
     },
   }
 }

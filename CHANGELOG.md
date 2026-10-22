@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.0 — 2026-10-22
+
+- Disconnect Drive: a button on the Drive page withdraws Drive Read's access (Google revokes the token) and forgets the connection on this device. Books and reading positions stay; connecting again takes one tap. Before, the only way out was to wait for the token to expire or close the tab. Logged as `auth.disconnected`.
+
 ## 0.23.5 — 2026-10-22
 
 - Books larger than 200 MB are refused before any parsing: at import ("larger than 200 MB, the most Drive Read opens"), before a Drive download (by Drive's size, and the download stops if more arrives), and when opening a stored file. A crafted archive or PDF could otherwise exhaust the tab's memory. Inner limits on decompression would need changes to foliate-js and are not made.

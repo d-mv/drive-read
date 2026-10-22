@@ -255,6 +255,9 @@ sequenceDiagram
 
 - The GIS script loads on the first tap that needs Drive, never at boot, so the app starts with
   no network.
+- **Disconnect Drive** (Drive page) asks Google to revoke the token, then forgets it and the
+  "connected" flag on this device. Books, positions and the account id stay, so the same account
+  connects back without the switch prompt. Logged as `auth.disconnected`.
 - One Google account per device library. When a different account connects (its user id
   differs from the last one), the reader is asked first. If they continue, every book and the
   sync state are removed from this device without tombstones, so nothing of the old account is

@@ -31,6 +31,19 @@ const voyageLink = (page: Page) =>
     .filter({ visible: true })
     .first()
 
+test('disconnecting revokes access and asks to connect again', async ({ page }) => {
+  await fakeGoogle(page)
+  await connect(page)
+  await page.getByRole('button', { name: 'Disconnect Drive' }).click()
+  await expect(page.getByText('Connect Google Drive to browse and add your books.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Disconnect Drive' })).toHaveCount(0)
+  expect(await page.evaluate(() => (window as { __revoked?: string[] }).__revoked)).toEqual([
+    'fake-token',
+  ])
+  await page.reload()
+  await expect(page.getByText('Connect Google Drive to browse and add your books.')).toBeVisible()
+})
+
 test('opens on My Drive folders, with no all-books list', async ({ page }) => {
   await fakeGoogle(page)
   await connect(page)

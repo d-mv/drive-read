@@ -66,7 +66,8 @@ window.google = { accounts: { oauth2: {
       setTimeout(function () { cfg.callback({ access_token: 'fake-token', expires_in: 3599, scope: cfg.scope }) }, 10)
     } }
   },
-  hasGrantedAllScopes: function () { return true }
+  hasGrantedAllScopes: function () { return true },
+  revoke: function (token, done) { (window.__revoked = window.__revoked || []).push(token); if (done) done() }
 } } }`
 
 const CORS = {
