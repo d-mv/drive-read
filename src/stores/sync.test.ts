@@ -288,6 +288,26 @@ describe('failures', () => {
     expect(useSync().status).toBe('idle')
   })
 
+  it('ignores a progress file whose record names another book', async () => {
+    const appdata = memoryAppData()
+    await device(appdata, 'Laptop')
+    await useLibrary().addFromDrive([driveFile('b1'), driveFile('b2')])
+    await useLibrary().saveProgress('b2', at(0.3))
+    await appdata.create('tok', 'progress-b1.json', {
+      v: 1,
+      fileId: 'b2',
+      fraction: 0.9,
+      updatedAt: '2099-01-01T00:00:00.000Z',
+      device: { id: 'other', name: 'Phone' },
+      locator: { kind: 'cfi', cfi: 'epubcfi(/6/8)' },
+      bookmarks: [],
+      extra: 'not kept',
+    })
+    await useSync().syncNow()
+    expect(useLibrary().progress.b2?.fraction).toBe(0.3)
+    expect(useLibrary().progress.b1).toBeUndefined()
+  })
+
   it('an expired token keeps changes waiting and asks to reconnect', async () => {
     const appdata = memoryAppData()
     await device(appdata, 'Laptop')

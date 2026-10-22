@@ -206,3 +206,52 @@ describe('schema validation', () => {
     ).toBe(false)
   })
 })
+
+describe('schema validation: values', () => {
+  const entry = {
+    fileId: '1AbC-d_9',
+    md5: null,
+    name: 'Book',
+    addedAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00Z',
+    removed: false,
+  }
+  const doc = (e: object) => ({ v: 1, entries: [{ ...entry, ...e }] })
+
+  it('accepts Drive ids and local ids', () => {
+    expect(isValidLibraryDoc(doc({}))).toBe(true)
+    expect(isValidLibraryDoc(doc({ fileId: 'local-0123456789abcdef0123456789abcdef' }))).toBe(true)
+  })
+
+  it.each([
+    ['a path-like id', { fileId: '../x' }],
+    ['an empty id', { fileId: '' }],
+    ['a prototype key', { fileId: '__proto__x/..' }],
+    ['a timestamp that sorts after any date', { updatedAt: '\uffff' }],
+    ['a non-ISO added date', { addedAt: 'yesterday' }],
+  ])('rejects a library entry with %s', (_, e) => {
+    expect(isValidLibraryDoc(doc(e))).toBe(false)
+  })
+
+  const progress = {
+    v: 1,
+    fileId: 'b1',
+    fraction: 0.5,
+    updatedAt: '2026-10-01T00:00:00.000Z',
+    device: { id: 'd1', name: 'Laptop' },
+    locator: { kind: 'page', page: 3, offset: 0.2 },
+  }
+
+  it.each([
+    ['a fraction above 1', { fraction: 1.5 }],
+    ['a negative fraction', { fraction: -0.1 }],
+    ['a huge fraction', { fraction: 1e308 }],
+    ['a negative page', { locator: { kind: 'page', page: -5, offset: 0 } }],
+    ['a fractional page', { locator: { kind: 'page', page: 1.5, offset: 0 } }],
+    ['an offset outside 0..1', { locator: { kind: 'page', page: 1, offset: 1e308 } }],
+    ['a non-ISO timestamp', { updatedAt: '\uffff' }],
+    ['a path-like id', { fileId: '../x' }],
+  ])('rejects progress with %s', (_, p) => {
+    expect(isValidSyncedProgress({ ...progress, ...p })).toBe(false)
+  })
+})

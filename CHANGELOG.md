@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.3 — 2026-10-22
+
+- Sync is stricter about what other devices wrote. A `progress-<id>.json` whose record names another book is ignored (before, it overwrote that book's position), and only known fields are stored. Library and progress records need a Drive-style id, ISO timestamps (a value like `\uffff` used to win every later merge), a fraction from 0 to 1, and a non-negative whole page with an offset from 0 to 1.
+
 ## 0.23.2 — 2026-10-22
 
 - Security (ops): `.DS_Store` files are kept out of the Docker build context at any depth (`**/.DS_Store`). A Finder `public/.DS_Store` was being served at `/.DS_Store`, listing the names in `public/`. `scripts/check-build-args.sh` now requires the server's known host key (`StrictHostKeyChecking=yes`) before it sends the password.

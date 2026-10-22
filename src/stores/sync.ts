@@ -235,7 +235,8 @@ export const useSync = defineStore('sync', () => {
 
       const r = await appdata.read(tok, file.id)
       if (r._tag === 'Err') return r.error
-      if (!isValidSyncedProgress(r.value)) {
+      // A record is only ever about the book its file is named after.
+      if (!isValidSyncedProgress(r.value) || r.value.fileId !== book.id) {
         track('sync.failed', { reason: 'corrupt-progress-doc', pending: pending.value })
         continue
       }
@@ -254,8 +255,15 @@ export const useSync = defineStore('sync', () => {
           if (local) await library.markSynced(book.id, file.id, file.modifiedTime)
           continue
         }
+        const { v, fileId, locator, fraction, updatedAt, device } = remote.record
         await library.applyRemoteProgress({
-          ...remote.record,
+          v,
+          fileId,
+          locator,
+          fraction,
+          updatedAt,
+          device: { id: device.id, name: device.name },
+          bookmarks: [],
           dirty: false,
           remoteId: file.id,
           remoteModifiedTime: file.modifiedTime,
