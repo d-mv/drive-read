@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.6 — 2026-10-22
+
+- Security: books reach only the foliate-js readers the app offers (EPUB, FB2). An EPUB goes in as `book.epub` and must be a zip, and an FB2 with Kindle bytes is refused, so a Kindle (MOBI) file or a comic archive (CBZ) named as a book no longer opens through foliate's MOBI or CBZ readers. These readers were never reviewed for this app. Such files now report as unreadable.
+
 ## 0.22.5 — 2026-10-22
 
 - Security: the app container's Caddy sends `Strict-Transport-Security: max-age=31536000` and `Cross-Origin-Opener-Policy: same-origin-allow-popups`. The front proxy already redirects HTTP to HTTPS, but sent neither header.

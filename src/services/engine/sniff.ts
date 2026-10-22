@@ -40,14 +40,25 @@ export async function detectFormat(file: File): Promise<BookFormat | null> {
   return entry && named === 'fb2' ? null : named
 }
 
+/** foliate-js's own test for a Kindle book: `BOOKMOBI` at byte 60. */
+const isMobi = (head: Uint8Array) =>
+  new TextDecoder('latin1').decode(head.subarray(60, 68)) === 'BOOKMOBI'
+
 /**
- * foliate-js picks its reader by file name: an FB2, whatever it was called, goes in as
- * `book.fb2` (XML) or `book.fbz` (zipped).
+ * foliate-js picks its reader by file name, type and bytes, and also has Kindle (MOBI) and comic
+ * (CBZ) readers this app never offers. So an EPUB goes in as `book.epub` and must be a zip; an
+ * FB2 goes in as `book.fbz` (zipped) or `book.fb2` (XML), never with Kindle bytes. Anything else
+ * throws, and the engine reports the file as unreadable.
  */
 export async function foliateFile(file: File, format: BookFormat): Promise<File> {
+  const head = new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer())
+  const zipped = firstZipEntry(head) !== null
+  if (format === 'epub') {
+    if (!zipped) throw new Error('not an EPUB: the file is not a zip archive')
+    return new File([file], 'book.epub', { type: 'application/epub+zip' })
+  }
   if (format !== 'fb2') return file
-  const zipped = firstZipEntry(new Uint8Array(await file.slice(0, HEAD_BYTES).arrayBuffer()))
-  return zipped !== null
-    ? new File([file], 'book.fbz', { type: 'application/x-zip-compressed-fb2' })
-    : new File([file], 'book.fb2', { type: 'application/x-fictionbook+xml' })
+  if (zipped) return new File([file], 'book.fbz', { type: 'application/x-zip-compressed-fb2' })
+  if (isMobi(head)) throw new Error('not an FB2: the file is a Kindle book')
+  return new File([file], 'book.fb2', { type: 'application/x-fictionbook+xml' })
 }
