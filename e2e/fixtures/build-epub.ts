@@ -1,6 +1,7 @@
 /**
  * Builds e2e/fixtures/test-voyage.epub: four chapters with a TOC, long enough to paginate.
- * Chapter 3 carries a script that must NOT run (the CSP blocks it). Chapter 1 opens with a
+ * Chapter 3 carries an inline script and a script from a Google JSONP URL; neither may run (the
+ * CSP blocks both). Chapter 1 opens with a
  * footnote reference whose note lives in chapter 4, a web link and a javascript: link.
  * Run: bun e2e/fixtures/build-epub.ts (needs the `zip` CLI)
  */
@@ -61,7 +62,7 @@ write(
 chapters.forEach((title, i) => {
   const script =
     i === 2
-      ? `<script>try { parent.document.documentElement.dataset.pwned = '1' } catch (e) {} document.documentElement.dataset.pwned = '1'</script>`
+      ? `<script>try { parent.document.documentElement.dataset.pwned = '1' } catch (e) {} document.documentElement.dataset.pwned = '1'</script><script src="https://accounts.google.com/o/oauth2/revoke?callback=probe"></script>`
       : ''
   write(
     `OEBPS/c${i + 1}.xhtml`,

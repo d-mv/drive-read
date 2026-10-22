@@ -496,7 +496,11 @@ flowchart LR
 
 ```text
 default-src 'self';
-script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com;
+script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client;
+object-src 'none';
+base-uri 'none';
+form-action 'none';
+frame-ancestors 'none';
 connect-src 'self' https://www.googleapis.com https://accounts.google.com https://logger-api.mlnkv.net;
 frame-src blob: https://accounts.google.com;
 img-src 'self' blob: data:;
@@ -506,6 +510,10 @@ worker-src 'self' blob:
 ```
 
 `script-src` allows neither `blob:` nor `'unsafe-inline'`, so a script inside a book cannot run.
+Book pages are same-origin frames (foliate's sandbox is `allow-same-origin allow-scripts`), so the
+CSP is the only barrier between a book and the token: Google is allowed for the sign-in script
+path only, since other URLs on that host (JSONP endpoints) would run a script the book asks for.
+The e2e test stands in such an endpoint and checks the book's script stays blocked.
 `'wasm-unsafe-eval'` only lets pdf.js compile its own WebAssembly decoders, served from `'self'`;
 it allows no JavaScript eval. foliate-js's own PDF path (with a second, vendored pdf.js) is
 replaced by a stub at build time, so it is neither shipped nor precached.

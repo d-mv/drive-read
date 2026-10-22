@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.3 — 2026-10-22
+
+- Security: the CSP allows Google for the sign-in script only (`https://accounts.google.com/gsi/client`), not the whole host. Book pages are same-origin frames, so a book's `<script src>` pointing at any script-returning URL on that host (a JSONP endpoint) would have run with access to the Drive token. The e2e test now stands in such an endpoint and checks the book's script stays blocked. Also added `object-src 'none'`, `base-uri 'none'`, `form-action 'none'` and `frame-ancestors 'none'`.
+
 ## 0.22.2 — 2026-10-22
 
 - Security: links in a book open only if they are http(s), in a new tab with no handle on the reader tab (`noopener,noreferrer`). Before, foliate opened any scheme with `window.open`, and the linked page could redirect the reader tab (e.g. to a fake sign-in page). Other schemes (javascript:, data:, file:, mailto:, app protocols) are dropped. E2E covers both cases.

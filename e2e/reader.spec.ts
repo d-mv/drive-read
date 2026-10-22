@@ -105,6 +105,13 @@ test('a javascript: link in the book opens nothing', async ({ page }) => {
 })
 
 test('a script inside the book does not run', async ({ page }) => {
+  // Stands in for a JSONP endpoint on the Google sign-in host: script the book author steers.
+  await page.route('https://accounts.google.com/o/oauth2/revoke**', (r) =>
+    r.fulfill({
+      contentType: 'text/javascript',
+      body: "parent.document.documentElement.dataset.pwned = 'jsonp'",
+    }),
+  )
   const violations: string[] = []
   page.on('console', (m) => {
     if (/Content Security Policy/i.test(m.text())) violations.push(m.text())
