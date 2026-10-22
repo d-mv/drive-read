@@ -49,6 +49,8 @@ interface GisGlobal {
 }
 
 const SCRIPT = 'https://accounts.google.com/gsi/client'
+/** Google's access tokens last an hour; assumed if a response leaves the lifetime out. */
+const DEFAULT_LIFETIME_S = 3600
 
 function loadScript(): Promise<GisGlobal> {
   const existing = (window as { google?: GisGlobal }).google
@@ -93,7 +95,10 @@ export function createGis(clientId: string, now: () => number = Date.now): Gis {
             if (!google.accounts.oauth2.hasGrantedAllScopes(r, ...DRIVE_SCOPES))
               return resolve(Err({ kind: 'scopes-missing' }))
             resolve(
-              Ok({ accessToken: r.access_token, expiresAt: now() + (r.expires_in ?? 0) * 1000 }),
+              Ok({
+                accessToken: r.access_token,
+                expiresAt: now() + (r.expires_in ?? DEFAULT_LIFETIME_S) * 1000,
+              }),
             )
           },
           error_callback: (e) => resolve(Err(ERROR_KIND[e.type] ?? { kind: 'popup-closed' })),
