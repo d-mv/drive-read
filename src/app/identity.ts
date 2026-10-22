@@ -10,11 +10,19 @@ import type { Device } from './device'
 export const USER_KEY = 'drive-read:user'
 const USER_ID = /^u_[0-9a-f]{16}$/
 
-export async function userIdFromPermission(permissionId: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(permissionId))
+/** Makes the id specific to this app: a plain hash of a permission id is the same everywhere. */
+const SALT = 'drive-read/user-id/v2:'
+
+async function hashId(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
   const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
   return `u_${hex.slice(0, 16)}`
 }
+
+export const userIdFromPermission = (permissionId: string) => hashId(SALT + permissionId)
+
+/** The id before 0.23.4 (unsalted): a device that stored it is still the same account. */
+export const legacyUserIdFromPermission = (permissionId: string) => hashId(permissionId)
 
 /** Kept so sessions without a token (offline, expired) are still attributed. */
 export function loadUserId(): string | null {

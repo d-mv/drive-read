@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.4 — 2026-10-22
+
+- Logs: `error.uncaught` sends the kind of error (`TypeError`, `QuotaExceededError`…) and where it happened, never the message, which could quote a book's text or a file name. The pseudonymous user id is now a salted hash of the Drive permission id, so it can't be matched with a plain hash of a known id. User ids in the logs change once; a device that stored the old id is still recognised as the same account when it reconnects.
+
 ## 0.23.3 — 2026-10-22
 
 - Sync is stricter about what other devices wrote. A `progress-<id>.json` whose record names another book is ignored (before, it overwrote that book's position), and only known fields are stored. Library and progress records need a Drive-style id, ISO timestamps (a value like `\uffff` used to win every later merge), a fraction from 0 to 1, and a non-negative whole page with an offset from 0 to 1.

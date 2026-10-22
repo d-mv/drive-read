@@ -3,7 +3,12 @@ import { computed, ref } from 'vue'
 
 import { useServices } from '@/services'
 import type { AuthError, TokenGrant } from '@/services/auth/gis'
-import { loadUserId, saveUserId, userIdFromPermission } from '@/app/identity'
+import {
+  legacyUserIdFromPermission,
+  loadUserId,
+  saveUserId,
+  userIdFromPermission,
+} from '@/app/identity'
 import { track } from '@/services/events'
 import { logger } from '@/services/logger'
 import { None, type Option, Some } from '@/shared/result'
@@ -21,6 +26,12 @@ const CONNECTED_KEY = 'drive-read:drive-connected'
 const SAFETY_MS = 60_000
 
 export type AuthStatus = 'disconnected' | 'connected' | 'expired'
+
+/** Who connected: the log id, and the unsalted id older versions stored on this device. */
+interface Account {
+  userId: string
+  legacyId: string
+}
 
 function readSession(): TokenGrant | null {
   try {
@@ -77,8 +88,8 @@ export const useAuth = defineStore('auth', () => {
         return false
       }
       // Which account this is, before the token is kept: one small call.
-      const userId = await accountOf(r.value.accessToken)
-      if (!(await sameAccountOrReset(userId))) return false
+      const account = await accountOf(r.value.accessToken)
+      if (!(await sameAccountOrReset(account))) return false
       const first = !everConnected.value
       token.value = r.value
       everConnected.value = true
@@ -87,7 +98,7 @@ export const useAuth = defineStore('auth', () => {
         localStorage.setItem(CONNECTED_KEY, '1')
       })
       track('auth.connected', { first })
-      if (userId) setUser(userId)
+      if (account) setUser(account.userId)
       return true
     } finally {
       busy.value = false
@@ -99,9 +110,9 @@ export const useAuth = defineStore('auth', () => {
    * confirmed, clear the device first, or the old account's books and positions would be pushed
    * into the new account's Drive. False: the user kept the old account.
    */
-  async function sameAccountOrReset(userId: string | null): Promise<boolean> {
+  async function sameAccountOrReset(account: Account | null): Promise<boolean> {
     const before = loadUserId()
-    if (!userId || !before || userId === before) return true
+    if (!account || !before || before === account.userId || before === account.legacyId) return true
     const library = useLibrary()
     const books = library.books.length
     const confirmed = confirm(
@@ -117,12 +128,16 @@ export const useAuth = defineStore('auth', () => {
   }
 
   /** Pseudonymous account id for the logs: a hash of the Drive permission id, never the email. */
-  async function accountOf(accessToken: string): Promise<string | null> {
+  async function accountOf(accessToken: string): Promise<Account | null> {
     const about = await useServices()
       .drive.aboutUser(accessToken)
       .catch(() => null)
     if (!about || about._tag === 'Err') return null
-    return userIdFromPermission(about.value.permissionId)
+    const { permissionId } = about.value
+    return {
+      userId: await userIdFromPermission(permissionId),
+      legacyId: await legacyUserIdFromPermission(permissionId),
+    }
   }
 
   function setUser(userId: string) {
@@ -131,8 +146,8 @@ export const useAuth = defineStore('auth', () => {
   }
 
   async function identify(accessToken: string) {
-    const userId = await accountOf(accessToken)
-    if (userId) setUser(userId)
+    const account = await accountOf(accessToken)
+    if (account) setUser(account.userId)
   }
 
   /** The token if it is still good; a stale one is dropped. */

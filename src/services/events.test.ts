@@ -33,9 +33,9 @@ describe('track', () => {
 
   it('logs crashes as errors', () => {
     const error = vi.spyOn(logger, 'error')
-    track('error.uncaught', { message: 'x is undefined', source: 'reader.ts:12' })
+    track('error.uncaught', { name: 'TypeError', source: 'reader.ts:12' })
     expect(error).toHaveBeenCalledWith('error.uncaught', {
-      message: 'x is undefined',
+      name: 'TypeError',
       source: 'reader.ts:12',
     })
   })

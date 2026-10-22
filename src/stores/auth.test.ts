@@ -83,9 +83,9 @@ describe('identity in the logs', () => {
     )
     await useAuth().connect()
     await vi.waitFor(() =>
-      expect(setIdentity).toHaveBeenCalledWith({ userId: 'u_ba7816bf8f01cfea' }),
+      expect(setIdentity).toHaveBeenCalledWith({ userId: 'u_659b68cd6dbb8530' }),
     )
-    expect(localStorage.getItem(USER_KEY)).toBe('u_ba7816bf8f01cfea')
+    expect(localStorage.getItem(USER_KEY)).toBe('u_659b68cd6dbb8530')
     expect(info).toHaveBeenCalledWith('auth.connected', { first: true })
     vi.restoreAllMocks()
   })
@@ -102,7 +102,7 @@ describe('identity for accounts connected before identification existed', () => 
     localStorage.setItem('drive-read:drive-connected', '1')
     useAuth().restore()
     await vi.waitFor(() =>
-      expect(setIdentity).toHaveBeenCalledWith({ userId: 'u_ba7816bf8f01cfea' }),
+      expect(setIdentity).toHaveBeenCalledWith({ userId: 'u_659b68cd6dbb8530' }),
     )
     expect(drive.aboutUser).toHaveBeenCalledWith('tok')
     vi.restoreAllMocks()
@@ -130,7 +130,7 @@ describe('connecting a different Google account on this device', () => {
     md5: null,
     modifiedTime: '',
   }
-  /** Account A ('abc') was connected before and has a synced book on this device. */
+  /** Account A ('abc') was connected before 0.23.4 (unsalted id) and has a synced book here. */
   async function signedInBefore() {
     const ctx = await setupServices()
     localStorage.setItem(USER_KEY, 'u_ba7816bf8f01cfea')
@@ -144,11 +144,13 @@ describe('connecting a different Google account on this device', () => {
 
   it('keeps the library when the same account connects again, without asking', async () => {
     await signedInBefore()
+    // The stored id is the old unsalted form: still the same account, now stored salted.
     const ask = vi.fn<() => boolean>(() => true)
     vi.stubGlobal('confirm', ask)
     expect(await useAuth().connect()).toBe(true)
     expect(ask).not.toHaveBeenCalled()
     expect(useLibrary().books.map((b) => b.id)).toEqual(['book-a'])
+    expect(localStorage.getItem(USER_KEY)).toBe('u_659b68cd6dbb8530')
     vi.unstubAllGlobals()
   })
 

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { blockedOrigin, errorSource, isBenignError, vueErrorEvent } from './observability'
+import {
+  blockedOrigin,
+  errorName,
+  errorSource,
+  isBenignError,
+  vueErrorEvent,
+} from './observability'
 
 describe('blockedOrigin', () => {
   it('keeps only the origin or the kind, never a path that could name a book', () => {
@@ -31,14 +37,24 @@ describe('isBenignError', () => {
   })
 })
 
+describe('errorName', () => {
+  it('is the kind of error only, never its message (which can quote book text)', () => {
+    expect(errorName(new TypeError('Cannot read “Secret Title”'))).toBe('TypeError')
+    expect(errorName(new DOMException('quota', 'QuotaExceededError'))).toBe('QuotaExceededError')
+    expect(errorName('a thrown string with a title')).toBe('string')
+    expect(errorName(undefined)).toBe('undefined')
+    expect(errorName({ name: 'x'.repeat(200) })).toBe('object')
+  })
+})
+
 describe('vueErrorEvent', () => {
-  it('reports Vue render and handler errors with where they happened', () => {
-    expect(vueErrorEvent(new Error('boom'), 'render function')).toEqual({
-      message: 'boom',
+  it('reports Vue render and handler errors with where they happened, not the message', () => {
+    expect(vueErrorEvent(new RangeError('“A Book” page 3'), 'render function')).toEqual({
+      name: 'RangeError',
       source: 'vue:render function',
     })
     expect(vueErrorEvent('plain', 'setup function')).toEqual({
-      message: 'plain',
+      name: 'string',
       source: 'vue:setup function',
     })
   })

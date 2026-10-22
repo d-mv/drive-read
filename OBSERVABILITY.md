@@ -47,7 +47,7 @@ URLs with paths, tokens or emails.
 | `storage.write_failed` | warn | `what` (`progress`, `book`), `reason` (`quota`, `unknown`) | Lost writes |
 | `pwa.update_available`, `pwa.update_applied` (`waiting`, `controlled`), `pwa.reloading` (`trigger`: `activated`, `controllerchange`, `no-waiting`, `timeout`), `pwa.updated` (`from`, `to`), `pwa.offline_ready` | info | | Update uptake: offered → applied → reloaded → running |
 | `pwa.install_prompted`, `pwa.install_result` (`outcome`), `pwa.installed` | info | | Install funnel |
-| `error.uncaught` | error | `message` (≤300 chars), `source` (`chunk.js:line`, `promise` or `vue:<where>`) | Crashes, including Vue render and handler errors. The browser's "ResizeObserver loop" notice is ignored |
+| `error.uncaught` | error | `name` (`TypeError`, `QuotaExceededError`…; never the message, which can quote book text), `source` (`chunk.js:line`, `promise` or `vue:<where>`) | Crashes, including Vue render and handler errors. The browser's "ResizeObserver loop" notice is ignored |
 | `csp.violation` | warn | `directive`, `blocked` (origin or kind only) | Blocked content, e.g. scripts inside books (`blob`) |
 
 ## Asking questions

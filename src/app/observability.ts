@@ -7,7 +7,8 @@ import { browserKind } from './update'
 
 /**
  * Observability wiring (OBSERVABILITY.md): who the events are about (pseudonymous), app start
- * timing, uncaught errors and CSP violations. Nothing here sends titles, URLs paths or emails.
+ * timing, uncaught errors and CSP violations. Nothing here sends titles, URLs paths or emails,
+ * nor error messages: they can quote a book's text or a file name.
  */
 
 /** Only the origin or the kind of a blocked resource: a path or blob URL could name a book. */
@@ -34,15 +35,18 @@ export function errorSource(
   return line ? `${name}:${line}` : name
 }
 
-const short = (s: unknown) => String(s ?? '').slice(0, 300)
+/** The kind of error (`TypeError`, `QuotaExceededError`), or of the thrown value. */
+export function errorName(err: unknown): string {
+  if (err instanceof Error || err instanceof DOMException) return err.name.slice(0, 60)
+  return typeof err
+}
 
 /** Browser notices that are not crashes: logging them would bury real errors. */
 export const isBenignError = (message: string) => message.startsWith('ResizeObserver loop')
 
 /** A Vue render, setup or handler error (these never reach window.onerror). */
-export function vueErrorEvent(err: unknown, info: string): { message: string; source: string } {
-  const message = err instanceof Error ? err.message : String(err)
-  return { message: short(message), source: `vue:${info}` }
+export function vueErrorEvent(err: unknown, info: string): { name: string; source: string } {
+  return { name: errorName(err), source: `vue:${info}` }
 }
 
 export function startObservability(device: Device) {
@@ -51,13 +55,12 @@ export function startObservability(device: Device) {
   addEventListener('error', (e) => {
     if (isBenignError(String(e.message ?? ''))) return
     track('error.uncaught', {
-      message: short(e.message),
+      name: errorName(e.error),
       source: errorSource(e.filename, e.lineno, e.colno),
     })
   })
   addEventListener('unhandledrejection', (e) => {
-    const reason = e.reason as { message?: string } | undefined
-    track('error.uncaught', { message: short(reason?.message ?? e.reason), source: 'promise' })
+    track('error.uncaught', { name: errorName(e.reason), source: 'promise' })
   })
   document.addEventListener('securitypolicyviolation', (e) => {
     track('csp.violation', {

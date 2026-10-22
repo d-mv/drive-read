@@ -1,15 +1,27 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { deviceLabel, loadUserId, saveUserId, userIdFromPermission, USER_KEY } from './identity'
+import {
+  deviceLabel,
+  legacyUserIdFromPermission,
+  loadUserId,
+  saveUserId,
+  userIdFromPermission,
+  USER_KEY,
+} from './identity'
 
 beforeEach(() => localStorage.clear())
 
 describe('userIdFromPermission', () => {
-  it('is u_ plus the first 16 hex digits of SHA-256 of the permission id: stable, not reversible', async () => {
-    // SHA-256("abc") = ba7816bf8f01cfea…
-    expect(await userIdFromPermission('abc')).toBe('u_ba7816bf8f01cfea')
-    expect(await userIdFromPermission('abc')).toBe(await userIdFromPermission('abc'))
+  it('is u_ plus 16 hex digits of a salted SHA-256 of the permission id: stable, not reversible', async () => {
+    // SHA-256("drive-read/user-id/v2:abc") = 659b68cd6dbb8530…
+    expect(await userIdFromPermission('abc')).toBe('u_659b68cd6dbb8530')
     expect(await userIdFromPermission('abd')).not.toBe(await userIdFromPermission('abc'))
+  })
+
+  it('differs from the plain hash anyone could compute from a known permission id', async () => {
+    // SHA-256("abc") = ba7816bf8f01cfea…: the id before 0.23.4, still recognised as the same account.
+    expect(await legacyUserIdFromPermission('abc')).toBe('u_ba7816bf8f01cfea')
+    expect(await userIdFromPermission('abc')).not.toBe(await legacyUserIdFromPermission('abc'))
   })
 })
 

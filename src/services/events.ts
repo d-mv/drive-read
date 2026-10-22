@@ -83,7 +83,7 @@ export interface Events {
   'pwa.install_prompted': Record<string, never>
   'pwa.install_result': { outcome: string }
   'pwa.installed': Record<string, never>
-  'error.uncaught': { message: string; source: string }
+  'error.uncaught': { name: string; source: string }
   'csp.violation': { directive: string; blocked: string }
 }
 
