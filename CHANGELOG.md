@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.2 — 2026-10-22
+
+- Security (ops): `.DS_Store` files are kept out of the Docker build context at any depth (`**/.DS_Store`). A Finder `public/.DS_Store` was being served at `/.DS_Store`, listing the names in `public/`. `scripts/check-build-args.sh` now requires the server's known host key (`StrictHostKeyChecking=yes`) before it sends the password.
+
 ## 0.23.1 — 2026-10-22
 
 - Fix: a Google token response without `expires_in` is taken to last Google's usual hour. Before, it counted as already expired while Connect reported success.

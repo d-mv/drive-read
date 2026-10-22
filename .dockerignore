@@ -3,7 +3,7 @@ dist
 test-results
 playwright-report
 .git
-.DS_Store
+**/.DS_Store
 # Build-time config comes only from build args (deploy.toml), never from a local .env.
 .env
 .env.*
