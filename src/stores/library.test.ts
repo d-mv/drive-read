@@ -6,6 +6,8 @@ import { logger } from '@/services/logger'
 import { type MemoryLocalFiles, memoryLocalFiles } from '@/services/storage/localFiles'
 import { isSome } from '@/shared/result'
 
+import { MAX_BOOK_BYTES } from '@/domain/book'
+
 import { useLibrary } from './library'
 import { epubFile, Err, META, setupServices } from './test-services'
 
@@ -19,6 +21,15 @@ const at = (fraction: number): Position => ({
 })
 
 describe('importFiles', () => {
+  it('refuses a file over the size limit before reading it', async () => {
+    const { services } = await setupServices()
+    const big = epubFile('abc', 'huge.epub')
+    Object.defineProperty(big, 'size', { value: MAX_BOOK_BYTES + 1 })
+    const result = await useLibrary().importFiles([big])
+    expect(result.failed).toEqual([{ name: 'huge.epub', reason: 'too-large' }])
+    expect(await services.db.allBooks()).toEqual([])
+  })
+
   it('stores the file and cover and records the metadata', async () => {
     const { blobs, services } = await setupServices()
     const library = useLibrary()

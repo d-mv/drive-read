@@ -7,6 +7,7 @@ const FAILURE_COPY: Record<ImportFailure, string> = {
   unreadable: "This file can't be opened. It may be protected or damaged.",
   quota: 'Not enough space on this device.',
   storage: "The file couldn't be saved on this device.",
+  'too-large': 'This file is larger than 200 MB, the most Drive Read opens.',
 }
 
 /** One line for the user about a finished import, or null when everything went in. */

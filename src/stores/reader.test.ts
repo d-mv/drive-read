@@ -8,7 +8,11 @@ import type { Speaker } from '@/services/speech/player'
 
 import { useAuth } from './auth'
 import { useLibrary } from './library'
+import { MAX_BOOK_BYTES } from '@/domain/book'
+
 import { useReader } from './reader'
+import { Some } from '@/shared/result'
+
 import { epubFile, Err, META, Ok, setupServices } from './test-services'
 
 beforeEach(() => setActivePinia(createPinia()))
@@ -269,6 +273,7 @@ describe('Drive books', () => {
       'tok',
       expect.objectContaining({ id: 'd1' }),
       expect.any(Function),
+      { maxBytes: MAX_BOOK_BYTES },
     )
     expect(blobs.paths()).toContain('books/d1')
     expect(engine.open).toHaveBeenCalled()
@@ -278,6 +283,37 @@ describe('Drive books', () => {
       title: 'Harbour Year',
       provisional: false,
     })
+  })
+
+  it('does not download a Drive book over the size limit', async () => {
+    const { drive } = await withDriveBook('tok')
+    await useLibrary().addFromDrive([{ ...driveFile, id: 'big', size: MAX_BOOK_BYTES + 1 }])
+    const reader = useReader()
+    await reader.open('big', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'error', error: 'too-large' })
+    expect(drive.download).not.toHaveBeenCalled()
+  })
+
+  it('does not parse a stored book over the size limit', async () => {
+    const { blobs, engine } = await withDriveBook('tok')
+    const big = new File(['x'], 'b', { type: 'application/epub+zip' })
+    Object.defineProperty(big, 'size', { value: MAX_BOOK_BYTES + 1 })
+    vi.spyOn(blobs, 'get').mockResolvedValue(Some(big))
+    const reader = useReader()
+    await reader.open('d1', document.createElement('div'))
+    expect(reader.status).toEqual({ kind: 'error', error: 'too-large' })
+    expect(engine.open).not.toHaveBeenCalled()
+  })
+
+  it('passes the size limit to the download', async () => {
+    const { drive } = await withDriveBook('tok')
+    drive.download.mockResolvedValue(Err({ kind: 'too-large' }))
+    const reader = useReader()
+    await reader.open('d1', document.createElement('div'))
+    expect(drive.download).toHaveBeenCalledWith('tok', expect.anything(), expect.any(Function), {
+      maxBytes: MAX_BOOK_BYTES,
+    })
+    expect(reader.status).toEqual({ kind: 'error', error: 'too-large' })
   })
 
   it('asks to reconnect when there is no token', async () => {

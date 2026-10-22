@@ -39,6 +39,8 @@ export type DriveError =
   | { kind: 'forbidden' }
   | { kind: 'rate-limited' }
   | { kind: 'http'; status: number }
+  /** Over the size limit the caller set: not downloaded. */
+  | { kind: 'too-large' }
 
 export type FetchFn = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -192,17 +194,31 @@ export function createDriveApi(fetchFn: FetchFn = (i, init) => fetch(i, init)) {
     return Ok({ books, truncated: queue.length > 0 })
   }
 
-  /** Downloads a file (alt=media), reporting 0..1 progress as it streams. */
+  /**
+   * Downloads a file (alt=media), reporting 0..1 progress as it streams. With `maxBytes`, a file
+   * declared or streamed bigger than that is cut off and reported as `too-large`.
+   */
   async function download(
     token: string,
     file: Pick<DriveFile, 'id' | 'mimeType' | 'size'>,
     onProgress?: (fraction: number) => void,
+    opts: { maxBytes?: number } = {},
   ): Promise<Result<Blob, DriveError>> {
+    const max = opts.maxBytes ?? Infinity
     const res = await request(token, `${API}/files/${encodeURIComponent(file.id)}?alt=media`)
     if (res._tag === 'Err') return res
-    const total = Number(res.value.headers.get('content-length')) || file.size || 0
+    const declared = Number(res.value.headers.get('content-length'))
+    if (declared > max) {
+      void res.value.body?.cancel()
+      return Err({ kind: 'too-large' })
+    }
+    const total = declared || file.size || 0
     const reader = res.value.body?.getReader()
-    if (!reader) return Ok(new Blob([await res.value.arrayBuffer()], { type: file.mimeType }))
+    if (!reader) {
+      const whole = await res.value.arrayBuffer()
+      if (whole.byteLength > max) return Err({ kind: 'too-large' })
+      return Ok(new Blob([whole], { type: file.mimeType }))
+    }
     const chunks: Uint8Array[] = []
     let received = 0
     try {
@@ -211,6 +227,10 @@ export function createDriveApi(fetchFn: FetchFn = (i, init) => fetch(i, init)) {
         if (done) break
         chunks.push(value)
         received += value.length
+        if (received > max) {
+          void reader.cancel()
+          return Err({ kind: 'too-large' })
+        }
         if (total > 0) onProgress?.(Math.min(1, received / total))
       }
     } catch {

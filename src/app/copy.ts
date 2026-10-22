@@ -27,6 +27,8 @@ export function driveErrorCopy(e: DriveError): string {
       return 'Drive access has expired. Reconnect to continue.'
     case 'http':
       return `Drive did not answer (error ${e.status}). Try again.`
+    case 'too-large':
+      return 'That file is larger than 200 MB, the most Drive Read opens.'
   }
 }
 

@@ -212,6 +212,30 @@ describe('download', () => {
   })
 })
 
+describe('download size limit', () => {
+  it('refuses a file whose declared length is over the limit, without reading it', async () => {
+    const f = fakeFetch(() => new Response('x'.repeat(5), { headers: { 'content-length': '50' } }))
+    const r = await createDriveApi(f.fn).download(
+      't',
+      { id: 'a', mimeType: 'application/pdf', size: 0 },
+      undefined,
+      { maxBytes: 10 },
+    )
+    expect(r).toEqual({ _tag: 'Err', error: { kind: 'too-large' } })
+  })
+
+  it('stops a stream that grows past the limit, whatever the server declared', async () => {
+    const f = fakeFetch(() => new Response(new Uint8Array(50)))
+    const r = await createDriveApi(f.fn).download(
+      't',
+      { id: 'a', mimeType: 'application/pdf', size: 1 },
+      undefined,
+      { maxBytes: 10 },
+    )
+    expect(r).toEqual({ _tag: 'Err', error: { kind: 'too-large' } })
+  })
+})
+
 describe('aboutUser', () => {
   it("returns the account's stable permission id", async () => {
     const f = fakeFetch((url) => {

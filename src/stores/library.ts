@@ -5,6 +5,7 @@ import {
   type BookFormat,
   type BookRecord,
   type LibraryItem,
+  MAX_BOOK_BYTES,
   type ProgressRecord,
   readingStatus,
   titleFromFileName,
@@ -22,7 +23,7 @@ import { isErr, isNone, toNullable } from '@/shared/result'
 
 import { useSync } from './sync'
 
-export type ImportFailure = 'unsupported' | 'unreadable' | 'quota' | 'storage'
+export type ImportFailure = 'unsupported' | 'unreadable' | 'quota' | 'storage' | 'too-large'
 
 export interface ImportResult {
   /** Added books, and books already in the library that the same bytes matched. */
@@ -68,6 +69,7 @@ export const useLibrary = defineStore('library', () => {
 
   async function importOne(file: File): Promise<BookRecord | ImportFailure> {
     const { db, blobs, createEngine, bookId, now, files } = useServices()
+    if (file.size > MAX_BOOK_BYTES) return 'too-large'
     // By content: books are often misnamed (a zipped FB2 saved as .epub).
     const format = await detectFormat(file)
     if (!format) return 'unsupported'

@@ -1,4 +1,4 @@
-import type { BookFormat } from '@/domain/book'
+import { type BookFormat, MAX_BOOK_BYTES } from '@/domain/book'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -43,6 +43,8 @@ export type ReaderError =
   | 'missing-in-drive'
   | 'download-failed'
   | 'storage-full'
+  /** Over MAX_BOOK_BYTES: not downloaded or opened. */
+  | 'too-large'
 export type ReaderStatus =
   | { kind: 'idle' }
   | { kind: 'loading' }
@@ -63,6 +65,7 @@ const DOWNLOAD_ERROR: Record<DriveError['kind'], ReaderError> = {
   forbidden: 'missing-in-drive',
   'rate-limited': 'download-failed',
   http: 'download-failed',
+  'too-large': 'too-large',
 }
 
 /** The open book: engine lifecycle, position, and navigation. */
@@ -162,6 +165,7 @@ export const useReader = defineStore('reader', () => {
       file = fetched
     }
     if (isNone(file)) return fail('missing-file')
+    if (file.value.size > MAX_BOOK_BYTES) return fail('too-large')
 
     // The name can lie (a zipped FB2 saved as .epub): the bytes decide, and the record follows.
     const format = (await detectFormat(file.value)) ?? record.format
@@ -308,6 +312,7 @@ export const useReader = defineStore('reader', () => {
     const auth = useAuth()
     const { drive, blobs } = useServices()
     const record = library.books.find((b) => b.id === id)!
+    if (record.size > MAX_BOOK_BYTES) return 'too-large'
     const token = auth.validToken()
     if (isNone(token)) return 'reconnect'
 
@@ -323,6 +328,7 @@ export const useReader = defineStore('reader', () => {
       (fraction) => {
         if (mine === session) status.value = { kind: 'downloading', fraction }
       },
+      { maxBytes: MAX_BOOK_BYTES },
     )
     if (mine !== session) return 'stale'
     if (isErr(blob)) {

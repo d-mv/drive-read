@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.5 — 2026-10-22
+
+- Books larger than 200 MB are refused before any parsing: at import ("larger than 200 MB, the most Drive Read opens"), before a Drive download (by Drive's size, and the download stops if more arrives), and when opening a stored file. A crafted archive or PDF could otherwise exhaust the tab's memory. Inner limits on decompression would need changes to foliate-js and are not made.
+
 ## 0.23.4 — 2026-10-22
 
 - Logs: `error.uncaught` sends the kind of error (`TypeError`, `QuotaExceededError`…) and where it happened, never the message, which could quote a book's text or a file name. The pseudonymous user id is now a salted hash of the Drive permission id, so it can't be matched with a plain hash of a known id. User ids in the logs change once; a device that stored the old id is still recognised as the same account when it reconnects.

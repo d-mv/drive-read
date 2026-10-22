@@ -76,6 +76,7 @@ const ERRORS: Record<ReaderError, string> = {
   'missing-in-drive': 'Missing in Drive: the file was deleted or you no longer have access to it.',
   'download-failed': "The download didn't finish.",
   'storage-full': 'Not enough space on this device. Remove some downloaded books and try again.',
+  'too-large': 'This book is larger than 200 MB, the most Drive Read opens.',
 }
 
 /** The one action that fixes each error, besides going back. */
@@ -88,6 +89,7 @@ const ACTION: Partial<Record<ReaderError, FixAction>> = {
   offline: 'retry',
   'download-failed': 'retry',
   'storage-full': 'free-space',
+  'too-large': 'remove',
 }
 const ACTION_LABEL: Record<FixAction, string> = {
   reconnect: 'Reconnect Drive',

@@ -4,6 +4,12 @@ import type { Locator, TocEntry } from '@/services/engine/types'
 export type BookFormat = 'epub' | 'pdf' | 'fb2'
 
 /** A book in the library. Key: the Drive file ID, or `local-<sha256>` for a file from this device. */
+/**
+ * The largest book file the app downloads, imports or opens. Bigger files are refused before any
+ * parsing: a crafted archive or PDF could otherwise exhaust the tab's memory.
+ */
+export const MAX_BOOK_BYTES = 200 * 1024 * 1024
+
 export interface BookRecord {
   v: 1
   id: string
