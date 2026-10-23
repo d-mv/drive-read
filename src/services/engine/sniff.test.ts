@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { detectFormat, foliateFile } from './sniff'
+import { detectFormat, foliateKind } from './sniff'
 
 /** A zip whose first local file header names `first` (contents don't matter for sniffing). */
 function zipWith(first: string): Uint8Array<ArrayBuffer> {
@@ -44,35 +44,33 @@ describe('detectFormat', () => {
   })
 })
 
-describe('foliateFile', () => {
-  it('names an FB2 so foliate-js picks its FB2 reader', async () => {
-    expect((await foliateFile(file(FB2, 'Пламя.epub'), 'fb2')).name).toBe('book.fb2')
-    expect((await foliateFile(file(zipWith('a.fb2'), 'Пламя.epub'), 'fb2')).name).toBe('book.fbz')
+describe('foliateKind', () => {
+  it('opens an FB2 as plain XML or zipped, whatever it was called', async () => {
+    expect(await foliateKind(file(FB2, 'Пламя.epub'), 'fb2')).toBe('fb2')
+    expect(await foliateKind(file(zipWith('a.fb2'), 'Пламя.epub'), 'fb2')).toBe('fbz')
   })
 
-  it('names an EPUB so foliate-js picks its EPUB reader, whatever it was called', async () => {
+  it('opens an EPUB as an EPUB, whatever it was called', async () => {
     for (const [name, type] of [
       ['a.epub', ''],
       ['comic.cbz', ''],
       ['download', 'application/vnd.comicbook+zip'],
     ]) {
-      const out = await foliateFile(file(zipWith('mimetype'), name!, type), 'epub')
-      expect([out.name, out.type]).toEqual(['book.epub', 'application/epub+zip'])
-      expect(new Uint8Array(await out.arrayBuffer())).toEqual(zipWith('mimetype'))
+      expect(await foliateKind(file(zipWith('mimetype'), name!, type), 'epub')).toBe('epub')
     }
   })
 
-  it('refuses an EPUB that is not a zip, so no other foliate-js reader takes it', async () => {
-    await expect(foliateFile(file(mobi(), 'a.epub'), 'epub')).rejects.toThrow('not a zip')
-    await expect(foliateFile(file('nope', 'a.epub'), 'epub')).rejects.toThrow('not a zip')
+  it('refuses an EPUB that is not a zip', async () => {
+    await expect(foliateKind(file(mobi(), 'a.epub'), 'epub')).rejects.toThrow('not a zip')
+    await expect(foliateKind(file('nope', 'a.epub'), 'epub')).rejects.toThrow('not a zip')
   })
 
   it('refuses a Kindle (MOBI) file named as an FB2', async () => {
-    await expect(foliateFile(file(mobi(), 'a.fb2'), 'fb2')).rejects.toThrow('Kindle book')
+    await expect(foliateKind(file(mobi(), 'a.fb2'), 'fb2')).rejects.toThrow('Kindle book')
   })
 })
 
-/** The bytes foliate-js's MOBI reader looks for: `BOOKMOBI` at offset 60. */
+/** A Kindle book's signature: `BOOKMOBI` at offset 60. */
 function mobi(): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(1024)
   bytes.set(new TextEncoder().encode('BOOKMOBI'), 60)

@@ -3,9 +3,9 @@ import type { FoliateBook, FoliateRelocate, View } from '@foliate/view.js'
 import { Err, Ok, type Result } from '@/shared/result'
 
 import { formatAuthors, formatLanguageMap, tocEntries } from './epub-meta'
+import { openFoliateBook } from './foliate-book'
 import { externalUrl } from './links'
 import { chapterAt, normalizeStarts, sectionStarts } from './progress'
-import { foliateFile } from './sniff'
 import type {
   BookEngine,
   BookMeta,
@@ -68,8 +68,7 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
   async function open(file: File): Promise<Result<BookMeta, OpenError>> {
     // Anything foliate-js throws, while loading or while reading metadata, means unreadable.
     try {
-      const { makeBook } = await loadFoliate()
-      const opened = await makeBook(await foliateFile(file, format))
+      const opened = await openFoliateBook(file, format)
       book = opened
       const lang = [opened.metadata?.language].flat()[0]
       starts = sectionStarts(opened.sections)

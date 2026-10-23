@@ -86,6 +86,7 @@ src/
     engine/     types.ts         BookEngine interface
                 sniff.ts         format from a file's first bytes (EPUB, FB2, PDF), then its name
                 epub.ts          foliate-js adapter for EPUB and FB2 (epub-meta.ts: title, author, cover)
+                foliate-book.ts  builds the foliate book: reader choice, capped zip (zip.ts), embedded FB2 cover
                 pdf.ts           pdf.js adapter (pdf-layout.ts: layout maths)
                 progress.ts      chapter and progress maths
     speech/     ssml.ts          foliate's SSML blocks to plain text with word offsets; voice choice
@@ -302,8 +303,8 @@ flowchart LR
 
 | Format | Engine | Notes |
 | --- | --- | --- |
-| EPUB | foliate-js (git submodule, pinned commit) | Paginated, reader themes and typefaces, CFI positions; book scripts blocked by CSP |
-| FB2 | foliate-js (`fb2.js`) | From the device and Drive (any MIME type Drive gave it). `.fb2`, `.fbz`, `.fb2.zip`; detected by content (`engine/sniff.ts`), so a misnamed zipped FB2 opens, and a Drive book's format is corrected from its bytes on first open; renamed to `book.fb2`/`book.fbz` for foliate, which picks its reader by name |
+| EPUB | foliate-js (git submodule, pinned commit) | Paginated, reader themes and typefaces, CFI positions; book scripts blocked by CSP. Opened by `engine/foliate-book.ts`, not foliate's `makeBook`: only its EPUB and FB2 readers are used (never Kindle or comic), through a capped zip loader (`engine/zip.ts`: 10,000 files, 256 MB per file, 1 GB in all, as declared; zip.js stops a file inflating past its declared size) |
+| FB2 | foliate-js (`fb2.js`) | From the device and Drive (any MIME type Drive gave it). `.fb2`, `.fbz`, `.fb2.zip`; detected by content (`engine/sniff.ts`), so a misnamed zipped FB2 opens, and a Drive book's format is corrected from its bytes on first open; the cover is used only when embedded in the book (decoded in `foliate-book.ts`; foliate's own `fetch` of the cover src is never let out) |
 | PDF | pdfjs-dist 6 | Pages fitted to width and scrolled; zoom 100–300% (buttons, `+` `-` `0`, pinch); a text layer makes text selectable; standard fonts, CMaps, ICC profiles and WebAssembly image decoders (JPEG 2000, JBIG2) served from `/pdfjs/`; position is page + offset |
 
 Local books (opened from the device) go straight to OPFS, keyed by a content hash. They stay on
@@ -506,11 +507,11 @@ flowchart LR
   the e2e tests and production send the same CSP. Production also sends HSTS and
   `Cross-Origin-Opener-Policy: same-origin-allow-popups` (Google's sign-in popup still works). `/assets/*` is `immutable` for a year;
   everything else (`index.html`, `sw.js`, manifest) is `no-cache`.
-
 - Both base images (`oven/bun`, `caddy`) are pinned by exact version and digest, so security
   fixes arrive only when bumped. To bump: `docker buildx imagetools inspect oven/bun:<version>-alpine`
   (and `caddy:<version>-alpine`), copy the index `Digest`, update both parts of the `FROM` line.
   Check for new releases when deploying.
+
 ```text
 default-src 'self';
 script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client;

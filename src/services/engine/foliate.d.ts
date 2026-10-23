@@ -51,8 +51,6 @@ declare module '@foliate/view.js' {
     scrollToAnchor(anchor: Range, select?: boolean): Promise<void>
   }
 
-  export function makeBook(file: File | Blob): Promise<FoliateBook>
-
   export class View extends HTMLElement {
     book: FoliateBook
     renderer: FoliateRenderer
@@ -75,4 +73,49 @@ declare module '@foliate/view.js' {
     prev(): Promise<void>
     close(): void
   }
+}
+
+/** zip.js as vendored by foliate-js: only what engine/zip.ts uses. */
+declare module '@foliate/vendor/zip.js' {
+  export function configure(options: { useWebWorkers?: boolean }): void
+  export class BlobReader {
+    constructor(blob: Blob)
+  }
+  export class TextWriter {
+    private readonly text: true
+    constructor(encoding?: string)
+  }
+  export class BlobWriter {
+    private readonly blob: true
+    constructor(mimeType?: string)
+  }
+  export interface ZipEntry {
+    filename: string
+    /** As the archive declares it; zip.js refuses data that inflates past it. */
+    uncompressedSize: number
+    getData(writer: TextWriter): Promise<string>
+    getData(writer: BlobWriter): Promise<Blob>
+  }
+  export class ZipReader {
+    constructor(reader: BlobReader)
+    getEntries(): Promise<ZipEntry[]>
+  }
+}
+
+/** foliate-js's EPUB reader, given a loader (engine/zip.ts). */
+declare module '@foliate/epub.js' {
+  import type { FoliateBook } from '@foliate/view.js'
+  import type { ZipLoader } from '@/services/engine/zip'
+
+  export class EPUB {
+    constructor(loader: ZipLoader)
+    init(): Promise<FoliateBook>
+  }
+}
+
+/** foliate-js's FB2 reader, given the XML. */
+declare module '@foliate/fb2.js' {
+  import type { FoliateBook } from '@foliate/view.js'
+
+  export function makeFB2(xml: Blob): Promise<FoliateBook>
 }

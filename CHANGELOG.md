@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.3 — 2026-10-23
+
+- Security: zipped books (EPUB, zipped FB2) are read through a zip loader with caps: at most 10,000 files, 256 MB per file and 1 GB in all once unpacked. A few hundred KB of zip could otherwise unpack to gigabytes in the tab; such a file is now refused as unreadable. zip.js already stops a file that inflates past its declared size, so the declared sizes hold.
+- Security: an FB2's cover is used only when it is embedded in the book. A cover pointing at a URL is no longer fetched (before, a same-origin request went out when the book was opened). Fix: embedded FB2 covers now show in the library; the CSP had blocked foliate's fetch of their `data:` URL.
+- Books are built in `engine/foliate-book.ts` instead of foliate-js's `makeBook`, so its Kindle (MOBI) and comic (CBZ) readers, and the MOBI decompressor, can't be reached at all. foliate-js itself is unchanged.
+
 ## 0.24.2 — 2026-10-23
 
 - Security (ops): the Docker base images are pinned by exact version and digest (`oven/bun:1.4.4-alpine`, `caddy:2.11.7-alpine`). A deploy builds on exactly those images instead of whatever `1-alpine`/`2-alpine` pointed at that day, so a replaced or broken upstream image can't slip in unseen. Bumping them is a manual step (docs/ARCHITECTURE.md, Deployment).
