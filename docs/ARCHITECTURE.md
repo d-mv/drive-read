@@ -507,6 +507,10 @@ flowchart LR
   `Cross-Origin-Opener-Policy: same-origin-allow-popups` (Google's sign-in popup still works). `/assets/*` is `immutable` for a year;
   everything else (`index.html`, `sw.js`, manifest) is `no-cache`.
 
+- Both base images (`oven/bun`, `caddy`) are pinned by exact version and digest, so security
+  fixes arrive only when bumped. To bump: `docker buildx imagetools inspect oven/bun:<version>-alpine`
+  (and `caddy:<version>-alpine`), copy the index `Digest`, update both parts of the `FROM` line.
+  Check for new releases when deploying.
 ```text
 default-src 'self';
 script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client;

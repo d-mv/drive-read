@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.2 — 2026-10-23
+
+- Security (ops): the Docker base images are pinned by exact version and digest (`oven/bun:1.4.4-alpine`, `caddy:2.11.7-alpine`). A deploy builds on exactly those images instead of whatever `1-alpine`/`2-alpine` pointed at that day, so a replaced or broken upstream image can't slip in unseen. Bumping them is a manual step (docs/ARCHITECTURE.md, Deployment).
+
 ## 0.24.1 — 2026-10-22
 
 - Security (desktop): a symlink named as a book is never kept, and kept books are opened without following symlinks (`O_NOFOLLOW`, regular files only). A kept path swapped for a symlink later reads nothing instead of whatever it points at.
