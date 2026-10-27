@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.5 — 2026-10-27
+
+- Fix (Android PWA): no light strip behind the gesture bar in dark mode. The manifest's `background_color` and `theme_color` are now dark paper (`#171614`), since a manifest can't follow the theme and a dark strip on a light screen is far less visible than the reverse; the splash screen is dark for every theme. `html` now carries the theme's paper background (Android paints the gesture-bar area from it) and `color-scheme: light` for the light themes.
+
 ## 0.24.4 — 2026-10-25
 
 - Security (deps): `bun audit` is clean again. Electron 44.9.3 (eMudhra intermediate certificates distrusted), happy-dom 21.0.4 (tests only: import-alias code execution; 21 turns off CSS and iframe loading by default, which no test used), fast-uri 3.1.9 and serialize-javascript 7.1.4 (build tooling). Other libraries bumped within their ranges: pinia 4.1.0, vue 3.5.44, vue-router 5.4.0, playwright 1.64.1, vitest 5.0.5, vue-tsc 3.3.13, oxlint 1.89, oxfmt 0.74, electron-builder 26.18.0. Electron 45 and TypeScript 7 are held back for their own pass.

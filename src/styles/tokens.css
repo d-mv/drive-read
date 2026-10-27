@@ -62,6 +62,12 @@
   #app {
     height: 100%;
   }
+  /* Android paints the area behind the gesture bar with the html background, not body's.
+     Dark themes override color-scheme outside this layer. */
+  html {
+    background-color: var(--color-paper);
+    color-scheme: light;
+  }
   body {
     @apply bg-paper text-ink font-ui antialiased;
     font-size: 15px;

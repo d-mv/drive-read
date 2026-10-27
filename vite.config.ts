@@ -12,7 +12,11 @@ import { pdfjsAssets } from './scripts/pdfjs-assets.ts'
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
-const PAPER = '#F3F0E8'
+/**
+ * Dark paper. The manifest cannot follow the theme, and a dark strip behind the Android gesture
+ * bar on a light screen is far less visible than a light one on a dark screen.
+ */
+const MANIFEST_COLOR = '#171614'
 
 /**
  * foliate-js opens PDFs through its own vendored pdf.js (`view.js` → `./pdf.js`); this app opens
@@ -53,8 +57,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: PAPER,
-        theme_color: PAPER,
+        background_color: MANIFEST_COLOR,
+        theme_color: MANIFEST_COLOR,
         categories: ['books', 'education'],
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
