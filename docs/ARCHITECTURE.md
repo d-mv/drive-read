@@ -76,7 +76,7 @@ src/
   domain/       book.ts, settings.ts, reading.ts          pure types and rules
   views/        LibraryView, ReaderView, DriveView, ConnectView
   components/   BookCard, BookRow, BookCover, ContinueRow, ProgressSegments, ContentsPanel,
-                TextSettings, SegmentedControl, AppNotice, UpdateToast, AppIcon
+                TextSettings, SegmentedControl, ActionMenu, AppNotice, UpdateToast, AppIcon
   stores/       auth, library, reader, sync, settings, driveBrowser
   services/
     auth/       gis.ts           token client, script loaded on first use

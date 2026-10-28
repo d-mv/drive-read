@@ -151,6 +151,62 @@ test('a slow search answered after leaving it does not spill into the folder vie
   await expect(page.getByRole('checkbox')).toHaveCount(0)
 })
 
+test('the library menu adds from Drive, switches theme and disconnects', async ({ page }) => {
+  await fakeGoogle(page)
+  await connect(page)
+  await addVoyage(page)
+  await page.getByRole('button', { name: 'Back to library' }).click()
+
+  const menuButton = page.getByRole('button', { name: 'Library menu' })
+  const menu = page.getByRole('menu', { name: 'Library menu' })
+  await menuButton.click()
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Add from Drive',
+    'Switch theme',
+    'Disconnect Drive',
+  ])
+  await expect(menu.getByRole('menuitem').first()).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+  await expect(menuButton).toBeFocused()
+
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme)
+  const before = await theme()
+  await menuButton.click()
+  await menu.getByRole('menuitem', { name: 'Switch theme' }).click()
+  await expect.poll(theme).not.toBe(before)
+
+  await menuButton.click()
+  await menu.getByRole('menuitem', { name: 'Add from Drive' }).click()
+  await expect(page.getByRole('heading', { name: 'Add from Drive' })).toBeVisible()
+  await page.getByRole('button', { name: 'Back to library' }).click()
+
+  await menuButton.click()
+  await menu.getByRole('menuitem', { name: 'Disconnect Drive' }).click()
+  await menuButton.click()
+  await expect(menu.getByRole('menuitem', { name: 'Disconnect Drive' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+})
+
+test('the Show list filters the library by status', async ({ page }) => {
+  await fakeGoogle(page)
+  await connect(page)
+  await addVoyage(page)
+  await page.getByRole('button', { name: 'Back to library' }).click()
+
+  const show = page.getByRole('combobox', { name: 'Show' })
+  await expect(show.getByRole('option')).toHaveText([
+    'All · 1',
+    'Reading · 0',
+    'Unread · 1',
+    'Finished · 0',
+  ])
+  await show.selectOption('finished')
+  await expect(page.getByText('No books here yet.')).toBeVisible()
+  await show.selectOption('unread')
+  await expect(voyageLink(page)).toBeVisible()
+})
+
 test('removing a download frees the file but keeps the book and the place', async ({ page }) => {
   const google = await fakeGoogle(page)
   await connect(page)
@@ -170,7 +226,7 @@ test('removing a download frees the file but keeps the book and the place', asyn
   await expect(page.getByText('No downloaded Drive books on this device.')).toBeVisible()
 
   // Still in the library; opening downloads it again.
-  await page.getByRole('button', { name: /^All/ }).click()
+  await page.getByRole('combobox', { name: 'Show' }).selectOption('all')
   await voyageLink(page).click()
   await expect(page).toHaveURL(/\/read\/voyage$/)
   await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toBeVisible()
@@ -200,7 +256,8 @@ test.describe('Drive file changes', () => {
   /** The next day: the token has expired, so the reader reconnects, which syncs and checks. */
   async function nextDayReconnect(page: Page) {
     await page.clock.fastForward('25:00:00')
-    await page.getByRole('link', { name: 'Add from Drive' }).click()
+    await page.getByRole('button', { name: 'Library menu' }).click()
+    await page.getByRole('menuitem', { name: 'Add from Drive' }).click()
     const check = page.waitForResponse((r) => isDriveCheck(r.url()))
     await page.getByRole('button', { name: 'Reconnect Drive' }).click()
     await check

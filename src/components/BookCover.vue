@@ -73,7 +73,12 @@ const TEXT = {
     class="flex aspect-[2/3] w-full flex-col justify-between overflow-hidden border border-rule"
     :class="[TONE[coverTone(id)], TEXT[size].box]"
   >
-    <div class="font-read leading-tight font-medium" :class="TEXT[size].title">{{ title }}</div>
+    <div
+      class="min-h-0 overflow-hidden font-read leading-tight font-medium [overflow-wrap:anywhere]"
+      :class="TEXT[size].title"
+    >
+      {{ title }}
+    </div>
     <div class="font-mono tracking-[0.06em] uppercase" :class="TEXT[size].author">{{ author }}</div>
   </div>
 </template>

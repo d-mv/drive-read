@@ -1,6 +1,6 @@
 {
   "name": "drive-read",
-  "version": "0.24.5",
+  "version": "0.24.6",
   "private": true,
   "type": "module",
   "main": "desktop/out/main.mjs",

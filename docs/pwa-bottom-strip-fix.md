@@ -1,5 +1,7 @@
 # Fix: light strip behind Android gesture bar (dark mode)
 
+> **Known limitation (0.24.6):** on a device, Chrome colours the gesture-bar strip of an installed app from the manifest `theme_color`, not from the `html` background, so the dark manifest gives a dark strip in the light themes. The second acceptance criterion below is not met; dark was kept on purpose. It can follow the theme only once Chrome draws installed PWAs edge to edge.
+>
 > **Status (0.24.5):** done, adapted to this repo. The pre-paint theme already lived in `public/theme-init.js` (an inline script would break the CSP), tokens are `--color-paper` with 4 themes, and no `dark:` variant is needed. Added the `html` background and light `color-scheme` (`src/styles/tokens.css`) and a dark manifest (`vite.config.ts`).
 
 ## Symptom

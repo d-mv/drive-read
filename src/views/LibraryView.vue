@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { keyAction, keyInput } from '@/app/keymap'
 import { formatSize, lastReadLabel, syncedLabel, syncNotice } from '@/app/copy'
@@ -9,6 +9,7 @@ import { canInstall, install, iosHint } from '@/app/install'
 import { useOnline } from '@/app/useOnline'
 import { epubHintDone, finishEpubHint, openNotice } from '@/app/desktopOpen'
 import { useImportFiles } from '@/app/useImportFiles'
+import ActionMenu, { type ActionMenuItem } from '@/components/ActionMenu.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppNotice from '@/components/AppNotice.vue'
 import BookCard from '@/components/BookCard.vue'
@@ -104,6 +105,23 @@ const filters = computed(() =>
 
 const open = (id: string) => router.push({ name: 'reader', params: { id } })
 
+type MenuKey = 'drive' | 'theme' | 'disconnect'
+const menuItems = computed<ActionMenuItem<MenuKey>[]>(() => [
+  { key: 'drive', label: 'Add from Drive', icon: 'plus' },
+  { key: 'theme', label: 'Switch theme', icon: 'theme' },
+  ...(auth.status === 'disconnected'
+    ? []
+    : [{ key: 'disconnect', label: 'Disconnect Drive', icon: 'logout' } as const]),
+])
+async function onMenu(key: MenuKey) {
+  const run: Record<MenuKey, () => unknown> = {
+    drive: () => router.push({ name: 'drive' }),
+    theme: () => settings.toggleTheme(),
+    disconnect: () => auth.disconnect(),
+  }
+  await run[key]()
+}
+
 async function removeDownload(id: string) {
   await library.removeDownload(id)
   await refreshUsage()
@@ -158,7 +176,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex min-h-full flex-col">
     <header
-      class="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-rule px-3 pt-4 pb-2 sm:px-[clamp(16px,3vw,40px)] sm:py-3"
+      class="flex flex-wrap items-center gap-x-2 gap-y-3 border-b border-rule px-3 pt-4 pb-2 sm:gap-x-4 sm:px-[clamp(16px,3vw,40px)] sm:py-3"
     >
       <div class="mr-auto flex items-baseline gap-3 pl-2 sm:pl-0">
         <h1 class="text-2xl font-semibold tracking-[-0.01em] sm:text-xl">Library</h1>
@@ -183,28 +201,11 @@ onBeforeUnmount(() => {
           >/</kbd
         >
       </label>
-      <RouterLink
-        :to="{ name: 'drive' }"
-        class="flex h-11 items-center gap-2 rounded-ctl border border-ink px-3.5 font-medium"
-      >
-        <AppIcon name="plus" />
-        <span>Add from Drive</span>
-      </RouterLink>
-      <button
-        type="button"
-        aria-label="Open a file from this device"
-        title="Open a file from this device"
-        class="flex size-11 items-center justify-center rounded-ctl border border-rule disabled:opacity-50"
-        :disabled="busy"
-        @click="pick"
-      >
-        <AppIcon name="upload" />
-      </button>
       <button
         v-if="auth.status !== 'disconnected'"
         type="button"
         :title="auth.status === 'expired' ? 'Connection expired. Reconnect and sync' : 'Sync now'"
-        class="tabular h-11 px-1 font-mono text-xs text-ink2 underline-offset-[3px] hover:underline disabled:no-underline"
+        class="tabular h-11 max-w-[32vw] truncate px-1 sm:max-w-none font-mono text-xs text-ink2 underline-offset-[3px] hover:underline disabled:no-underline"
         :disabled="sync.status === 'syncing' || auth.busy"
         @click="onSyncClick"
       >
@@ -218,12 +219,15 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        aria-label="Switch theme"
-        class="flex size-11 items-center justify-center rounded-ctl border border-rule"
-        @click="settings.toggleTheme()"
+        aria-label="Open a file from this device"
+        title="Open a file from this device"
+        class="flex size-11 items-center justify-center rounded-ctl border border-rule disabled:opacity-50"
+        :disabled="busy"
+        @click="pick"
       >
-        <AppIcon name="theme" />
+        <AppIcon name="upload" />
       </button>
+      <ActionMenu label="Library menu" :items="menuItems" @select="onMenu" />
     </header>
 
     <AppNotice
@@ -246,21 +250,16 @@ onBeforeUnmount(() => {
       @resume="open(continueEntry.id)"
     />
 
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 pt-5 sm:px-[clamp(16px,3vw,40px)]">
-      <div role="group" aria-label="Show" class="mr-auto flex flex-wrap gap-x-6">
-        <button
-          v-for="f in filters"
-          :key="f.value"
-          type="button"
-          :aria-pressed="filter === f.value"
-          class="flex h-11 items-baseline gap-1.5 border-b-2 pt-3"
-          :class="filter === f.value ? 'border-ink font-semibold' : 'border-transparent'"
-          @click="filter = f.value"
-        >
-          <span>{{ f.label }}</span>
-          <span class="tabular font-mono text-xs font-normal text-ink2">{{ counts[f.value] }}</span>
-        </button>
-      </div>
+    <div class="flex items-center gap-x-6 px-5 pt-5 sm:px-[clamp(16px,3vw,40px)]">
+      <label class="relative mr-auto flex h-11 items-center">
+        <span class="sr-only">Show</span>
+        <select v-model="filter" class="h-11 appearance-none bg-transparent pr-6 font-semibold">
+          <option v-for="f in filters" :key="f.value" :value="f.value">
+            {{ f.label }} · {{ counts[f.value] }}
+          </option>
+        </select>
+        <AppIcon name="chevron-down" :size="16" class="pointer-events-none absolute right-0" />
+      </label>
       <label class="relative flex h-11 items-center gap-1.5 text-ink2">
         <span class="sr-only">Sort by</span>
         <select v-model="sort" class="h-11 appearance-none bg-transparent pr-6 text-sm">

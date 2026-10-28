@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.24.6 — 2026-10-28
+
+- Library header (phone and desktop): Add from Drive, Switch theme and Disconnect Drive move into a ⋯ menu (`ActionMenu`, keyboard: arrows, Home/End, Escape). The header is now one row on a phone: title, sync status, open-a-file, menu.
+- Library: the All / Reading / Unread / Finished / Downloaded tabs become a "Show" dropdown on the left of the Sort line, so they no longer wrap on a phone.
+- Typographic covers break long words instead of clipping them in list rows.
+- Known limitation (Android PWA): Chrome colours the strip behind the gesture bar from the manifest `theme_color`, not from the page, so it stays dark (`#171614`) in the light themes. Kept dark by choice until Chrome draws installed apps edge to edge. 0.24.5's note that `html` paints that strip was wrong.
+
 ## 0.24.5 — 2026-10-27
 
 - Fix (Android PWA): no light strip behind the gesture bar in dark mode. The manifest's `background_color` and `theme_color` are now dark paper (`#171614`), since a manifest can't follow the theme and a dark strip on a light screen is far less visible than the reverse; the splash screen is dark for every theme. `html` now carries the theme's paper background (Android paints the gesture-bar area from it) and `color-scheme: light` for the light themes.

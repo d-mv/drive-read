@@ -17,6 +17,8 @@ export type IconName =
   | 'listen'
   | 'play'
   | 'pause'
+  | 'more'
+  | 'logout'
 
 type Shape =
   | { kind: 'path'; d: string; filled?: boolean }
@@ -50,6 +52,12 @@ const ICONS: Record<IconName, Shape[]> = {
   ],
   play: [{ kind: 'path', d: 'M8 5.5v13l10.5-6.5z', filled: true }],
   pause: [{ kind: 'path', d: 'M7 5.5h3.5v13H7zM13.5 5.5H17v13h-3.5z', filled: true }],
+  more: [
+    { kind: 'circle', cx: 5.5, cy: 12, r: 1.25 },
+    { kind: 'circle', cx: 12, cy: 12, r: 1.25 },
+    { kind: 'circle', cx: 18.5, cy: 12, r: 1.25 },
+  ],
+  logout: [{ kind: 'path', d: 'M10 4H5v16h5M14 8l4 4-4 4M18 12H9' }],
 }
 
 const { name, size = 20 } = defineProps<{ name: IconName; size?: number }>()
