@@ -2,7 +2,8 @@
  * Builds e2e/fixtures/test-voyage.epub: four chapters with a TOC, long enough to paginate.
  * Chapter 3 carries an inline script and a script from a Google JSONP URL; neither may run (the
  * CSP blocks both). Chapter 1 opens with a
- * footnote reference whose note lives in chapter 4, a web link and a javascript: link.
+ * footnote reference whose note lives in chapter 4 (and links on to chapter 3), a web link and a
+ * javascript: link.
  * Run: bun e2e/fixtures/build-epub.ts (needs the `zip` CLI)
  */
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -22,7 +23,7 @@ const sentence = (c: number, i: number) =>
 const NOTEREF = ` <a epub:type="noteref" href="c4.xhtml#note-1">1</a>`
 // External links: the web one must open without a handle on the reader tab, the script one not at all.
 const LINKS = ` <a id="ext-web" href="https://example.test/away">web</a> <a id="ext-js" href="javascript:void(parent.document.documentElement.dataset.pwned='link')">js</a>`
-const NOTE = `<aside epub:type="footnote" id="note-1"><p>1. The log was kept in pencil.</p></aside>`
+const NOTE = `<aside epub:type="footnote" id="note-1"><p>1. The log was kept in pencil. See <a id="note-onward" href="c3.xhtml">Signals</a>.</p></aside>`
 const body = (c: number) =>
   Array.from(
     { length: 40 },

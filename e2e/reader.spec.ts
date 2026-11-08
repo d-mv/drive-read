@@ -69,6 +69,26 @@ test('follows a footnote and comes back to the text', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Back to text' })).toBeHidden()
 })
 
+test('one "Back to text" returns from a run of links', async ({ page }) => {
+  await addBook(page)
+  const click = async (selector: string) => {
+    const links = page.frames().map((f) => f.locator(selector))
+    await expect
+      .poll(async () => (await Promise.all(links.map((l) => l.count()))).indexOf(1))
+      .not.toBe(-1)
+    const counts = await Promise.all(links.map((l) => l.count()))
+    await links[counts.indexOf(1)].dispatchEvent('click')
+  }
+  await click('a[href$="#note-1"]')
+  await expect(page.getByText('04 / 04')).toBeVisible()
+  await click('#note-onward')
+  await expect(page.getByText('03 / 04')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Back to text' }).click()
+  await expect(page.getByText('01 / 04')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Back to text' })).toBeHidden()
+})
+
 test('a web link in the book opens without a handle on the reader tab', async ({ page }) => {
   await page
     .context()

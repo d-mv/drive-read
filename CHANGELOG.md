@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.7 — 2026-11-08
+
+- Fix: "Back to text" now disappears after one press. It returns to where you were before the first link you followed, even after several links (for example a footnote's own link onward), and a link that goes nowhere no longer shows it.
+
 ## 0.24.6 — 2026-10-28
 
 - Library header (phone and desktop): Add from Drive, Switch theme and Disconnect Drive move into a ⋯ menu (`ActionMenu`, keyboard: arrows, Home/End, Escape). The header is now one row on a phone: title, sync status, open-a-file, menu.

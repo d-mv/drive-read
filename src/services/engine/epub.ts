@@ -35,6 +35,8 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
   let relocateCb: ((r: Relocation) => void) | undefined
   let keydownCb: ((e: KeyboardEvent) => void) | undefined
   let linkCb: (() => void) | undefined
+  /** Where the reader was before following the first of a run of in-book links. */
+  let linkOrigin: string | null = null
   let theme: ReaderTheme | null = null
   const registered = new WeakMap<Document, Map<string, FontFace>>()
 
@@ -148,7 +150,17 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
       // Fires before the section is laid out, so the faces are there for the first layout.
       registerFonts(doc, theme?.fonts ?? [])
     })
-    view.addEventListener('link', () => linkCb?.())
+    // Navigate here instead of letting foliate do it, so a link that goes nowhere is not counted.
+    view.addEventListener('link', (e) => {
+      e.preventDefault()
+      const from = view?.lastLocation?.cfi ?? null
+      const { href } = (e as CustomEvent<{ href: string }>).detail
+      void view?.goTo(href).then((moved) => {
+        if (!moved) return
+        linkOrigin ??= from
+        linkCb?.()
+      })
+    })
     // foliate would window.open() any scheme and leave the new page a handle on this tab.
     view.addEventListener('external-link', (e) => {
       e.preventDefault()
@@ -168,6 +180,7 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
 
   async function goTo(loc: Locator) {
     if (!view) return
+    linkOrigin = null
     if (loc.kind === 'cfi') await view.goTo(loc.cfi)
     else if (loc.kind === 'href') await view.goTo(loc.href)
   }
@@ -195,8 +208,10 @@ export function createEpubEngine(format: 'epub' | 'fb2' = 'epub'): BookEngine {
     onLink(cb) {
       linkCb = cb
     },
-    back() {
-      view?.history.back()
+    async back() {
+      const to = linkOrigin
+      linkOrigin = null
+      if (to) await view?.goTo(to)
     },
     async *search(query: string): AsyncIterable<SearchYield> {
       if (!view) return

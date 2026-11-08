@@ -17,8 +17,8 @@ export interface BookEngine {
   onKeydown(cb: (e: KeyboardEvent) => void): void
   /** EPUB only: an in-book link (a footnote, a cross-reference) was followed. */
   onLink?(cb: () => void): void
-  /** EPUB only: returns to where the reader was before the last followed link. */
-  back?(): void
+  /** EPUB only: returns to where the reader was before following links, however many. */
+  back?(): Promise<void>
   /** PDF only: zoom relative to the page fitted to the reading width (1 = fit). */
   setZoom?(zoom: number): Promise<void>
   /** PDF only: the zoom changed by a pinch. */

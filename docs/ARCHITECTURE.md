@@ -418,8 +418,9 @@ chrome and the book content; dark mode swaps token values.
   applying the CSS, so a typeface switch is one reflow with no fallback flash.
 - Literata carries its Cyrillic subsets (with fontsource's `unicode-range`); Cartisse and NV Jost
   have Cyrillic too. Libron, NV Zilla Slab and Readerly are Latin only.
-- After an in-book link (a footnote), the reader shows "Back to text", which steps back through
-  foliate's history (`engine.back()`); any other jump (contents, search) clears it.
+- After an in-book link (a footnote), the reader shows "Back to text". One press returns to where
+  the reader was before the first link of the run, however many links followed (`engine.back()`);
+  a link that goes nowhere does not count, and any other jump (contents, search) clears it.
 - PDF pages keep their own colours; dark mode changes only the surround.
 - Read aloud (EPUB, FB2): foliate's `tts.js` gives the section's text as SSML blocks with a mark
   before every word. `speech/ssml.ts` flattens a block to text plus mark offsets, the browser's

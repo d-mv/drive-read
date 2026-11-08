@@ -394,10 +394,10 @@ onBeforeUnmount(() => {
           :aria-busy="reader.status.kind === 'loading' || reader.status.kind === 'downloading'"
         />
         <button
-          v-if="reader.linkDepth > 0 && reader.status.kind === 'ready'"
+          v-if="reader.linked && reader.status.kind === 'ready'"
           type="button"
           class="absolute bottom-3 left-1/2 z-10 flex h-11 -translate-x-1/2 items-center gap-1 rounded-ctl border border-rule bg-panel pr-4 pl-2.5 text-sm font-medium shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
-          @click="reader.back()"
+          @click="void reader.back()"
         >
           <AppIcon name="chevron-left" :size="16" />
           Back to text

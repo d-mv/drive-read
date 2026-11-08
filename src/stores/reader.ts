@@ -83,7 +83,8 @@ export const useReader = defineStore('reader', () => {
   const zoom = ref(1)
   const zoomable = ref(false)
   /** In-book links followed since the last other jump; while > 0 the reader offers Back. */
-  const linkDepth = ref(0)
+  /** An in-book link was followed and "Back to text" can return to where the reader was. */
+  const linked = ref(false)
   /** Read aloud: offered for reflowable books where the browser can speak. */
   const canReadAloud = ref(false)
   const readAloudState = ref<ReadAloudState>('idle')
@@ -215,7 +216,7 @@ export const useReader = defineStore('reader', () => {
       if (pageChanged) void library.saveProgress(id, r.position)
     })
     if (opts.onKeydown) next.onKeydown(opts.onKeydown)
-    next.onLink?.(() => linkDepth.value++)
+    next.onLink?.(() => (linked.value = true))
     zoomable.value = !!next.setZoom
     next.onZoom?.((z) => (zoom.value = z))
 
@@ -378,7 +379,7 @@ export const useReader = defineStore('reader', () => {
     toc.value = []
     zoom.value = 1
     zoomable.value = false
-    linkDepth.value = 0
+    linked.value = false
     status.value = { kind: 'idle' }
   }
 
@@ -395,7 +396,7 @@ export const useReader = defineStore('reader', () => {
   const prev = () => moving(async () => void (await engine?.prev()))
   const goTo = (loc: Locator) =>
     moving(async () => {
-      linkDepth.value = 0
+      linked.value = false
       await engine?.goTo(loc)
     })
 
@@ -419,9 +420,9 @@ export const useReader = defineStore('reader', () => {
   }
   /** Returns from a followed link (a footnote) to where the reader was. */
   const back = () => {
-    if (linkDepth.value === 0) return
-    linkDepth.value--
-    engine?.back?.()
+    if (!linked.value) return
+    linked.value = false
+    return moving(async () => void (await engine?.back?.()))
   }
 
   /** One zoom level in or out, or back to fitting the width (0). */
@@ -460,7 +461,7 @@ export const useReader = defineStore('reader', () => {
     next,
     prev,
     goTo,
-    linkDepth,
+    linked,
     back,
     setTheme,
     flushSession,
