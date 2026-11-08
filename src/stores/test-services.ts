@@ -38,7 +38,7 @@ export function fakeEngine(meta: Result<BookMeta, OpenError>): FakeEngine {
   return { engine, relocate: (r) => relocateCb?.(r) }
 }
 
-export type MockGis = { [K in keyof Gis]: Mock<Gis[K]> }
+export type MockGis = { [K in keyof Gis]: Mock<NonNullable<Gis[K]>> }
 export type MockDrive = { [K in keyof DriveApi]: Mock<DriveApi[K]> }
 
 export interface TestContext extends FakeEngine {

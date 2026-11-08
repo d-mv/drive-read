@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.0 — 2026-11-08
+
+- Desktop app: Google Drive sign-in. Connect Google Drive opens Google in your browser; once approved, the app stays connected across restarts and renews its access without asking. The sign-in is kept encrypted in the macOS keychain and never reaches the page; Disconnect Drive withdraws it at Google and deletes it. Needs a "Desktop app" OAuth client in `.env` (`DESKTOP_GOOGLE_CLIENT_ID`, `DESKTOP_GOOGLE_CLIENT_SECRET`); see docs/DESKTOP.md.
+- Welcome screen: Connect Google Drive goes straight to Drive when already connected, instead of asking again.
+- Known limitation (desktop): closing the browser tab without finishing leaves "Connecting…" for up to 5 minutes.
+
 ## 0.24.7 — 2026-11-08
 
 - Fix: "Back to text" now disappears after one press. It returns to where you were before the first link you followed, even after several links (for example a footnote's own link onward), and a link that goes nowhere no longer shows it.

@@ -314,7 +314,7 @@ export const useReader = defineStore('reader', () => {
     const { drive, blobs } = useServices()
     const record = library.books.find((b) => b.id === id)!
     if (record.size > MAX_BOOK_BYTES) return 'too-large'
-    const token = auth.validToken()
+    const token = await auth.validToken()
     if (isNone(token)) return 'reconnect'
 
     status.value = { kind: 'downloading', fraction: 0 }

@@ -7,10 +7,25 @@ import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, protocol, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  type IpcMainInvokeEvent,
+  protocol,
+  safeStorage,
+  shell,
+} from 'electron'
 
 import { CSP } from '../csp.ts'
 import { IPC } from '../src/shared/desktop'
+import {
+  createDesktopAuth,
+  createVault,
+  type DesktopAuth,
+  type Encryption,
+  GOOGLE_ENDPOINTS,
+} from './auth'
 import { type Grants, keepFile, loadGrants, md5Kept, readKept } from './files'
 import { setAppMenu } from './menu'
 import { bookArgs, createOpenQueue } from './opens'
@@ -136,6 +151,57 @@ function handleFiles(g: Grants) {
   })
 }
 
+/**
+ * The "Desktop app" OAuth client, baked in by desktop/build.ts from .env. A test run's fake
+ * Google gets a made-up client, is "opened" with a plain request instead of the browser, and
+ * keeps its sign-in without the keychain.
+ */
+function desktopAuth(): DesktopAuth {
+  const vaultFile = join(app.getPath('userData'), 'drive-sign-in.bin')
+  const fake = overrides.fakeGoogle
+  if (fake) {
+    const plain: Encryption = {
+      isEncryptionAvailable: () => true,
+      encryptString: (s) => Buffer.from(s),
+      decryptString: (b) => b.toString(),
+    }
+    return createDesktopAuth({
+      config: {
+        clientId: 'e2e-desktop',
+        clientSecret: 'e2e-secret',
+        authUrl: `${fake}/auth`,
+        tokenUrl: `${fake}/token`,
+        revokeUrl: `${fake}/revoke`,
+      },
+      vault: createVault(vaultFile, plain),
+      openBrowser: async (url) => void (await fetch(url)),
+    })
+  }
+  return createDesktopAuth({
+    config: {
+      clientId: process.env.DESKTOP_GOOGLE_CLIENT_ID ?? '',
+      clientSecret: process.env.DESKTOP_GOOGLE_CLIENT_SECRET ?? '',
+      ...GOOGLE_ENDPOINTS,
+    },
+    vault: createVault(vaultFile, safeStorage),
+    openBrowser: (url) => shell.openExternal(url),
+  })
+}
+
+function handleAuth(auth: DesktopAuth) {
+  ipcMain.handle(IPC.authConnect, async (e) => {
+    if (!fromApp(e)) return { ok: false, reason: 'unavailable' }
+    const r = await auth.connect()
+    // Back from the browser: bring the app forward again.
+    win?.show()
+    return r
+  })
+  ipcMain.handle(IPC.authToken, (e, renew: unknown) =>
+    fromApp(e) ? auth.token(renew === true) : { ok: false, reason: 'unavailable' },
+  )
+  ipcMain.handle(IPC.authDisconnect, (e) => (fromApp(e) ? auth.disconnect() : undefined))
+}
+
 async function createWindow() {
   win = new BrowserWindow({
     width: 1200,
@@ -177,6 +243,7 @@ void app.whenReady().then(async () => {
   protocol.handle('app', serve)
   grants = await loadGrants(join(app.getPath('userData'), 'kept-files.json'))
   handleFiles(grants)
+  handleAuth(desktopAuth())
   setAppMenu(() => win?.webContents.send(IPC.menuOpen))
   await createWindow()
   // Books from before `ready`, and from the command line (`electron . book.epub`).

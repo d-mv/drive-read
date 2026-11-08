@@ -5,14 +5,17 @@ Mac only. It reads local EPUB, FB2 and PDF files where they sit, is the default 
 once chosen in Finder, appears in "Open With" for `.pdf`, `.fb2` and `.fbz`, and syncs reading
 positions for local files through Drive. Related: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-**Status (v0.21.0, 2026-10-19):** phases 0, 1, 2, 4 and 5 are done. Phase 3 (Google sign-in in
-the desktop app) waits for a "Desktop app" OAuth client from the owner; until then Drive
-browsing and sync do not work in the desktop app, and local books work fully.
+**Status (v0.25.0, 2026-11-08):** all phases are built. Phase 3 (Google sign-in) is tested
+against a fake Google; it works for real once `.env` has the owner's "Desktop app" OAuth client
+(`DESKTOP_GOOGLE_CLIENT_ID`, `DESKTOP_GOOGLE_CLIENT_SECRET`). Without it, Connect Google Drive
+reports that sign-in is unavailable, and local books work fully.
 
 ## Build and install
 
 Needs Bun, the repo's dependencies (`bun install`) and a `.env` with `VITE_GOOGLE_CLIENT_ID`
-(and `VITE_LOGGER_INGEST_KEY` for logs), as for the web app.
+(and `VITE_LOGGER_INGEST_KEY` for logs), as for the web app, plus `DESKTOP_GOOGLE_CLIENT_ID` and
+`DESKTOP_GOOGLE_CLIENT_SECRET` for Drive sign-in (Google Cloud Console → Credentials → Create
+OAuth client ID → Desktop app, in the web client's project).
 
 ```sh
 bun run desktop:package -- --install   # build, sign ad hoc, copy to /Applications
@@ -26,9 +29,9 @@ bun run test:desktop                   # desktop end-to-end tests
 - **EPUB default:** macOS keeps the current EPUB app until you change it once: select an EPUB in
   Finder → File › Get Info → Open with: Drive Read → Change All. The Library shows these steps
   once.
-- **Keychain:** an ad-hoc signature changes with every build. Once desktop sign-in (phase 3)
-  stores its token in the keychain, macOS will ask once after each rebuild whether Drive Read
-  may use it.
+- **Keychain:** an ad-hoc signature changes with every build, so macOS asks once after each
+  rebuild whether Drive Read may use its keychain entry (the key that encrypts the Drive
+  sign-in).
 - **Web deploys:** `.dockerignore` keeps `desktop/out` and `desktop/release` out of the web
   image, but the deploy skill's rsync uploads the repo, so move `desktop/release` (about 300 MB)
   aside while deploying.
@@ -57,9 +60,11 @@ desktop/
   files.ts       kept-file allowlist (kept-files.json), reading, MD5
   opens.ts       queue for files that arrive before the page listens; launch arguments
   menu.ts        File › Open… (⌘O) and Open Recent
+  auth.ts        Google sign-in: loopback + PKCE, refresh token encrypted with safeStorage
   build.ts       bun build: main (ESM) and preload (CJS) into desktop/out/
   e2e/           Playwright `_electron` tests
 src/shared/desktop.ts               the bridge contract and IPC channel names
+src/services/auth/desktop.ts        `Services.gis` in the desktop app: sign-in through the bridge
 src/services/storage/localFiles.ts  `Services.files`: keep, read, md5 (null on the web)
 src/app/desktopOpen.ts              books from Finder, drop and the menu; the EPUB hint
 scripts/package-desktop.ts          `bun run desktop:package`
@@ -72,6 +77,15 @@ electron-builder.yml                .app layout, icon, document types
 - **Isolation:** `contextIsolation` and `sandbox` on, no Node in the page. Navigation away from
   the origin is blocked; web links open in the browser. The only permission granted is the
   screen wake lock. IPC is answered only for `app://drive-read/` and every argument is checked.
+- **Sign-in:** Google's OAuth flow for installed apps, run by main (`desktop/auth.ts`). Connect
+  opens Google's consent page in the system browser; Google redirects to a one-shot server on
+  `127.0.0.1` (random port, closed after one reply or 5 minutes), and only a reply carrying the
+  request's `state` counts. The code is exchanged with PKCE (S256). The refresh token stays in
+  main, encrypted with `safeStorage` (the keychain) in `drive-sign-in.bin` in the app profile;
+  without a keychain it is not saved. The page asks main for access tokens over IPC
+  (`auth:connect`, `auth:token`, `auth:disconnect`) and renews them without a tap, also after a
+  401. Disconnect revokes the refresh token at Google and deletes the file. A test run's
+  `DR_FAKE_GOOGLE` (dev only) points at a local fake, without the browser or the keychain.
 - **Launch hardening:** the packaged app's Electron fuses (`electron-builder.yml`) turn off
   `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect`, and load only the integrity-checked
   `app.asar`, so another process cannot run its own code as Drive Read (and use its macOS folder
@@ -110,7 +124,7 @@ electron-builder.yml                .app layout, icon, document types
 | 0 | Spike: the web build in Electron over `app://` | Done (v0.14.1); spike removed |
 | 1 | Desktop shell, local files read in place, "Locate file…" | Done (v0.15.0) |
 | 2 | File types, single instance, Finder / Dock / drop / File › Open…, Recents, EPUB hint | Done (v0.16.0); Finder opens checked on the packaged app |
-| 3 | Desktop OAuth (system browser, loopback redirect, PKCE) with the refresh token in the keychain (`safeStorage`) | Waiting for the owner's "Desktop app" OAuth client |
+| 3 | Desktop OAuth (system browser, loopback redirect, PKCE) with the refresh token in the keychain (`safeStorage`) | Built (v0.25.0); tested against a fake Google, real sign-in waits for the owner's "Desktop app" OAuth client in `.env` |
 | 4 | Local-file progress sync (MD5 match, `progress-local-*`) | Done (v0.17.0); end-to-end against Drive waits for phase 3 |
 | 5 | Local packaging and install | Done (v0.19.0). The `.dmg`, certificate and update check of v0.18.0 were removed: the app is never distributed |
 

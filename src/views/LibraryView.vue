@@ -35,7 +35,7 @@ const syncDismissed = ref(false)
 const online = useOnline()
 
 async function onSyncClick() {
-  if (isNone(auth.validToken())) {
+  if (isNone(await auth.validToken())) {
     const ok = await auth.connect()
     if (!ok) return
   }

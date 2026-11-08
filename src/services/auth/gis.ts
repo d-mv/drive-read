@@ -1,3 +1,4 @@
+import { DRIVE_SCOPES } from '@/shared/google'
 import { Err, Ok, type Result } from '@/shared/result'
 
 /**
@@ -5,11 +6,6 @@ import { Err, Ok, type Result } from '@/shared/result'
  * injected the first time a token is needed, never at boot, so the app starts with no network.
  * A token request must come from a user gesture (a tap); there is no refresh token.
  */
-
-export const DRIVE_SCOPES = [
-  'https://www.googleapis.com/auth/drive.readonly',
-  'https://www.googleapis.com/auth/drive.appdata',
-] as const
 
 export interface TokenGrant {
   accessToken: string
@@ -24,10 +20,16 @@ export type AuthError =
   | { kind: 'scopes-missing' }
   | { kind: 'unavailable' }
 
+/** Sign-in with Google: the web's token model here, the desktop OAuth flow in `./desktop`. */
 export interface Gis {
   requestToken(): Promise<Result<TokenGrant, AuthError>>
-  /** Withdraws the app's access granted with this token. Best effort: always settles. */
-  revoke(accessToken: string): Promise<void>
+  /**
+   * Desktop only: a token from the saved sign-in, without asking the user. `renew`: Drive refused
+   * the last one, so get a new one instead of the one cached.
+   */
+  silentToken?(renew: boolean): Promise<Result<TokenGrant, AuthError>>
+  /** Withdraws the app's access (granted with this token, if any). Best effort: always settles. */
+  revoke(accessToken: string | null): Promise<void>
 }
 
 interface GisTokenResponse {
@@ -112,7 +114,7 @@ export function createGis(clientId: string, now: () => number = Date.now): Gis {
       })
     },
     async revoke(accessToken) {
-      if (!clientId) return
+      if (!clientId || !accessToken) return
       try {
         const google = await loadScript()
         await Promise.race([

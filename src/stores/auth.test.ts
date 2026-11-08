@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { USER_KEY } from '@/app/identity'
+import type { Gis } from '@/services/auth/gis'
 import type { DriveFile } from '@/services/drive/client'
 import { logger } from '@/services/logger'
 
@@ -23,7 +24,7 @@ describe('auth', () => {
     const auth = useAuth()
     auth.restore()
     expect(auth.status).toBe('disconnected')
-    expect(auth.validToken()).toEqual(None)
+    expect(await auth.validToken()).toEqual(None)
   })
 
   it('connects and keeps the token for this tab', async () => {
@@ -34,12 +35,12 @@ describe('auth', () => {
     const auth = useAuth()
     expect(await auth.connect()).toBe(true)
     expect(auth.status).toBe('connected')
-    expect(auth.validToken()).toEqual(Some('tok'))
+    expect(await auth.validToken()).toEqual(Some('tok'))
 
     setActivePinia(createPinia())
     const reloaded = useAuth()
     reloaded.restore()
-    expect(reloaded.validToken()).toEqual(Some('tok'))
+    expect(await reloaded.validToken()).toEqual(Some('tok'))
   })
 
   it('reports why connecting failed', async () => {
@@ -56,7 +57,7 @@ describe('auth', () => {
     gis.requestToken.mockResolvedValue(Ok({ accessToken: 'tok', expiresAt: Date.now() + 30_000 }))
     const auth = useAuth()
     await auth.connect()
-    expect(auth.validToken()).toEqual(None)
+    expect(await auth.validToken()).toEqual(None)
     expect(auth.status).toBe('expired')
   })
 
@@ -162,7 +163,7 @@ describe('connecting a different Google account on this device', () => {
     const auth = useAuth()
     expect(await auth.connect()).toBe(false)
     expect(ask).toHaveBeenCalledOnce()
-    expect(auth.validToken()).toEqual(None)
+    expect(await auth.validToken()).toEqual(None)
     expect(sessionStorage.getItem('drive-read:token')).toBeNull()
     expect(localStorage.getItem(USER_KEY)).toBe('u_ba7816bf8f01cfea')
     expect(useLibrary().books.map((b) => b.id)).toEqual(['book-a'])
@@ -179,7 +180,7 @@ describe('connecting a different Google account on this device', () => {
     )
     const auth = useAuth()
     expect(await auth.connect()).toBe(true)
-    expect(auth.validToken()).toEqual(Some('tok'))
+    expect(await auth.validToken()).toEqual(Some('tok'))
     expect(useLibrary().books).toEqual([])
     expect(await services.db.allBooks()).toEqual([])
     const meta = await services.db.getSyncMeta()
@@ -204,7 +205,7 @@ describe('disconnect', () => {
     await auth.disconnect()
     expect(gis.revoke).toHaveBeenCalledWith('tok')
     expect(auth.status).toBe('disconnected')
-    expect(auth.validToken()).toEqual(None)
+    expect(await auth.validToken()).toEqual(None)
     expect(sessionStorage.getItem('drive-read:token')).toBeNull()
     expect(localStorage.getItem('drive-read:drive-connected')).toBeNull()
     expect(localStorage.getItem(USER_KEY)).toBe(account)
@@ -214,5 +215,76 @@ describe('disconnect', () => {
     const reloaded = useAuth()
     reloaded.restore()
     expect(reloaded.status).toBe('disconnected')
+  })
+})
+
+describe('desktop sign-in', () => {
+  const grant = (accessToken: string, ms = 3_600_000) =>
+    Ok({ accessToken, expiresAt: Date.now() + ms })
+
+  async function desktop() {
+    const ctx = await setupServices()
+    ctx.gis.silentToken = vi.fn<NonNullable<Gis['silentToken']>>(async () => grant('silent'))
+    return { ...ctx, silent: ctx.gis.silentToken }
+  }
+
+  it('connects at start from the saved sign-in, without a tap', async () => {
+    const { silent } = await desktop()
+    localStorage.setItem('drive-read:drive-connected', '1')
+    const auth = useAuth()
+    auth.restore()
+    await vi.waitFor(() => expect(auth.status).toBe('connected'))
+    expect(silent).toHaveBeenCalledWith(false)
+    expect(await auth.validToken()).toEqual(Some('silent'))
+  })
+
+  it('renews a stale token silently', async () => {
+    const { gis, silent } = await desktop()
+    gis.requestToken.mockResolvedValue(grant('first', 30_000))
+    const auth = useAuth()
+    await auth.connect()
+    expect(await auth.validToken()).toEqual(Some('silent'))
+    expect(auth.status).toBe('connected')
+    expect(silent).toHaveBeenCalledOnce()
+  })
+
+  it('asks for a new token, not the cached one, after Drive refused it', async () => {
+    const { gis, silent } = await desktop()
+    gis.requestToken.mockResolvedValue(grant('first'))
+    const auth = useAuth()
+    await auth.connect()
+    auth.markExpired('api')
+    expect(await auth.validToken()).toEqual(Some('silent'))
+    expect(silent).toHaveBeenCalledWith(true)
+  })
+
+  it('shows Reconnect when the saved sign-in is gone', async () => {
+    const { gis, silent } = await desktop()
+    gis.requestToken.mockResolvedValue(grant('first', 30_000))
+    silent.mockResolvedValue(Err({ kind: 'denied' }))
+    const auth = useAuth()
+    await auth.connect()
+    expect(await auth.validToken()).toEqual(None)
+    expect(auth.status).toBe('expired')
+  })
+
+  it('never asks the web app for a silent token', async () => {
+    await setupServices()
+    localStorage.setItem('drive-read:drive-connected', '1')
+    const auth = useAuth()
+    auth.restore()
+    expect(await auth.validToken()).toEqual(None)
+    expect(auth.status).toBe('expired')
+  })
+
+  it('Disconnect withdraws the saved sign-in even with no token in memory', async () => {
+    const { gis, silent } = await desktop()
+    silent.mockResolvedValue(Err({ kind: 'unavailable' }))
+    localStorage.setItem('drive-read:drive-connected', '1')
+    const auth = useAuth()
+    auth.restore()
+    await auth.disconnect()
+    expect(gis.revoke).toHaveBeenCalledWith(null)
+    expect(auth.status).toBe('disconnected')
   })
 })

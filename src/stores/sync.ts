@@ -156,8 +156,8 @@ export const useSync = defineStore('sync', () => {
     timer = setTimeout(() => void push(), IDLE_MS)
   }
 
-  function token(): string | null {
-    const t = useAuth().validToken()
+  async function token(): Promise<string | null> {
+    const t = await useAuth().validToken()
     if (isNone(t)) {
       status.value = 'reconnect'
       return null
@@ -337,7 +337,7 @@ export const useSync = defineStore('sync', () => {
    */
   async function run(full: boolean, opts: { keepalive?: boolean } = {}) {
     clearTimeout(timer)
-    const tok = token()
+    const tok = await token()
     if (!tok) return
     await withLock(async () => {
       status.value = 'syncing'

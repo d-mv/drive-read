@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { authErrorCopy } from '@/app/copy'
 import { openNotice } from '@/app/desktopOpen'
 import { useImportFiles } from '@/app/useImportFiles'
+import { isSome } from '@/shared/result'
 import { useAuth } from '@/stores/auth'
 
 /** First run (canvas: "First run, connect Drive"). */
@@ -11,8 +12,10 @@ const router = useRouter()
 const auth = useAuth()
 const { busy, message, pick } = useImportFiles()
 
+/** Already connected (the desktop app's saved sign-in, or a token from this tab): no prompt. */
 async function connect() {
-  if (await auth.connect()) await router.push({ name: 'drive' })
+  if (isSome(await auth.validToken()) || (await auth.connect()))
+    await router.push({ name: 'drive' })
 }
 
 async function openFile() {

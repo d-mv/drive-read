@@ -221,8 +221,10 @@ app asks for an access token on a tap, keeps it in memory and sessionStorage unt
 keep working without a token.
 
 The desktop app cannot use this flow: Google does not accept `app://drive-read` as an origin.
-Its own sign-in (the desktop OAuth flow with a refresh token) is phase 3 in
-[`DESKTOP.md`](DESKTOP.md) and not built yet, so for now the desktop app reads local books only.
+It signs in with Google's flow for installed apps instead (system browser, loopback redirect,
+PKCE), and keeps a refresh token in the keychain, so it renews access tokens without a tap
+(`gis.silentToken`; `validToken()` is async for this). See "Sign-in" in
+[`DESKTOP.md`](DESKTOP.md).
 
 | Scope | Why | Google's class |
 | --- | --- | --- |

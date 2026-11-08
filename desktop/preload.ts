@@ -24,6 +24,9 @@ const bridge: DesktopBridge = {
   onMenuOpen(cb) {
     ipcRenderer.on(IPC.menuOpen, () => cb())
   },
+  connect: () => ipcRenderer.invoke(IPC.authConnect),
+  token: (renew) => ipcRenderer.invoke(IPC.authToken, renew === true),
+  disconnect: () => ipcRenderer.invoke(IPC.authDisconnect),
 }
 
 contextBridge.exposeInMainWorld(BRIDGE_KEY, bridge)

@@ -93,7 +93,7 @@ export const useDriveBrowser = defineStore('driveBrowser', () => {
     isCurrent: () => boolean = () => true,
   ): Promise<T | null> {
     const auth = useAuth()
-    const token = auth.validToken()
+    const token = await auth.validToken()
     if (isNone(token)) {
       status.value = { kind: 'reconnect' }
       return null

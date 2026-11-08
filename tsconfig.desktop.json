@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "types": ["bun"]
   },
-  "include": ["desktop/**/*.ts", "src/shared/desktop.ts", "csp.ts"]
+  "include": ["desktop/**/*.ts", "src/shared/desktop.ts", "src/shared/google.ts", "e2e/fake-google.ts", "csp.ts"]
 }

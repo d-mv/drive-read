@@ -12,6 +12,22 @@ export type DesktopReadResult =
   | { ok: true; bytes: Uint8Array<ArrayBuffer> }
   | { ok: false; reason: DesktopReadError }
 
+/**
+ * Google sign-in in main (the desktop OAuth flow). The page only ever sees short-lived access
+ * tokens; the refresh token stays in main, encrypted in the keychain.
+ * `signed-out`: no saved sign-in, or Google no longer accepts it.
+ */
+export type DesktopAuthError =
+  | 'cancelled'
+  | 'denied'
+  | 'scopes-missing'
+  | 'unavailable'
+  | 'signed-out'
+
+export type DesktopAuthReply =
+  | { ok: true; accessToken: string; expiresAt: number }
+  | { ok: false; reason: DesktopAuthError }
+
 export interface DesktopBridge {
   /** Lets main read this file from now on. Its absolute path, or null when it isn't on disk. */
   keep(file: File): Promise<string | null>
@@ -26,6 +42,12 @@ export interface DesktopBridge {
   onOpenPaths(cb: (paths: string[]) => void): void
   /** File › Open… (⌘O) in the app menu. */
   onMenuOpen(cb: () => void): void
+  /** Signs in with Google in the system browser and saves the sign-in. */
+  connect(): Promise<DesktopAuthReply>
+  /** An access token from the saved sign-in, without asking. `renew`: not the cached one. */
+  token(renew: boolean): Promise<DesktopAuthReply>
+  /** Withdraws the app's access at Google and forgets the saved sign-in. */
+  disconnect(): Promise<void>
 }
 
 export const BRIDGE_KEY = 'driveReadDesktop'
@@ -41,6 +63,9 @@ export const IPC = {
   ready: 'files:ready',
   /** main → page: File › Open… */
   menuOpen: 'menu:open',
+  authConnect: 'auth:connect',
+  authToken: 'auth:token',
+  authDisconnect: 'auth:disconnect',
 } as const
 
 declare global {

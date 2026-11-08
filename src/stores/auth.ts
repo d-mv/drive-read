@@ -18,7 +18,8 @@ import { useSync } from './sync'
 
 /**
  * The Drive access token (architecture doc, "Token lifecycle"): in memory and in sessionStorage,
- * so a reload within its lifetime needs no prompt. A new token always needs a tap (connect()).
+ * so a reload within its lifetime needs no prompt. On the web a new token always needs a tap
+ * (connect()); the desktop app renews it from its saved sign-in (`gis.silentToken`).
  */
 const TOKEN_KEY = 'drive-read:token'
 const CONNECTED_KEY = 'drive-read:drive-connected'
@@ -57,6 +58,9 @@ export const useAuth = defineStore('auth', () => {
   const busy = ref(false)
   /** Bumped when validToken() finds the token stale, so `status` recomputes. */
   const tick = ref(0)
+  /** Drive refused the token: the next silent renewal must not hand back the cached one. */
+  let refused = false
+  let renewing: Promise<Option<string>> | null = null
 
   const fresh = (t: TokenGrant | null) => !!t && t.expiresAt - SAFETY_MS > Date.now()
 
@@ -73,6 +77,9 @@ export const useAuth = defineStore('auth', () => {
       token.value = t
       // Connected before identification existed (or storage was cleared): identify now.
       if (!loadUserId()) void identify(t!.accessToken)
+    } else if (everConnected.value) {
+      // Desktop: connect from the saved sign-in at start.
+      void validToken()
     }
   }
 
@@ -91,12 +98,9 @@ export const useAuth = defineStore('auth', () => {
       const account = await accountOf(r.value.accessToken)
       if (!(await sameAccountOrReset(account))) return false
       const first = !everConnected.value
-      token.value = r.value
+      keep(r.value)
       everConnected.value = true
-      safely(() => {
-        sessionStorage.setItem(TOKEN_KEY, JSON.stringify(r.value))
-        localStorage.setItem(CONNECTED_KEY, '1')
-      })
+      safely(() => localStorage.setItem(CONNECTED_KEY, '1'))
       track('auth.connected', { first })
       if (account) setUser(account.userId)
       return true
@@ -140,6 +144,13 @@ export const useAuth = defineStore('auth', () => {
     }
   }
 
+  function keep(t: TokenGrant) {
+    token.value = t
+    refused = false
+    tick.value++
+    safely(() => sessionStorage.setItem(TOKEN_KEY, JSON.stringify(t)))
+  }
+
   function setUser(userId: string) {
     saveUserId(userId)
     logger.setIdentity({ userId })
@@ -165,19 +176,32 @@ export const useAuth = defineStore('auth', () => {
       localStorage.removeItem(CONNECTED_KEY)
     })
     track('auth.disconnected', {})
-    if (t) await useServices().gis.revoke(t.accessToken)
+    await useServices().gis.revoke(t?.accessToken ?? null)
   }
 
-  /** The token if it is still good; a stale one is dropped. */
-  function validToken(): Option<string> {
+  /**
+   * The token if it is still good. A stale one is dropped; the desktop app then renews it from
+   * the saved sign-in, without a tap.
+   */
+  async function validToken(): Promise<Option<string>> {
     if (fresh(token.value)) return Some(token.value!.accessToken)
     if (token.value) markExpired('expiry')
-    return None
+    const silent = useServices().gis.silentToken
+    if (!silent || !everConnected.value) return None
+    renewing ??= (async () => {
+      const r = await silent(refused)
+      if (r._tag === 'Err' || !fresh(r.value)) return None
+      keep(r.value)
+      if (!loadUserId()) void identify(r.value.accessToken)
+      return Some(r.value.accessToken)
+    })().finally(() => (renewing = null))
+    return renewing
   }
 
   /** After a 401 or a passed expiry. `where` says which call found out. */
   function markExpired(where = 'api') {
     if (token.value) track('auth.expired', { where })
+    if (where !== 'expiry') refused = true
     token.value = null
     if (!everConnected.value) everConnected.value = true
     tick.value++

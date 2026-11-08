@@ -2,6 +2,17 @@
 
 Conservative choices and deviations from the architecture doc, newest first.
 
+## 2026-11-08: Desktop sign-in (v0.25.0)
+
+- **Main does the whole OAuth flow** (`desktop/auth.ts`): the refresh token never reaches the page, which gets access tokens over IPC. The page side is a second `Gis` (`services/auth/desktop.ts`) with an optional `silentToken`.
+- **`validToken()` is async** so the desktop app can renew a token where it is needed; the web app still answers at once and never renews.
+- **`prompt=consent` on every connect**, so Google always returns a refresh token (it omits it on a repeat consent otherwise).
+- **The client secret is baked into main** by `desktop/build.ts` (`define`), not read at run time. Google treats a desktop client's secret as not confidential, and the app is never distributed.
+- **The welcome screen's Connect reuses a valid token**: with an empty library the app opens on the welcome screen even when signed in, and Connect would otherwise open the browser again. The web app gains the same (a token from this tab skips the popup).
+- **Test runs (`DR_FAKE_GOOGLE`) skip the browser and the keychain**: the fake's consent URL is fetched by main, and the vault stores plain text. The `safeStorage` vault is covered by unit tests with a fake cipher.
+- **Known limitation:** if the browser tab is closed without finishing, the app shows "Connecting…" until the 5-minute wait ends, because the Connect buttons are disabled while busy.
+- **Not tested against real Google yet:** waits for the owner's "Desktop app" client in `.env`.
+
 ## 2026-10-20: Read aloud (v0.22.0)
 
 - **Asked for by the owner** for non-PDF books. EPUB and FB2 only: PDF text has no block structure to read by.

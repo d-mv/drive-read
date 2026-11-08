@@ -10,6 +10,7 @@ import { createApp } from 'vue'
 
 import { provideServices } from '@/services'
 import { track } from '@/services/events'
+import { desktopGis } from '@/services/auth/desktop'
 import { createGis } from '@/services/auth/gis'
 import { createAppData } from '@/services/drive/appdata'
 import { createDriveApi } from '@/services/drive/client'
@@ -51,7 +52,9 @@ async function start() {
     bookId: localBookId,
     now: () => new Date(),
     device: currentDeviceValue,
-    gis: createGis(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''),
+    gis: window.driveReadDesktop
+      ? desktopGis(window.driveReadDesktop)
+      : createGis(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''),
     drive: createDriveApi(),
     appdata: createAppData(),
     files: window.driveReadDesktop ? desktopFiles(window.driveReadDesktop) : null,
